@@ -1,4 +1,4 @@
-/* Құран оқу мектебі — клиентская часть. Без зависимостей. */
+/* Iqra — онлайн-курс чтения Корана. Клиентская часть без зависимостей. */
 (() => {
 "use strict";
 
@@ -6,10 +6,13 @@
 const KEY = "qoqu.v1";
 const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const blank = () => ({ lang: null, theme: null, xp: 0, days: {}, lessons: {}, ex: {}, tests: {},
-  badges: {}, hifz: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true } });
+  badges: {}, hifz: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true, tl: true },
+  last: null, listen: { r: "mishary-alafasy/r1", s: 1 }, at: 0 });
 let S = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch (e) {}
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+S.view = Object.assign({ color: true, tr: true, tl: true }, S.view);
+let onSave = null;
+const save = () => { S.at = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} if (onSave) onSave(); };
 
 /* ═════════════ язык и тема ═════════════ */
 if (!S.lang) S.lang = /^ru/i.test(navigator.language || "") ? "ru" : "kk";
@@ -19,10 +22,11 @@ applyTheme();
 const isDark = () => S.theme ? S.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
 
 const UI = {
-  brand: ["Құран оқу мектебі", "Школа чтения Корана"],
-  brandSub: ["нөлден тәжуидке дейін", "с нуля до таджвида"],
+  brand: ["Iqra", "Iqra"],
+  brandSub: ["Құранды нөлден оқу", "Коран с нуля"],
   home: ["Басты", "Главная"], course: ["Курс", "Курс"], ref: ["Анықтама", "Справочник"],
-  suras: ["Сүрелер", "Суры"], practice: ["Жаттығу", "Практика"], me: ["Менің жолым", "Мой путь"],
+  suras: ["Құран", "Коран"], practice: ["Жаттығу", "Практика"], me: ["Профиль", "Профиль"],
+  listen: ["Тыңдау", "Слушать"],
   heroTitle: ["Құранды оқуды нөлден үйреніңіз", "Научитесь читать Коран с нуля"],
   heroLead: ["Араб әріптерінен бастап тәжуидпен оқуға дейін — 110 қысқа сабақ, жаттығулар және қарилардың дауысы.",
     "От арабских букв до чтения с таджвидом — 110 коротких уроков, упражнения и голоса чтецов."],
@@ -89,8 +93,31 @@ const UI = {
   ayahN: ["аят", "аят"], playAll: ["Барлығын тыңдау", "Слушать всё"],
   stopAt: ["Тоқтағанда", "При остановке"],
   welcomeBack: ["Қош келдіңіз!", "С возвращением!"],
-  footer: ["Құран мәтіні — османдық жазу, Хафс риуаяты. Аудио: EveryAyah және Quran.com.",
-    "Текст Корана — усманский рисм, риваят Хафс. Аудио: EveryAyah и Quran.com."],
+  tl: ["Аударма", "Перевод"], tlBy: ["Мағына аудармасы: Халифа Алтай", "Перевод смыслов: Эльмир Кулиев"],
+  tlErr: ["Аударма жүктелмеді. Интернетті тексеріңіз.", "Перевод не загрузился. Проверьте интернет."],
+  search: ["Іздеу: атауы не нөмірі", "Поиск: название или номер"],
+  all: ["Барлығы", "Все"], juz30: ["30-жүз", "Джуз 30"], started: ["Басталғандар", "Начатые"],
+  mecca: ["Мекке", "Мекка"], medina: ["Медине", "Медина"], nothing: ["Ештеңе табылмады", "Ничего не найдено"],
+  contRead: ["Оқуды жалғастыру", "Продолжить чтение"], quranLead: ["114 сүре: тәжуид түстері, оқылуы, мағына аудармасы және әр аяттың аудиосы.", "114 сур: цвета таджвида, транскрипция, перевод смыслов и аудио каждого аята."],
+  listenLead: ["Қарини таңдап, сүрені толық тыңдаңыз. Басқа беттерге өтсеңіз де, дыбыс тоқтамайды.", "Выберите чтеца и слушайте суры целиком. Звук не прерывается при переходе по сайту."],
+  reciters: ["Қарилар", "Чтецы"], teach: ["үйретуші", "обучающее"], mujawwad: ["мужәууад", "муджаввад"],
+  ref2: ["Анықтама: әліпби, тәжуид, махраж", "Справочник: алфавит, таджвид, махрадж"],
+  sayName: ["Атын тыңдау", "Название"], syll: ["Буындар", "Слоги"],
+  ttsNote: ["Әріп аты мен буындарды құрылғының араб дауысы оқиды. Сөз мысалдарын — қари оқиды.", "Название буквы и слоги читает арабский голос устройства. Примеры слов — голос чтеца."],
+  noTts: ["Құрылғыда араб дауысы табылмады — қари оқыған мысал қосылады.", "На устройстве нет арабского голоса — включаю пример в исполнении чтеца."],
+  acc: ["Аккаунт", "Аккаунт"], signIn: ["Кіру", "Войти"], signUp: ["Тіркелу", "Регистрация"],
+  google: ["Google арқылы кіру", "Войти через Google"], email: ["Электрондық пошта", "Электронная почта"], password: ["Құпиясөз (кемінде 6 таңба)", "Пароль (не меньше 6 символов)"],
+  forgot: ["Құпиясөзді ұмыттым", "Забыли пароль?"], signOut: ["Шығу", "Выйти"], orDiv: ["немесе", "или"],
+  haveAcc: ["Аккаунтым бар — кіру", "Уже есть аккаунт — войти"], noAcc: ["Аккаунт жоқ — тіркелу", "Нет аккаунта — регистрация"],
+  synced: ["Прогресс бұлтта сақталады: телефонда да, компьютерде де бірдей.", "Прогресс хранится в облаке: одинаково на телефоне и компьютере."],
+  accWhy: ["Аккаунт ашсаңыз, прогресс жоғалмайды және барлық құрылғыда бірдей болады.", "С аккаунтом прогресс не потеряется и будет одинаковым на всех устройствах."],
+  accSoon: ["Аккаунттар жақында қосылады. Әзірге прогресс осы құрылғыда сақталады.", "Аккаунты скоро появятся. Пока прогресс хранится на этом устройстве."],
+  resetSent: ["Құпиясөзді қалпына келтіру сілтемесі поштаңызға жіберілді.", "Ссылка для сброса пароля отправлена на почту."],
+  needEmail: ["Алдымен поштаңызды жазыңыз.", "Сначала введите почту."], hello: ["Сәлем", "Здравствуйте"],
+  authErr: ["Кіру сәтсіз аяқталды", "Не удалось войти"], syncOk: ["Прогресс синхрондалды", "Прогресс синхронизирован"],
+  install: ["Телефонға орнату", "Установить на телефон"],
+  footer: ["Құран мәтіні — османдық жазу, Хафс риуаяты (Tanzil). Мағына аудармасы — Халифа Алтай. Аудио: EveryAyah, Quran.com, mp3quran.net.",
+    "Текст Корана — усманский рисм, риваят Хафс (Tanzil). Перевод смыслов — Эльмир Кулиев. Аудио: EveryAyah, Quran.com, mp3quran.net."],
   footer2: ["Бұл курс оқуды үйретеді; мағынасын білу үшін сенімді тәпсірді оқыңыз. Мүмкіндігінше оқуыңызды ұстазға тексертіңіз.",
     "Курс учит чтению; для понимания смысла читайте надёжный тафсир. По возможности проверяйте чтение у преподавателя."],
 };
@@ -113,7 +140,7 @@ const h = (tag, attrs = {}, ...kids) => {
   for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
   return el;
 };
-const AR_RUN = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF](?:[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF\s\-+=]*[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF])?/g;
+const AR_RUN = /[\u0600-\u06FF\u0750-\u077F\u08F0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF](?:[\u0600-\u06FF\u0750-\u077F\u08F0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\s\-+=]*[\u0600-\u06FF\u0750-\u077F\u08F0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF])?/g;
 const md = s => {
   s = esc(L(s));
   const keep = [];
@@ -154,7 +181,15 @@ const I = {
   alert: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>', bridge: '<path d="M3 17h18M5 17V9a7 7 0 0 1 14 0v8M9 17v-5M15 17v-5"/>',
   repeat: '<path d="M4 12a7 7 0 0 1 12-5l3 3M20 12a7 7 0 0 1-12 5l-3-3"/><path d="M19 4v6h-6M5 20v-6h6"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  prevT: '<path d="M6 5v14"/><path d="M19 5.5v13L9 12z" fill="currentColor" stroke="none"/>',
+  nextT: '<path d="M18 5v14"/><path d="M5 5.5v13L15 12z" fill="currentColor" stroke="none"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
+  headph: '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3.5" y="14" width="4.5" height="7" rx="1.5"/><rect x="16" y="14" width="4.5" height="7" rx="1.5"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5L12 13l8.5-6.5"/>',
+  out: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 16l-4-4 4-4M6 12h10"/>',
+  cloud: '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4.25 4.25 0 0 1-.5 8.5z"/>',
 };
+const GOOGLE_G = '<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 const icon = (n, cls = "") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 // восьмиконечная розетка (как знак конца аята / руб-уль-хизб)
 const ROS = '<svg viewBox="0 0 100 100" aria-hidden="true"><g fill="currentColor"><rect x="18" y="18" width="64" height="64" rx="6"/><rect x="18" y="18" width="64" height="64" rx="6" transform="rotate(45 50 50)"/></g><circle cx="50" cy="50" r="27" fill="none" stroke="var(--surface)" stroke-width="2.5" opacity=".55"/></svg>';
@@ -166,11 +201,26 @@ let CORE = null, COURSE = null;
 const LESSONS = {};
 const fetchJSON = u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.json(); });
 async function loadModule(m) {
-  if (!LESSONS[m]) LESSONS[m] = fetchJSON(`lessons-m${m}.json`).catch(() => []);
+  if (!LESSONS[m]) LESSONS[m] = fetchJSON(`data/lessons-m${m}.json`).catch(() => []);
   return LESSONS[m];
 }
 const letterBy = ar => CORE.letters.find(x => x.ar === ar);
 const suraBy = n => CORE.suras.find(s => s.n === +n);
+// тексты сур подгружаются по одной: quran/001.json …
+const SURA_P = {}, SURA_D = {};
+const loadSura = n => SURA_P[n] || (SURA_P[n] = fetchJSON(`quran/${String(n).padStart(3, "0")}.json`)
+  .then(d => (SURA_D[n] = d)).catch(e => { delete SURA_P[n]; throw e; }));
+// перевод смыслов: Кулиев (ru) и Халифа Алтай (kk) — api.alquran.cloud, запасной источник — jsDelivr
+const TL = {};
+function loadTl(n) {
+  const ru = S.lang === "ru", k = (ru ? "ru" : "kk") + n;
+  if (!TL[k]) TL[k] = fetch(`https://api.alquran.cloud/v1/surah/${n}/${ru ? "ru.kuliev" : "kk.khalifahaltai"}`)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => j.data.ayahs.map(a => a.text))
+    .catch(() => fetchJSON(`https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/${ru ? "rus-elmirkuliev" : "kaz-khalifahaltai"}/${n}.json`).then(j => j.chapter.map(a => a.text)))
+    .then(a => a.map(t => String(t).replace(/\r/g, "").trim()))
+    .catch(e => { delete TL[k]; throw e; });
+  return TL[k];
+}
 const moduleOf = n => COURSE.modules.find(m => n >= m.from && n <= m.to);
 
 /* ═════════════ аудио ═════════════ */
@@ -195,6 +245,7 @@ function stopAudio() {
 function playURL(url, el, rate = 1) {
   return new Promise(res => {
     stopAudio();
+    if (LP && !LP.a.paused) LP.a.pause();
     audioDone = res; audioEl = el || null;
     if (el) el.classList.add("playing");
     Audio1.src = url; Audio1.playbackRate = rate;
@@ -202,6 +253,94 @@ function playURL(url, el, rate = 1) {
     Audio1.onerror = () => { if (el) el.classList.remove("playing"); audioEl = null; audioDone = null; toast(T("audioErr")); res(false); };
     Audio1.play().catch(() => { if (audioDone === res) { audioDone = null; if (el) el.classList.remove("playing"); res(false); } });
   });
+}
+
+/* ───── озвучка букв: арабский голос устройства (Web Speech) ───── */
+const AR_NAMES = { "ا": "أَلِف", "ب": "بَاء", "ت": "تَاء", "ث": "ثَاء", "ج": "جِيم", "ح": "حَاء", "خ": "خَاء", "د": "دَال", "ذ": "ذَال", "ر": "رَاء",
+  "ز": "زَاي", "س": "سِين", "ش": "شِين", "ص": "صَاد", "ض": "ضَاد", "ط": "طَاء", "ظ": "ظَاء", "ع": "عَيْن", "غ": "غَيْن", "ف": "فَاء",
+  "ق": "قَاف", "ك": "كَاف", "ل": "لَام", "م": "مِيم", "ن": "نُون", "ه": "هَاء", "و": "وَاو", "ي": "يَاء", "ء": "هَمْزَة" };
+let arVoice;
+const findVoice = () => { if (!("speechSynthesis" in window)) return null; const v = speechSynthesis.getVoices(); return v.find(x => /^ar(-|_|$)/i.test(x.lang) && /SA|Maged|Majed|Tarik/i.test(x.lang + x.name)) || v.find(x => /^ar/i.test(x.lang)) || null; };
+if ("speechSynthesis" in window) { arVoice = findVoice(); speechSynthesis.onvoiceschanged = () => { arVoice = findVoice(); }; }
+function speakAr(text, el, fallbackLoc) {
+  stopAudio(); if (LP && !LP.a.paused) LP.a.pause();
+  if (!arVoice) arVoice = findVoice();
+  if (!arVoice) { if (fallbackLoc) { toast(T("noTts")); playURL(wordURL(fallbackLoc), el); } else toast(T("noTts")); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text); u.voice = arVoice; u.lang = arVoice.lang; u.rate = 0.75;
+  if (el) { el.classList.add("playing"); u.onend = u.onerror = () => el.classList.remove("playing"); }
+  speechSynthesis.speak(u);
+}
+
+/* ───── прослушивание сур целиком (mp3quran.net), не прерывается при переходах ───── */
+const MP3Q = "https://cdn.mp3quran.net/audio/";
+const LRECITERS = [
+  ["mishary-alafasy/r1", "Мишари Әл-Афаси", "Мишари Аль-Афаси"],
+  ["muhammad-minshawi/r3", "Миншауи — үйретуші", "Миншави — обучающее"],
+  ["mahmoud-husary/r1", "Махмұд Халил әл-Хусари", "Махмуд Халиль аль-Хусари"],
+  ["abdulbasit-abdulsamad/r3", "Абдулбасит Абдуссамад", "Абдул-Басит Абдус-Самад"],
+  ["muhammad-minshawi/r1", "Мұхаммед Сыддық әл-Миншауи", "Мухаммад Сиддик аль-Миншави"],
+  ["saad-ghamdi/r1", "Сағд әл-Ғамиди", "Саад аль-Гамиди"],
+  ["maher-muaiqly/r1", "Махир әл-Мұғайқли", "Махер аль-Муайкли"],
+  ["saud-shuraim/r1", "Сағуд әш-Шурайм", "Сауд аш-Шурайм"],
+  ["yasser-dosari/r1", "Ясир әд-Дәусари", "Ясир ад-Даусари"],
+  ["nasser-qatami/r1", "Насир әл-Қатами", "Насер аль-Катами"],
+  ["ahmad-ajmi/r1", "Ахмад әл-Ажми", "Ахмад аль-Аджми"],
+  ["muhammad-ayyub/r1", "Мұхаммед Әйюб", "Мухаммад Айюб"],
+  ["abdulbasit-abdulsamad/r1", "Абдулбасит — мужәууад", "Абдул-Басит — муджаввад"],
+  ["mahmoud-husary/r2", "Хусари — мужәууад", "Хусари — муджаввад"],
+];
+const recName = id => { const r = LRECITERS.find(x => x[0] === id) || LRECITERS[0]; return S.lang === "ru" ? r[2] : r[1]; };
+const fmtT = t => { if (!isFinite(t)) return "0:00"; t = Math.floor(t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0"); };
+let LP = null; // { a: Audio, bar: Element }
+function listenPlay(s, rec) {
+  if (rec) S.listen.r = rec;
+  S.listen.s = s; save();
+  stopAudio();
+  if (!LP) { const a = new Audio(); a.preload = "auto"; LP = { a }; a.onended = () => { if (S.listen.s < 114) listenPlay(S.listen.s + 1); else lpRender(); };
+    a.ontimeupdate = lpTick; a.onplay = a.onpause = () => { lpRender(); if (typeof onListenChange === "function") onListenChange(); };
+    a.onerror = () => { toast(T("audioErr")); lpRender(); }; }
+  LP.a.src = MP3Q + S.listen.r + "/" + String(s).padStart(3, "0") + ".mp3";
+  LP.a.playbackRate = S.listen.rate || 1;
+  LP.a.play().catch(() => {});
+  if ("mediaSession" in navigator) {
+    const su = suraBy(s);
+    navigator.mediaSession.metadata = new MediaMetadata({ title: `${s}. ${L(su.name)} — ${su.ar}`, artist: recName(S.listen.r), album: "Iqra",
+      artwork: [{ src: new URL("icon.svg", location.href).href, sizes: "any", type: "image/svg+xml" }] });
+    navigator.mediaSession.setActionHandler("previoustrack", () => S.listen.s > 1 && listenPlay(S.listen.s - 1));
+    navigator.mediaSession.setActionHandler("nexttrack", () => S.listen.s < 114 && listenPlay(S.listen.s + 1));
+    navigator.mediaSession.setActionHandler("play", () => LP.a.play());
+    navigator.mediaSession.setActionHandler("pause", () => LP.a.pause());
+  }
+  lpRender();
+}
+let onListenChange = null;
+function lpTick() {
+  const bar = $("#lp"); if (!bar || !LP) return;
+  const a = LP.a, r = $("input[type=range]", bar);
+  if (r && !r.matches(":active")) r.value = a.duration ? (a.currentTime / a.duration * 1000).toFixed(0) : 0;
+  const t = $(".lp-t", bar); if (t) t.textContent = fmtT(a.currentTime) + " / " + fmtT(a.duration);
+}
+function lpRender() {
+  let bar = $("#lp");
+  if (!LP || !LP.a.src) { if (bar) bar.remove(); document.body.classList.remove("has-lp"); return; }
+  if (!bar) { bar = h("div", { id: "lp", class: "lp", role: "region", "aria-label": T("listen") }); document.body.append(bar); }
+  document.body.classList.add("has-lp");
+  const s = suraBy(S.listen.s), a = LP.a;
+  bar.innerHTML = "";
+  const pp = h("button", { class: "lp-pp", title: a.paused ? T("play") : T("pause"), html: icon(a.paused ? "play" : "pause") });
+  pp.onclick = () => a.paused ? a.play() : a.pause();
+  const prev = h("button", { class: "lp-b", title: T("prev"), html: icon("prevT"), disabled: S.listen.s <= 1 }); prev.onclick = () => listenPlay(S.listen.s - 1);
+  const next = h("button", { class: "lp-b", title: T("next"), html: icon("nextT"), disabled: S.listen.s >= 114 }); next.onclick = () => listenPlay(S.listen.s + 1);
+  const range = h("input", { type: "range", min: 0, max: 1000, value: 0, "aria-label": T("listen") });
+  range.oninput = () => { if (a.duration) a.currentTime = range.value / 1000 * a.duration; };
+  const close = h("button", { class: "lp-b", title: T("cancel"), html: icon("close") });
+  close.onclick = () => { a.pause(); a.removeAttribute("src"); a.load(); lpRender(); };
+  bar.append(h("div", { class: "lp-in" },
+    h("a", { class: "lp-info", href: "#/listen" }, h("b", {}, `${s.n}. ${L(s.name)}`), h("small", {}, recName(S.listen.r))),
+    h("div", { class: "lp-ctl" }, prev, pp, next, close),
+    h("div", { class: "lp-seek" }, range, h("span", { class: "lp-t num" }, "0:00 / 0:00"))));
+  lpTick();
 }
 
 /* ═════════════ игровая часть ═════════════ */
@@ -242,7 +381,7 @@ const BADGES = [
 ];
 function doneCount() { return Object.values(S.lessons).filter(x => x && x.done).length; }
 function modDone(m) { if (!COURSE) return false; const M = COURSE.modules[m - 1]; for (let n = M.from; n <= M.to; n++) if (!(S.lessons[n] && S.lessons[n].done)) return false; return true; }
-function suraMemorized(n) { const s = CORE && suraBy(n); if (!s) return false; const st = S.hifz[n] || {}; return s.ayat.every(a => st[a.n]); }
+function suraMemorized(n) { const s = CORE && suraBy(n); if (!s) return false; const st = S.hifz[n] || {}; let k = 0; for (let a = 1; a <= s.c; a++) if (st[a]) k++; return k >= s.c; }
 function checkBadges() {
   if (!CORE || !COURSE) return;
   for (const [id, glyph, name] of BADGES) {
@@ -262,25 +401,26 @@ function toast(msg, glyph) {
 }
 
 /* ═════════════ оболочка ═════════════ */
-const NAV = [["#/", "home", "home"], ["#/course", "course", "path"], ["#/ref", "ref", "book"], ["#/suras", "suras", "quran"], ["#/practice", "practice", "target"]];
-const LOGO = `<svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="var(--primary)"><rect x="16" y="16" width="68" height="68" rx="8"/><rect x="16" y="16" width="68" height="68" rx="8" transform="rotate(45 50 50)"/></g><text x="50" y="66" text-anchor="middle" font-family="Amiri Quran, Amiri, serif" font-size="48" fill="var(--primary-ink)">ق</text></svg>`;
+const NAV = [["#/", "home", "home", 1], ["#/course", "course", "path", 1], ["#/suras", "suras", "quran", 1], ["#/listen", "listen", "headph", 1], ["#/practice", "practice", "target", 1], ["#/ref", "ref", "book", 0]];
+const LOGO = `<svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="var(--primary)"><rect x="16" y="16" width="68" height="68" rx="8"/><rect x="16" y="16" width="68" height="68" rx="8" transform="rotate(45 50 50)"/></g><text x="50" y="66" text-anchor="middle" font-family="Iqra Quran, Amiri Quran, serif" font-size="48" fill="var(--primary-ink)">ق</text></svg>`;
 function shell() {
   document.body.innerHTML = "";
   const top = h("header", { class: "top" }, h("div", { class: "top-in" },
-    h("a", { class: "brand", href: "#/", html: LOGO + `<span><b>${esc(T("brand"))}</b><small>${esc(T("brandSub"))}</small></span>` }),
+    h("a", { class: "brand", href: "#/", html: LOGO + `<span><b>Iqra <i class="ar" lang="ar">اقرأ</i></b><small>${esc(T("brandSub"))}</small></span>` }),
     h("nav", { class: "nav", "aria-label": "main" }, NAV.map(([href, k]) => h("a", { href, "data-k": k }, T(k)))),
     h("a", { class: "chip", href: "#/me", id: "topstats", title: T("me") }),
-    h("div", { class: "lang hide-m", role: "group", "aria-label": T("language") },
+    h("div", { class: "lang", role: "group", "aria-label": T("language") },
       ["kk", "ru"].map(l => h("button", { "aria-pressed": String(S.lang === l), onclick: () => setLang(l) }, l === "kk" ? "ҚАЗ" : "РУС"))),
     h("button", { class: "iconbtn hide-m", title: T("theme"), html: icon(isDark() ? "sun" : "moon"), onclick: toggleTheme }),
+    h("a", { class: "iconbtn avatar", href: "#/me", id: "avatar", title: T("me"), html: icon("user") }),
   ));
-  const tabbar = h("nav", { class: "tabbar", "aria-label": "main" }, NAV.map(([href, k, ic]) => h("a", { href, "data-k": k, html: icon(ic) + `<span>${esc(T(k))}</span>` })));
+  const tabbar = h("nav", { class: "tabbar", "aria-label": "main" }, NAV.filter(x => x[3]).map(([href, k, ic]) => h("a", { href, "data-k": k, html: icon(ic) + `<span>${esc(T(k))}</span>` })));
   const main = h("main", { id: "view", tabindex: "-1" });
   const foot = h("footer", { class: "site" }, h("p", {}, T("footer")), h("p", { style: "margin-top:6px" }, T("footer2")));
   document.body.append(top, main, foot, tabbar, toasts);
   document.documentElement.lang = S.lang === "ru" ? "ru" : "kk";
-  document.title = T("brand");
-  renderTopStats();
+  document.title = S.lang === "ru" ? "Iqra — учимся читать Коран с нуля" : "Iqra — Құранды нөлден оқып үйрену";
+  renderTopStats(); renderAvatar(); lpRender();
 }
 function renderTopStats() {
   const el = $("#topstats"); if (!el) return;
@@ -294,7 +434,8 @@ function markNav(k) { $$("[data-k]").forEach(a => { if (a.dataset.k === k) a.set
 
 /* ═════════════ маршрутизация ═════════════ */
 async function route() {
-  stopAudio();
+  stopAudio(); onListenChange = null;
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
   const view = $("#view");
   const parts = (location.hash.replace(/^#\/?/, "") || "").split("/").map(decodeURIComponent);
   const [p0, p1, p2] = parts;
@@ -306,9 +447,10 @@ async function route() {
     else if (p0 === "lesson") { markNav("course"); await pageLesson(view, +p1); }
     else if (p0 === "ref") { markNav("ref"); pageRef(view, p1, p2); }
     else if (p0 === "suras") { markNav("suras"); pageSuras(view); }
-    else if (p0 === "sura") { markNav("suras"); pageSura(view, +p1, p2 === "hifz"); }
+    else if (p0 === "sura") { markNav("suras"); await pageSura(view, +p1, p2 === "hifz", /^\d+$/.test(p2 || "") ? +p2 : 0); }
+    else if (p0 === "listen") { markNav("listen"); pageListen(view); }
     else if (p0 === "practice") { markNav("practice"); p1 ? pageTrainer(view, p1) : pagePractice(view); }
-    else if (p0 === "me") { markNav(""); pageMe(view); }
+    else if (p0 === "me") { markNav("me"); pageMe(view); }
     else notFound(view);
   } catch (e) { console.error(e); notFound(view); }
   view.focus({ preventScroll: true });
@@ -352,6 +494,12 @@ async function pageHome(v) {
     $(".next .ros", v).style.color = "var(--primary-ink)";
     $(".next .ros .rn", v).style.color = "var(--primary)";
   }
+
+  const lastS = S.last && suraBy(S.last.s);
+  v.append(h("section", { class: "section quick" },
+    h("a", { class: "qcard", href: lastS ? `#/sura/${lastS.n}/${S.last.a}` : "#/suras", html: `<span class="qi">${icon("quran")}</span><div><b>${esc(lastS ? T("contRead") : T("suras"))}</b><small>${esc(lastS ? `${L(lastS.name)} · ${S.last.a} ${T("ayahN")}` : (S.lang === "ru" ? "114 сур с переводом" : "114 сүре, аудармасымен"))}</small></div>` }),
+    h("a", { class: "qcard", href: "#/listen", html: `<span class="qi">${icon("headph")}</span><div><b>${esc(T("listen"))}</b><small>${esc(S.lang === "ru" ? "12 известных чтецов" : "12 танымал қари")}</small></div>` }),
+    h("a", { class: "qcard", href: "#/ref", html: `<span class="qi">${icon("book")}</span><div><b>${esc(T("ref"))}</b><small>${esc(S.lang === "ru" ? "Алфавит, таджвид, махрадж" : "Әліпби, тәжуид, махраж")}</small></div>` })));
 
   const mods = h("div", { class: "mods" });
   for (const M of COURSE.modules) {
@@ -402,6 +550,9 @@ async function pageLesson(v, n) {
   const list = await loadModule(M.id);
   const les = list.find(x => x.n === n);
   if (!les) return notFound(v);
+  const need = new Set();
+  les.blocks.forEach(b => { if (b.type === "ayah") need.add(b.s); if (b.type === "sura") need.add(b.n); });
+  await Promise.all([...need].map(loadSura));
   exCounter = 0;
   const wrap = h("article", { class: "read" });
   const total = les.blocks.filter(b => b.type === "ex").length;
@@ -452,7 +603,7 @@ function renderBlock(b, key, ctx) {
     }
     case "direction": return h("div", { class: "dir", html: `<div class="ar">بِسْمِ ٱللَّهِ</div><svg viewBox="0 0 300 28" preserveAspectRatio="none"><path d="M280 14H24M36 4L22 14l14 10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="cap">${esc(S.lang === "ru" ? "Читаем и пишем справа налево" : "Оңнан солға оқимыз және жазамыз")}</div>` });
     case "forms": return formsEl(letterBy(b.ar));
-    case "letter": return letterCard(letterBy(b.ar));
+    case "letter": { const Lt = letterBy(b.ar); return h("div", { class: "stack", style: "gap:10px" }, letterCard(Lt), sayBtns(Lt)); }
     case "makhraj": return makhrajEl(b.keys);
     case "words": return wordsEl(letterBy(b.ar).words);
     case "wordlist": return wordsEl(b.items);
@@ -480,7 +631,7 @@ function renderBlock(b, key, ctx) {
     case "test": return testEl(b, key, ctx);
     case "modules": return h("div", { class: "mods" }, COURSE.modules.map(M => h("div", { class: "mod", html: `<div><h3>${M.id}. ${esc(L(M.title))}</h3></div><span class="mar">${M.ar}</span><p>${esc(L(M.desc))}</p><div class="meta"><span>${esc(T("lesson"))} ${M.from}–${M.to}</span></div>` })));
     case "rulecard": return ruleCards(b.keys);
-    case "hifzlinks": return h("div", { class: "slist" }, b.suras.map(n => { const s = suraBy(n); return h("a", { class: "sitem", href: `#/sura/${n}/hifz`, html: `${rosette(n, suraMemorized(n) ? "done" : "")}<div><b>${esc(L(s.name))}</b><small>${esc(ayatN(s.ayat.length))}</small></div><span class="ar">${s.ar}</span>` }); }));
+    case "hifzlinks": return h("div", { class: "slist" }, b.suras.map(n => suraItem(suraBy(n), `#/sura/${n}/hifz`)));
     case "rex": {
       const g = h("div", { class: "rex" });
       for (const it of b.items) {
@@ -500,11 +651,25 @@ function formsEl(Lt) {
   const names = S.lang === "ru" ? UI.forms4ru : UI.forms4;
   return h("div", { class: "forms" }, Lt.forms.map((f, i) => h("div", {}, h("div", { class: "f" }, f), h("div", { class: "c" }, names[i]))));
 }
+const nameParts = s => { const m = String(s).match(/^(.*?)\s*\((.+)\)$/); return m ? [m[1], m[2]] : [String(s), ""]; };
+function sayBtns(Lt, big) {
+  const ex = Lt.words && Lt.words[0] && Lt.words[0].loc;
+  const row = h("div", { class: "say" + (big ? " big" : "") });
+  const nb = h("button", { class: "saybtn", type: "button", html: icon("sound") + `<span>${esc(T("sayName"))}</span><span class="ar">${AR_NAMES[Lt.ar] || Lt.ar}</span>` });
+  nb.onclick = () => speakAr(AR_NAMES[Lt.ar] || Lt.ar, nb, ex);
+  row.append(nb);
+  if (!"اوي".includes(Lt.ar) && Lt.ar !== "ء") ["َ", "ِ", "ُ"].forEach(v => {
+    const b = h("button", { class: "saybtn syl", type: "button", html: `<span class="ar">${Lt.ar + v}</span>` });
+    b.onclick = () => speakAr(Lt.ar + v, b, ex); row.append(b);
+  });
+  return row;
+}
 function letterCard(Lt) {
   const mk = CORE.makhraj[Lt.mk];
+  const [nm, note] = nameParts(L(Lt.name));
   return h("div", { class: "lcard", html: `<div class="g">${Lt.ar}</div><dl>
-    <dt>${esc(T("name"))}</dt><dd>${esc(L(Lt.name))}</dd>
-    <dt>${esc(T("sound"))}</dt><dd>${esc(Lt.sound)}</dd>
+    <dt>${esc(T("name"))}</dt><dd>${esc(nm)}${note ? `<small class="note">${esc(note)}</small>` : ""}</dd>
+    <dt>${esc(T("sound"))}</dt><dd><span class="snd">${esc(L(Lt.sound))}</span></dd>
     <dt>${esc(T("mk"))}</dt><dd>${esc(L(mk.name))}</dd>
     <dt>${esc(T("sifat"))}</dt><dd style="font-weight:500">${Lt.sifat.map(s => esc(L(s))).join(", ")}</dd>
     <dt>${esc(T("joins"))}</dt><dd>${esc(Lt.joins ? T("joinsY") : T("joinsN"))}</dd></dl>` });
@@ -557,8 +722,8 @@ const MK_LETTERS = { jawf: "ا و ي", halq_far: "ء ه", halq_mid: "ع ح", hal
 function makhrajEl(keys = []) {
   const hl = new Set(keys);
   const lab = (x, y, s) => `<text x="${x}" y="${y}" text-anchor="middle" font-family="Onest,sans-serif" font-size="9" fill="var(--muted)">${esc(s)}</text>`;
-  const tr = S.lang === "ru" ? { nose: "носовая полость", pal: "твёрдое нёбо", soft: "мягкое", tongue: "язык", teeth: "зубы", lips: "губы", throat: "горло", lar: "гортань" }
-    : { nose: "мұрын қуысы", pal: "қатты таңдай", soft: "жұмсақ", tongue: "тіл", teeth: "тіс", lips: "ерін", throat: "тамақ", lar: "көмей" };
+  const tr = S.lang === "ru" ? { nose: "носовая полость", pal: "твёрдое нёбо", soft: "мягкое нёбо", tongue: "язык", teeth: "зубы", lips: "губы", throat: "горло", lar: "гортань" }
+    : { nose: "мұрын қуысы", pal: "қатты таңдай", soft: "жұмсақ таңдай", tongue: "тіл", teeth: "тіс", lips: "ерін", throat: "көмей", lar: "кеңірдек" };
   let marks = "";
   for (const [k, [x, y, n]] of Object.entries(MK)) {
     const on = hl.has(k);
@@ -602,14 +767,14 @@ function traceEl(ch, key, ctx) {
   let guide = null;
   const drawGuide = () => {
     g.clearRect(0, 0, cv.width, cv.height);
-    g.save(); g.font = `300px "Amiri Quran", "Amiri", serif`; g.textAlign = "center"; g.textBaseline = "alphabetic"; g.direction = "rtl";
+    g.save(); g.font = `300px "Iqra Quran", "Amiri Quran", serif`; g.textAlign = "center"; g.textBaseline = "alphabetic"; g.direction = "rtl";
     g.fillStyle = isDark() ? "rgba(230,236,239,.22)" : "rgba(20,32,27,.16)";
     const m = g.measureText(ch); const asc = m.actualBoundingBoxAscent || 150, desc = m.actualBoundingBoxDescent || 40;
     g.fillText(ch, cv.width / 2, cv.height / 2 + (asc - desc) / 2); g.restore();
     const img = g.getImageData(0, 0, cv.width, cv.height).data;
     guide = []; for (let y = 0; y < cv.height; y += 6) for (let x = 0; x < cv.width; x += 6) if (img[(y * cv.width + x) * 4 + 3] > 20) guide.push([x, y]);
   };
-  const ready = document.fonts && document.fonts.load ? document.fonts.load('300px "Amiri Quran"', ch) : Promise.resolve();
+  const ready = document.fonts && document.fonts.load ? document.fonts.load('300px "Iqra Quran"', ch) : Promise.resolve();
   ready.then(drawGuide, drawGuide);
   let down = false, last = null;
   const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
@@ -778,15 +943,6 @@ function ayahWordsHTML(sp) {
   }
   return words.filter(w => w.length);
 }
-function ayahBlock(s, a, color = true) {
-  const sura = suraBy(s), ay = sura.ayat[a - 1];
-  const el = h("div", { class: "ay" + (color ? "" : " nocolor") });
-  el.append(ayahLine(sura, ay));
-  const pb = h("button", { class: "pa", html: icon("play"), title: T("play") });
-  pb.onclick = () => playURL(ayahURL(s, a), el);
-  el.append(h("div", { class: "meta" }, h("span", { class: "tr" }, L(ay.tr)), h("span", { class: "row" }, h("span", { class: "pill" }, `${L(sura.name)} ${s}:${a}`), pb)));
-  return el;
-}
 function ayahLine(sura, ay, mode = 0, peek) {
   const at = h("div", { class: "at", lang: "ar" });
   const ws = ayahWordsHTML(ay.sp);
@@ -795,7 +951,7 @@ function ayahLine(sura, ay, mode = 0, peek) {
     const sp = h("span", { class: "wd", html });
     const hide = mode === 3 || (mode === 1 && i % 2 === 1);
     if (hide) sp.classList.add("hidew");
-    if (mode === 2) { const plain = w.map(x => x[0]).join(""); const first = plain.match(/^[ء-يٱ][ً-ٰۖ-ۭ]*/u); sp.innerHTML = `<span>${esc(first ? first[0] : plain[0])}</span><span class="rest">${esc(plain.slice(first ? first[0].length : 1))}</span>`; sp.classList.add("firstl"); }
+    if (mode === 2) { const plain = w.map(x => x[0]).join(""); const first = plain.match(/^[\u0621-\u064A\u0671][\u064B-\u0670\u06D6-\u06ED\u08F0-\u08F2]*/u); sp.innerHTML = `<span>${esc(first ? first[0] : plain[0])}</span><span class="rest">${esc(plain.slice(first ? first[0].length : 1))}</span>`; sp.classList.add("firstl"); }
     sp.onclick = () => {
       if (sp.classList.contains("hidew")) { sp.classList.add("peek"); }
       if (sp.classList.contains("firstl")) { sp.classList.remove("firstl"); sp.innerHTML = html; }
@@ -808,38 +964,79 @@ function ayahLine(sura, ay, mode = 0, peek) {
 }
 
 /* ═════════════ суры ═════════════ */
+function suraItem(s, href) {
+  const st = S.hifz[s.n] || {}; const m = Object.keys(st).length;
+  return h("a", { class: "sitem", href: href || `#/sura/${s.n}`, html: `${rosette(s.n, suraMemorized(s.n) ? "done" : "")}<div class="si-t"><b>${esc(L(s.name))}</b><small>${esc(ayatN(s.c))} · ${esc(T(s.p === "m" ? "mecca" : "medina"))}${m ? ` · ${m} ✓` : ""}</small></div><span class="ar" lang="ar">${s.ar}</span>` });
+}
+const norm = x => String(x).toLowerCase().replace(/ё/g, "е").replace(/[әғқңөұүһі]/g, c => ({ ә: "а", ғ: "г", қ: "к", ң: "н", ө: "о", ұ: "у", ү: "у", һ: "х", і: "и" }[c])).replace(/^(аль|ал|ан|ар|ас|аш|ат|ад|аз|әл)[-\s]/, "").replace(/[^a-zа-я0-9ء-ي]/g, "");
+function suraFilter(listEl, q, mode, hrefOf) {
+  const nq = norm(q);
+  const items = CORE.suras.filter(s => {
+    if (mode === "j30" && !(s.n === 1 || s.n >= 78)) return false;
+    if (mode === "st" && !(S.hifz[s.n] && Object.keys(S.hifz[s.n]).length) && !(S.last && S.last.s === s.n)) return false;
+    if (!nq) return true;
+    return String(s.n) === q.trim() || norm(s.name.kk).includes(nq) || norm(s.name.ru).includes(nq) || s.ar.includes(q.trim());
+  });
+  listEl.innerHTML = "";
+  if (!items.length) listEl.append(h("p", { class: "muted" }, T("nothing")));
+  items.forEach(s => listEl.append(suraItem(s, hrefOf ? hrefOf(s) : null)));
+}
+function suraSearch(onChange) {
+  let mode = "all";
+  const inp = h("input", { type: "search", class: "search", placeholder: T("search"), "aria-label": T("search"), enterkeyhint: "search" });
+  const seg = h("div", { class: "seg" }, [["all", "all"], ["j30", "juz30"], ["st", "started"]].map(([k, t]) => {
+    const b = h("button", { "aria-pressed": String(k === mode) }, T(t));
+    b.onclick = () => { mode = k; $$("button", seg).forEach(x => x.setAttribute("aria-pressed", String(x === b))); onChange(inp.value, mode); };
+    return b;
+  }));
+  inp.oninput = () => onChange(inp.value, mode);
+  return h("div", { class: "sfind" }, h("label", { class: "sbox", html: icon("search") }, inp), seg);
+}
 function pageSuras(v) {
-  v.append(h("h1", {}, T("suras")), h("p", { class: "muted", style: "margin:8px 0 18px" }, S.lang === "ru" ? "Аль-Фатиха и суры 30-го джуза с голосами чтецов, цветами таджвида и режимом заучивания." : "Әл-Фатиха және 30-жүз сүрелері: қари дауысы, тәжуид түстері және жаттау режимі."));
+  v.append(h("h1", {}, T("suras")), h("p", { class: "muted", style: "margin:8px 0 16px" }, T("quranLead")));
+  const ls = S.last && suraBy(S.last.s);
+  if (ls) v.append(h("a", { class: "next", style: "margin-bottom:16px", href: `#/sura/${ls.n}/${S.last.a}`, html: `${rosette(ls.n)}<div><small>${esc(T("contRead"))}</small><b>${esc(L(ls.name))} · ${S.last.a} ${esc(T("ayahN"))}</b></div><span class="go">${icon("arrow")}</span>` }));
+  if (ls) { $(".next .ros", v).style.color = "var(--primary-ink)"; $(".next .ros .rn", v).style.color = "var(--primary)"; }
   const g = h("div", { class: "slist" });
-  for (const s of CORE.suras) {
-    const st = S.hifz[s.n] || {}; const m = s.ayat.filter(a => st[a.n]).length;
-    g.append(h("a", { class: "sitem", href: `#/sura/${s.n}`, html: `${rosette(s.n, suraMemorized(s.n) ? "done" : "")}<div><b>${esc(L(s.name))}</b><small>${esc(ayatN(s.ayat.length))}${m ? ` · ${m} ✓` : ""}</small></div><span class="ar">${s.ar}</span>` }));
-  }
-  v.append(g);
+  v.append(suraSearch((q, m) => suraFilter(g, q, m)), g);
+  suraFilter(g, "", "all");
+}
+function ayahBlock(s, a, color = true) {
+  const sura = suraBy(s), ay = SURA_D[s].ayat[a - 1];
+  const el = h("div", { class: "ay" + (color ? "" : " nocolor") });
+  el.append(ayahLine(sura, ay));
+  const pb = h("button", { class: "pa", html: icon("play"), title: T("play") });
+  pb.onclick = () => playURL(ayahURL(s, a), el);
+  el.append(h("div", { class: "meta" }, h("span", { class: "tr" }, L(ay.tr)), h("span", { class: "row" }, h("span", { class: "pill" }, `${L(sura.name)} ${s}:${a}`), pb)));
+  return el;
 }
 function suraEmbed(n) {
-  const s = suraBy(n);
+  const s = suraBy(n), d = SURA_D[n];
   const wrap = h("div", { class: "stack" });
   wrap.append(h("div", { class: "row" }, h("a", { class: "btn", href: `#/sura/${n}`, html: icon("play") + esc(T("playAll")) }), h("a", { class: "btn ghost", href: `#/sura/${n}/hifz` }, T("hifz"))));
   const list = h("div", { class: "ayahs" });
-  s.ayat.forEach(a => list.append(ayahBlock(n, a.n)));
-  wrap.append(legendEl([...new Set(s.ayat.flatMap(a => a.r))]), list);
+  d.ayat.forEach(a => list.append(ayahBlock(n, a.n)));
+  wrap.append(legendEl([...new Set(d.ayat.flatMap(a => a.r))]), list);
   return wrap;
 }
-function pageSura(v, n, hifz) {
+async function pageSura(v, n, hifz, goto) {
   const s = suraBy(n);
   if (!s) return notFound(v);
+  const loading = h("div", { class: "loading" }, "…"); v.append(loading);
+  let d;
+  try { d = await loadSura(n); } catch (e) { loading.textContent = T("audioErr"); return; }
+  loading.remove();
   const wrap = h("div", { class: "read" });
   wrap.append(h("div", { class: "crumbs", html: `<a href="#/suras">${esc(T("suras"))}</a><span>·</span><span>${s.n}</span>` }),
-    h("div", { class: "row", style: "justify-content:space-between;margin-bottom:14px" },
-      h("div", {}, h("h1", {}, L(s.name)), h("p", { class: "muted" }, ayatN(s.ayat.length))),
-      h("div", { class: "ar", style: "font-size:40px;color:var(--primary)" }, s.ar)));
+    h("div", { class: "shead" },
+      h("div", {}, h("h1", {}, L(s.name)), h("p", { class: "muted" }, `${ayatN(s.c)} · ${T(s.p === "m" ? "mecca" : "medina")}`)),
+      h("div", { class: "ar sname", lang: "ar" }, s.ar)));
   const modeTabs = h("div", { class: "seg", style: "margin-bottom:12px" },
     h("button", { "aria-pressed": String(!hifz), onclick: () => location.hash = `#/sura/${n}` }, T("read")),
     h("button", { "aria-pressed": String(!!hifz), onclick: () => location.hash = `#/sura/${n}/hifz` }, T("hifz")));
   wrap.append(modeTabs);
 
-  // плеер
+  // плеер по аятам
   let playing = false, idx = 0, rep = 1, rate = 1, hzLevel = 0;
   const playBtn = h("button", { class: "play", html: icon("play"), title: T("playAll") });
   const recSel = h("select", { "aria-label": T("reciter") }, RECITERS.map(([id, nm]) => h("option", { value: id, selected: id === S.reciter ? "" : null }, L({ kk: nm[0], ru: nm[1] }))));
@@ -847,14 +1044,15 @@ function pageSura(v, n, hifz) {
   const repSel = h("select", { "aria-label": T("repeat") }, [1, 3, 5, 10].map(k => h("option", { value: k }, `${T("repeat")} ×${k}`)));
   repSel.onchange = () => rep = +repSel.value;
   if (hifz) { rep = 3; repSel.value = "3"; }
-  const rateSel = h("select", { "aria-label": T("speed") }, [[0.75, "0.75×"], [1, "1×"]].map(([k, t]) => h("option", { value: k, selected: k === 1 ? "" : null }, t)));
+  const rateSel = h("select", { "aria-label": T("speed") }, [[0.75, "0.75×"], [1, "1×"], [1.25, "1.25×"]].map(([k, t]) => h("option", { value: k, selected: k === 1 ? "" : null }, t)));
   rateSel.onchange = () => rate = +rateSel.value;
   const colorT = h("button", { class: "tog", "aria-pressed": String(S.view.color) }, T("colors"));
   const trT = h("button", { class: "tog", "aria-pressed": String(S.view.tr) }, T("translit"));
+  const tlT = h("button", { class: "tog", "aria-pressed": String(S.view.tl) }, T("tl"));
   recSel.classList.add("rec");
-  const moreBtn = h("button", { class: "iconbtn more", title: T("settings"), html: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' });
-  const player = h("div", { class: "player" }, playBtn, recSel, moreBtn, h("div", { class: "xtra" }, repSel, rateSel, hifz ? null : colorT, hifz ? null : trT));
-  moreBtn.onclick = () => player.classList.toggle("open");
+  const moreBtn = h("button", { class: "iconbtn more", title: T("settings"), "aria-expanded": "false", html: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' });
+  const player = h("div", { class: "player" }, playBtn, recSel, moreBtn, h("div", { class: "xtra" }, repSel, rateSel, hifz ? null : colorT, hifz ? null : trT, hifz ? null : tlT));
+  moreBtn.onclick = () => { player.classList.toggle("open"); moreBtn.setAttribute("aria-expanded", String(player.classList.contains("open"))); };
   wrap.append(player);
 
   if (hifz) {
@@ -864,13 +1062,15 @@ function pageSura(v, n, hifz) {
   } else {
     wrap.append(h("p", { class: "muted small", style: "margin-top:10px" }, T("tapWord")));
   }
-  if (n !== 1) wrap.append(h("div", { class: "bism" }, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"));
-  const list = h("div", { class: "ayahs" + (S.view.color || hifz ? "" : " nocolor") + (S.view.tr && !hifz ? "" : " notr") });
+  if (n !== 1 && n !== 9) wrap.append(h("div", { class: "bism", lang: "ar" }, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"));
+  const list = h("div", { class: "ayahs" + (S.view.color || hifz ? "" : " nocolor") + (S.view.tr && !hifz ? "" : " notr") + (S.view.tl && !hifz ? "" : " notl") });
   const cards = [];
+  let tlData = null;
+  const fillTl = () => { if (!tlData) return; cards.forEach((c, i) => { const el = $(".tl", c); if (el) el.textContent = tlData[i] || ""; }); };
   const draw = () => {
     list.innerHTML = ""; cards.length = 0;
-    s.ayat.forEach((a, i) => {
-      const card = h("div", { class: "ay", id: "a" + a.n });
+    d.ayat.forEach((a, i) => {
+      const card = h("div", { class: "ay", id: "a" + a.n, "data-n": a.n });
       card.append(ayahLine(s, a, hifz ? hzLevel : 0));
       const pb = h("button", { class: "pa", html: icon("play"), title: T("play") });
       pb.onclick = () => { stopAll(); playOne(i, true); };
@@ -887,39 +1087,88 @@ function pageSura(v, n, hifz) {
         right.append(mb);
       }
       right.append(pb);
-      card.append(h("div", { class: "meta" }, h("span", { class: "tr" }, L(a.tr)), h("span", { class: "rl" }, hifz ? "" : a.r.map(r => `<span style="color:${CORE.rules[r].c}">${esc(L(CORE.rules[r].name))}</span>`).join("")), right));
-      $(".rl", card).innerHTML = hifz ? "" : a.r.map(r => `<span style="color:${CORE.rules[r].c}">${esc(L(CORE.rules[r].name))}</span>`).join("");
+      const meta = h("div", { class: "meta" }, h("span", { class: "tr" }, L(a.tr)), h("span", { class: "rl" }), right);
+      $(".rl", meta).innerHTML = hifz ? "" : a.r.map(r => `<span style="color:${CORE.rules[r].c}">${esc(L(CORE.rules[r].name))}</span>`).join("");
+      card.append(meta);
+      if (!hifz) card.append(h("p", { class: "tl" }, tlData ? tlData[i] || "" : ""));
       cards.push(card); list.append(card);
     });
   };
   draw();
+  const tlNote = h("p", { class: "muted small tlby" }, T("tlBy"));
+  const getTl = () => { if (hifz || tlData) return; loadTl(n).then(t => { tlData = t; fillTl(); }).catch(() => { tlNote.textContent = T("tlErr"); }); };
+  if (S.view.tl) getTl();
   colorT.onclick = () => { S.view.color = !S.view.color; save(); colorT.setAttribute("aria-pressed", String(S.view.color)); list.classList.toggle("nocolor", !S.view.color); };
   trT.onclick = () => { S.view.tr = !S.view.tr; save(); trT.setAttribute("aria-pressed", String(S.view.tr)); list.classList.toggle("notr", !S.view.tr); };
+  tlT.onclick = () => { S.view.tl = !S.view.tl; save(); tlT.setAttribute("aria-pressed", String(S.view.tl)); list.classList.toggle("notl", !S.view.tl); if (S.view.tl) getTl(); };
+
+  // место чтения запоминается
+  const mark = a => { if (hifz) return; if (!S.last || S.last.s !== n || S.last.a !== a) { S.last = { s: n, a }; save(); } };
+  if ("IntersectionObserver" in window && !hifz) {
+    const io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) mark(+e.target.dataset.n); }, { rootMargin: "-45% 0px -50% 0px" });
+    cards.forEach(c => io.observe(c));
+  }
 
   let token = 0;
   const stopAll = () => { token++; playing = false; playBtn.innerHTML = icon("play"); cards.forEach(c => c.classList.remove("cur")); stopAudio(); };
   const playOne = async (i, single) => {
     const my = ++token; playing = true; playBtn.innerHTML = icon("pause");
-    for (; i < s.ayat.length; i++) {
-      idx = i;
+    for (; i < d.ayat.length; i++) {
+      idx = i; mark(i + 1);
       cards.forEach(c => c.classList.remove("cur")); cards[i].classList.add("cur");
       cards[i].scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       for (let r = 0; r < rep; r++) {
-        const ok = await playURL(ayahURL(n, s.ayat[i].n), null, rate);
+        const ok = await playURL(ayahURL(n, d.ayat[i].n), null, rate);
         if (my !== token || !ok) { if (my === token) stopAll(); return; }
       }
       if (single) break;
     }
     if (my === token) stopAll();
   };
-  playBtn.onclick = () => { if (playing) stopAll(); else playOne(idx >= s.ayat.length - 1 ? 0 : idx, false); };
+  playBtn.onclick = () => { if (playing) stopAll(); else playOne(idx >= d.ayat.length - 1 ? 0 : idx, false); };
   wrap.append(list);
-  if (!hifz) wrap.append(h("div", { style: "margin-top:16px" }, legendEl([...new Set(s.ayat.flatMap(a => a.r))])));
-  const i = CORE.suras.findIndex(x => x.n === n);
+  if (!hifz) wrap.append(tlNote, h("div", { style: "margin-top:16px" }, legendEl([...new Set(d.ayat.flatMap(a => a.r))])));
+  const pv = suraBy(n - 1), nx = suraBy(n + 1);
   wrap.append(h("div", { class: "lnav" },
-    CORE.suras[i - 1] ? h("a", { class: "btn ghost", href: `#/sura/${CORE.suras[i - 1].n}${hifz ? "/hifz" : ""}`, html: icon("back") + esc(L(CORE.suras[i - 1].name)) }) : h("span"),
-    CORE.suras[i + 1] ? h("a", { class: "btn ghost", href: `#/sura/${CORE.suras[i + 1].n}${hifz ? "/hifz" : ""}`, html: esc(L(CORE.suras[i + 1].name)) + icon("arrow") }) : h("span")));
+    pv ? h("a", { class: "btn ghost", href: `#/sura/${pv.n}${hifz ? "/hifz" : ""}`, html: icon("back") + esc(L(pv.name)) }) : h("span"),
+    nx ? h("a", { class: "btn ghost", href: `#/sura/${nx.n}${hifz ? "/hifz" : ""}`, html: esc(L(nx.name)) + icon("arrow") }) : h("span")));
   v.append(wrap);
+  if (goto && cards[goto - 1]) { idx = goto - 1; setTimeout(() => cards[goto - 1].scrollIntoView({ block: "center" }), 60); cards[goto - 1].classList.add("flash"); }
+}
+
+/* ═════════════ слушать ═════════════ */
+function pageListen(v) {
+  v.append(h("h1", {}, T("listen")), h("p", { class: "muted", style: "margin:8px 0 16px" }, T("listenLead")));
+  const recs = h("div", { class: "recs", role: "radiogroup", "aria-label": T("reciters") });
+  const drawRecs = () => {
+    recs.innerHTML = "";
+    LRECITERS.forEach(([id, kk, ru]) => {
+      const on = S.listen.r === id;
+      const b = h("button", { class: "rec-c", role: "radio", "aria-checked": String(on), html: `<span class="rav">${esc((S.lang === "ru" ? ru : kk).replace(/^(Мишари|Мұхаммед|Мухаммад|Махмұд|Махмуд|Сағд|Саад|Сағуд|Сауд|Ясир|Насир|Насер|Ахмад)\s+/, "").replace(/^(Әл-|Аль-|әл-|аль-|ад-|аш-|әд-|әш-)/, "").slice(0, 1))}</span><b>${esc(S.lang === "ru" ? ru : kk)}</b>` });
+      b.onclick = () => { S.listen.r = id; save(); drawRecs(); if (LP && LP.a.src) listenPlay(S.listen.s, id); };
+      recs.append(b);
+    });
+  };
+  drawRecs();
+  v.append(h("h2", { style: "margin-bottom:10px" }, T("reciters")), recs);
+  const g = h("div", { class: "slist" });
+  const href = () => null;
+  const fill = (q, m) => {
+    suraFilter(g, q, m, href);
+    $$("a.sitem", g).forEach((a, i) => {
+      const n = +a.querySelector(".rn").textContent;
+      a.removeAttribute("href"); a.setAttribute("role", "button"); a.tabIndex = 0;
+      const playing = LP && LP.a.src && !LP.a.paused && S.listen.s === n;
+      a.classList.toggle("now", S.listen.s === n && !!(LP && LP.a.src));
+      a.insertAdjacentHTML("beforeend", `<span class="lplay">${icon(playing ? "pause" : "play")}</span>`);
+      a.onclick = () => { if (LP && LP.a.src && S.listen.s === n) { LP.a.paused ? LP.a.play() : LP.a.pause(); } else listenPlay(n); };
+      a.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); a.click(); } };
+    });
+  };
+  let lastQ = "", lastM = "all";
+  v.append(h("h2", { style: "margin:24px 0 10px" }, T("suras")), suraSearch((q, m) => { lastQ = q; lastM = m; fill(q, m); }), g);
+  fill("", "all");
+  onListenChange = () => fill(lastQ, lastM);
 }
 
 /* ═════════════ справочник ═════════════ */
@@ -931,8 +1180,8 @@ function pageRef(v, sec, arg) {
   v.append(h("h1", {}, T("ref")), h("div", { style: "height:14px" }), tabs);
   if (sec === "alphabet") {
     const g = h("div", { class: "agrid" });
-    CORE.letters.forEach(x => g.append(h("a", { class: "alt", href: `#/ref/letter/${encodeURIComponent(x.ar)}`, html: `<span class="g">${x.ar}</span><span class="n">${esc(L(x.name))}</span>` })));
-    v.append(g);
+    CORE.letters.forEach(x => { const [nm] = nameParts(L(x.name)); g.append(h("a", { class: "alt", href: `#/ref/letter/${encodeURIComponent(x.ar)}`, html: `<span class="g" lang="ar">${x.ar}</span><span class="n">${esc(nm)}</span><span class="s">${esc(L(x.sound))}</span>` })); });
+    v.append(h("p", { class: "muted small", style: "margin-bottom:12px" }, S.lang === "ru" ? "Нажмите на букву: название, звук, махрадж, примеры и озвучка." : "Әріпті басыңыз: аты, дыбысы, махражы, мысалдар және дыбыстау."), g);
   } else if (sec === "tajweed") {
     v.append(ruleCards());
   } else if (sec === "makhraj") {
@@ -944,8 +1193,8 @@ function pageLetter(v, ar) {
   if (!Lt) return notFound(v);
   const lesson = Object.entries({ 3: "ب", 4: "م", 5: "وف", 7: "ت", 8: "د", 9: "ط", 11: "ث", 12: "ذ", 13: "ظ", 15: "س", 16: "ز", 17: "ص", 19: "ج", 20: "ش", 21: "ي", 23: "قك", 24: "ض", 25: "لن", 26: "ر", 28: "ءه", 29: "عح", 30: "غخا" }).find(([, s]) => s.includes(ar));
   const wrap = h("div", { class: "read stack" });
-  wrap.append(h("div", { class: "crumbs", html: `<a href="#/ref/alphabet">${esc(T("alphabet"))}</a><span>·</span><span>${esc(L(Lt.name))}</span>` }),
-    letterCard(Lt), formsEl(Lt), makhrajEl([Lt.mk]),
+  wrap.append(h("div", { class: "crumbs", html: `<a href="#/ref/alphabet">${esc(T("alphabet"))}</a><span>·</span><span>${esc(nameParts(L(Lt.name))[0])}</span>` }),
+    letterCard(Lt), sayBtns(Lt, true), h("p", { class: "muted small" }, T("ttsNote")), formsEl(Lt), makhrajEl([Lt.mk]),
     h("div", { class: "box kz" }, h("h4", { html: icon("bridge") + esc(S.lang === "ru" ? "Сравнение" : "Салыстыру") }), mdEl(Lt.cmp)),
     h("div", { class: "box warn" }, h("h4", { html: icon("alert") + esc(S.lang === "ru" ? "Частая ошибка" : "Жиі қате") }), mdEl({ kk: Lt.err.kk + "\n\n" + Lt.fix.kk, ru: Lt.err.ru + "\n\n" + Lt.fix.ru })),
     h("h3", {}, T("examples")), wordsEl(Lt.words), traceEl(Lt.forms[0], "ref" + ar, null));
@@ -971,7 +1220,7 @@ const TRAINERS = [
     make() { const x = pick(CORE.letters.filter(y => y.joins)); const pi = 1 + Math.floor(Math.random() * 3); const names = [["басындағы", "в начале"], ["ортасындағы", "в середине"], ["соңындағы", "в конце"]][pi - 1];
       const o = shuffle([...new Set(x.forms)]); return { kind: "mcq", q: { kk: `⟦${x.ar}⟧ — сөз ${names[0]} формасы?`, ru: `⟦${x.ar}⟧ — форма ${names[1]} слова?` }, options: o.map(y => ({ ar: y })), answer: o.indexOf(x.forms[pi]) }; } },
   { id: "harakat", ic: "بَ", t: ["Буын оқу", "Чтение слогов"], d: ["Харакатты буынды оқып, дұрыс оқылуын табыңыз", "Прочитайте слог с огласовкой и выберите чтение"],
-    make() { const x = pick(consonants()); const snd = x.sound.split(" ")[0]; const hk = pick(HARAKAT.slice(0, 3)); const opts = shuffle(HARAKAT.slice(0, 3).map(([, v]) => snd + v).concat([snd]));
+    make() { const x = pick(consonants()); const snd = L(x.sound).split(" ")[0]; const hk = pick(HARAKAT.slice(0, 3)); const opts = shuffle(HARAKAT.slice(0, 3).map(([, v]) => snd + v).concat([snd]));
       return { kind: "mcq", q: { kk: "Қалай оқылады?", ru: "Как читается?" }, prompt: x.ar + hk[0], options: opts.map(o => ({ t: { kk: o, ru: o } })), answer: opts.indexOf(snd + hk[1]) }; } },
   { id: "listen", ic: "♪", t: ["Тыңдап табу", "Найди на слух"], d: ["Қаридың дауысын тыңдап, сөзді табыңыз", "Послушайте чтеца и найдите слово"],
     make() { const pool = CORE.words.filter(w => w.base.length >= 3 && w.base.length <= 6); const x = pick(pool); const w = shuffle(pool.filter(y => y !== x && Math.abs(y.base.length - x.base.length) <= 1)).slice(0, 3); const o = shuffle([x, ...w]);
@@ -993,7 +1242,9 @@ function pagePractice(v) {
   v.append(g);
   v.append(h("section", { class: "section" }, h("div", { class: "section-h" }, h("h2", {}, T("hifz"))),
     h("p", { class: "muted", style: "margin-bottom:12px" }, S.lang === "ru" ? "Выберите суру и учите её по аятам: слушайте с повтором, скрывайте слова, отмечайте выученное." : "Сүрені таңдап, аятпен жаттаңыз: қайталап тыңдаңыз, сөздерді жасырыңыз, жаттағаныңызды белгілеңіз."),
-    h("div", { class: "slist" }, CORE.suras.filter(s => s.ayat.length <= 8).map(s => h("a", { class: "sitem", href: `#/sura/${s.n}/hifz`, html: `${rosette(s.n, suraMemorized(s.n) ? "done" : "")}<div><b>${esc(L(s.name))}</b><small>${esc(ayatN(s.ayat.length))}</small></div><span class="ar">${s.ar}</span>` })))));
+    h("div", { class: "slist" }, CORE.suras.filter(s => s.n === 1 || (s.n >= 93 && s.c <= 11)).map(s => suraItem(s, `#/sura/${s.n}/hifz`))),
+    h("p", { style: "margin-top:12px" }, h("a", { href: "#/suras" }, S.lang === "ru" ? "Любая из 114 сур — откройте её и выберите «Режим заучивания» →" : "114 сүренің кез келгенін ашып, «Жаттау режимін» таңдаңыз →"))));
+  v.append(h("section", { class: "section" }, h("a", { class: "qcard", href: "#/ref", html: `<span class="qi">${icon("book")}</span><div><b>${esc(T("ref"))}</b><small>${esc(S.lang === "ru" ? "Алфавит с озвучкой, правила таджвида, карта махраджей" : "Дыбысталған әліпби, тәжуид ережелері, махраж картасы")}</small></div>` })));
 }
 function pageTrainer(v, id) {
   const tr = TRAINERS.find(t => t.id === id);
@@ -1034,6 +1285,7 @@ function pageMe(v) {
   const lv = levelOf(S.xp), [lo, hi] = levelBounds(lv);
   const wrap = h("div", { class: "read stack" });
   wrap.append(h("h1", {}, T("me")));
+  wrap.append(accountPanel());
   wrap.append(h("div", { class: "panel stack" },
     h("div", { class: "row", style: "justify-content:space-between" },
       h("div", { html: `<b style="font-size:22px">${esc(T("level"))} ${lv}</b><div class="muted small">${S.xp} ${esc(T("xp"))}</div>` }),
@@ -1064,9 +1316,145 @@ function pageMe(v) {
   wrap.append(h("div", { class: "panel stack" }, h("h3", {}, T("settings")),
     h("div", { class: "row", style: "justify-content:space-between" }, h("span", {}, T("language")), langSeg),
     h("div", { class: "row", style: "justify-content:space-between" }, h("span", {}, T("theme")), themeSeg),
-    h("p", { class: "muted small" }, T("savedHere")),
+    h("p", { class: "muted small" }, AUTH.user ? T("synced") : T("savedHere")),
     h("div", {}, h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = false }, T("resetAll"))), confirmBox));
   v.append(wrap);
+}
+
+/* ═════════════ аккаунт и синхронизация (Firebase) ═════════════ */
+const FB_V = "10.12.5";
+const AUTH = { off: true, user: null, fb: null };
+const AUTH_MSG = {
+  "auth/invalid-credential": ["Пошта немесе құпиясөз қате", "Неверная почта или пароль"],
+  "auth/wrong-password": ["Пошта немесе құпиясөз қате", "Неверная почта или пароль"],
+  "auth/user-not-found": ["Мұндай аккаунт жоқ — тіркеліңіз", "Такого аккаунта нет — зарегистрируйтесь"],
+  "auth/email-already-in-use": ["Бұл пошта тіркелген — кіріңіз", "Эта почта уже зарегистрирована — войдите"],
+  "auth/weak-password": ["Құпиясөз тым қысқа (кемінде 6 таңба)", "Слишком короткий пароль (не меньше 6 символов)"],
+  "auth/invalid-email": ["Пошта дұрыс жазылмаған", "Почта указана неверно"],
+  "auth/missing-password": ["Құпиясөзді жазыңыз", "Введите пароль"],
+  "auth/network-request-failed": ["Интернет байланысы жоқ", "Нет соединения с интернетом"],
+  "auth/too-many-requests": ["Әрекет тым көп. Біраздан кейін қайталаңыз", "Слишком много попыток. Повторите позже"],
+  "auth/unauthorized-domain": ["Бұл домен Firebase баптауларында рұқсат етілмеген", "Этот домен не разрешён в настройках Firebase"],
+};
+const authMsg = e => { const m = AUTH_MSG[e && e.code]; return m ? m[S.lang === "ru" ? 1 : 0] : (e && e.message) || "?"; };
+async function initAuth() {
+  let cfg;
+  try { cfg = await fetchJSON("data/firebase.json"); } catch (e) { return; }
+  if (!cfg || !cfg.apiKey) return;
+  try {
+    const [app, auth, fs] = await Promise.all(["app", "auth", "firestore"].map(m => import(`https://www.gstatic.com/firebasejs/${FB_V}/firebase-${m}.js`)));
+    const fa = app.initializeApp(cfg);
+    const A = auth.getAuth(fa); A.languageCode = S.lang === "ru" ? "ru" : "kk";
+    AUTH.fb = { auth, fs, A, db: fs.getFirestore(fa) }; AUTH.off = false;
+    auth.getRedirectResult(A).catch(e => toast(T("authErr") + ": " + authMsg(e)));
+    auth.onAuthStateChanged(A, async u => {
+      const was = AUTH.user; AUTH.user = u;
+      if (u) { await syncDown(); onSave = pushSoon; } else onSave = null;
+      renderAvatar();
+      if ((!!was !== !!u) && /^#\/me/.test(location.hash)) route();
+    });
+    if (/^#\/me/.test(location.hash)) route();
+  } catch (e) { console.warn("auth", e); }
+}
+function mergeState(a, b) { // объединяем прогресс двух устройств — ничего не теряем
+  const newer = (a.at || 0) >= (b.at || 0) ? a : b, m = Object.assign(blank(), newer);
+  m.xp = Math.max(a.xp || 0, b.xp || 0);
+  const maxMap = (x = {}, y = {}) => { const o = Object.assign({}, x); for (const k in y) o[k] = Math.max(o[k] || 0, y[k] || 0); return o; };
+  const union = (x = {}, y = {}) => Object.assign({}, y, x);
+  m.days = maxMap(a.days, b.days); m.tests = maxMap(a.tests, b.tests);
+  m.lessons = union(a.lessons, b.lessons); m.ex = union(a.ex, b.ex); m.badges = union(a.badges, b.badges);
+  m.hifz = {}; for (const k of new Set([...Object.keys(a.hifz || {}), ...Object.keys(b.hifz || {})])) m.hifz[k] = union((a.hifz || {})[k], (b.hifz || {})[k]);
+  m.tr = { n: Math.max(a.tr?.n || 0, b.tr?.n || 0), ok: Math.max(a.tr?.ok || 0, b.tr?.ok || 0) };
+  m.at = Math.max(a.at || 0, b.at || 0);
+  return m;
+}
+async function syncDown() {
+  const { fs, db } = AUTH.fb, u = AUTH.user;
+  try {
+    const snap = await fs.getDoc(fs.doc(db, "users", u.uid));
+    if (snap.exists()) {
+      const remote = JSON.parse(snap.data().state || "{}");
+      const keep = { lang: S.lang, theme: S.theme };
+      S = Object.assign(mergeState(S, remote), keep);
+      try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+      renderTopStats();
+    }
+    await pushNow();
+  } catch (e) { console.warn("sync", e); }
+}
+let pushT = null;
+const pushSoon = () => { clearTimeout(pushT); pushT = setTimeout(pushNow, 1500); };
+async function pushNow() {
+  if (!AUTH.user || !AUTH.fb) return;
+  const { fs, db } = AUTH.fb;
+  try { await fs.setDoc(fs.doc(db, "users", AUTH.user.uid), { state: JSON.stringify(S), at: Date.now(), name: AUTH.user.displayName || "" }); }
+  catch (e) { console.warn("push", e); }
+}
+function renderAvatar() {
+  const a = $("#avatar"); if (!a) return;
+  const u = AUTH.user;
+  a.classList.toggle("on", !!u);
+  if (u && u.photoURL) a.innerHTML = `<img src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer">`;
+  else if (u) a.innerHTML = `<span>${esc(((u.displayName || u.email || "?").trim()[0] || "?").toUpperCase())}</span>`;
+  else a.innerHTML = icon("user");
+}
+function accountPanel() {
+  const box = h("div", { class: "panel stack acc" });
+  if (AUTH.off) {
+    box.append(h("div", { class: "row", style: "gap:12px;flex-wrap:nowrap" }, h("span", { class: "acc-ic", html: icon("cloud") }),
+      h("div", {}, h("b", {}, T("acc")), h("p", { class: "muted small" }, T("accWhy") + " " + T("accSoon")))));
+    return box;
+  }
+  const { auth, A } = AUTH.fb;
+  const u = AUTH.user;
+  if (u) {
+    const out = h("button", { class: "btn ghost", html: icon("out") + esc(T("signOut")) });
+    out.onclick = async () => { await pushNow(); await auth.signOut(A); };
+    box.append(h("div", { class: "row", style: "gap:14px;flex-wrap:nowrap" },
+      h("span", { class: "iconbtn avatar on big", html: $("#avatar") ? $("#avatar").innerHTML : icon("user") }),
+      h("div", { style: "min-width:0" }, h("b", {}, `${T("hello")}, ${u.displayName || u.email}`), h("p", { class: "muted small" }, T("synced")))), h("div", {}, out));
+    return box;
+  }
+  let mode = "in";
+  const draw = () => {
+    box.innerHTML = "";
+    box.append(h("div", {}, h("h3", {}, mode === "in" ? T("signIn") : T("signUp")), h("p", { class: "muted small", style: "margin-top:4px" }, T("accWhy"))));
+    const g = h("button", { class: "btn ghost gbtn", type: "button", html: GOOGLE_G + esc(T("google")) });
+    g.onclick = async () => {
+      const p = new auth.GoogleAuthProvider();
+      try { await auth.signInWithPopup(A, p); }
+      catch (e) {
+        if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") auth.signInWithRedirect(A, p);
+        else if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") err.textContent = authMsg(e);
+      }
+    };
+    const em = h("input", { type: "email", autocomplete: "email", placeholder: T("email"), "aria-label": T("email"), required: true });
+    const pw = h("input", { type: "password", autocomplete: mode === "in" ? "current-password" : "new-password", placeholder: T("password"), "aria-label": T("password"), minlength: 6, required: true });
+    const nm = mode === "up" ? h("input", { type: "text", autocomplete: "name", placeholder: S.lang === "ru" ? "Имя" : "Атыңыз", "aria-label": S.lang === "ru" ? "Имя" : "Атыңыз" }) : null;
+    const err = h("p", { class: "fb bad", role: "alert" });
+    const sub = h("button", { class: "btn", type: "submit", html: icon("mail") + esc(mode === "in" ? T("signIn") : T("signUp")) });
+    const form = h("form", { class: "stack", style: "gap:10px", novalidate: true }, nm, em, pw, sub, err);
+    form.onsubmit = async e => {
+      e.preventDefault(); err.textContent = ""; sub.disabled = true;
+      try {
+        if (mode === "in") await auth.signInWithEmailAndPassword(A, em.value.trim(), pw.value);
+        else { const c = await auth.createUserWithEmailAndPassword(A, em.value.trim(), pw.value); if (nm && nm.value.trim()) await auth.updateProfile(c.user, { displayName: nm.value.trim() }); }
+      } catch (x) { err.textContent = authMsg(x); }
+      sub.disabled = false;
+    };
+    const links = h("div", { class: "row", style: "justify-content:space-between" });
+    const sw = h("button", { class: "linkbtn", type: "button" }, mode === "in" ? T("noAcc") : T("haveAcc"));
+    sw.onclick = () => { mode = mode === "in" ? "up" : "in"; draw(); };
+    links.append(sw);
+    if (mode === "in") {
+      const fg = h("button", { class: "linkbtn", type: "button" }, T("forgot"));
+      fg.onclick = async () => { if (!em.value.trim()) { err.textContent = T("needEmail"); em.focus(); return; } try { await auth.sendPasswordResetEmail(A, em.value.trim()); err.className = "fb ok"; err.textContent = T("resetSent"); } catch (x) { err.className = "fb bad"; err.textContent = authMsg(x); } };
+      links.append(fg);
+    }
+    box.append(g, h("div", { class: "or" }, h("span", {}, T("orDiv"))), form, links);
+  };
+  draw();
+  return box;
 }
 
 /* ═════════════ запуск ═════════════ */
@@ -1074,7 +1462,7 @@ async function boot() {
   shell();
   $("#view").append(h("div", { class: "loading" }, "…"));
   try {
-    [CORE, COURSE] = await Promise.all([fetchJSON("core.json"), fetchJSON("course.json")]);
+    [CORE, COURSE] = await Promise.all([fetchJSON("data/core.json"), fetchJSON("data/course.json")]);
   } catch (e) {
     $("#view").innerHTML = ""; $("#view").append(h("div", { class: "loading" }, S.lang === "ru" ? "Не удалось загрузить данные. Обновите страницу." : "Деректер жүктелмеді. Бетті жаңартыңыз."));
     return;
@@ -1083,6 +1471,8 @@ async function boot() {
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (!S.theme) { shell(); route(); } });
   route();
   checkBadges();
+  initAuth();
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 boot();
 })();
