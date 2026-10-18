@@ -188,6 +188,7 @@ const I = {
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5L12 13l8.5-6.5"/>',
   out: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 16l-4-4 4-4M6 12h10"/>',
   cloud: '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4.25 4.25 0 0 1-.5 8.5z"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
 };
 const GOOGLE_G = '<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 const icon = (n, cls = "") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
@@ -445,7 +446,7 @@ async function route() {
     if (!p0) { markNav("home"); await pageHome(view); }
     else if (p0 === "course") { markNav("course"); pageCourse(view); }
     else if (p0 === "lesson") { markNav("course"); await pageLesson(view, +p1); }
-    else if (p0 === "ref") { markNav("ref"); pageRef(view, p1, p2); }
+    else if (p0 === "ref") { markNav("ref"); await pageRef(view, p1, p2); }
     else if (p0 === "suras") { markNav("suras"); pageSuras(view); }
     else if (p0 === "sura") { markNav("suras"); await pageSura(view, +p1, p2 === "hifz", /^\d+$/.test(p2 || "") ? +p2 : 0); }
     else if (p0 === "listen") { markNav("listen"); pageListen(view); }
@@ -530,10 +531,11 @@ function pageCourse(v) {
     for (let n = M.from; n <= M.to; n++) {
       const les = COURSE.lessons[n - 1];
       const done = S.lessons[n] && S.lessons[n].done;
+      const locked = !done && n > cur;
       const cls = done ? "done" : (n === cur ? "cur" : "");
       const sub = done ? T("doneL") : (!les.ready ? T("soon") : (n === cur ? T("nextLesson") : ""));
-      ul.append(h("li", {}, h("a", { href: les.ready ? `#/lesson/${n}` : null, "aria-disabled": les.ready ? null : "true",
-        html: `${rosette(n, cls)}<div class="lt"><b>${mdInline(les.title)}</b>${sub ? `<span>${esc(sub)}</span>` : ""}</div>` })));
+      ul.append(h("li", { class: locked ? "locked" : null }, h("a", { href: les.ready ? `#/lesson/${n}` : null, "aria-disabled": les.ready ? null : "true",
+        html: `${rosette(n, cls)}<div class="lt"><b>${mdInline(les.title)}</b>${sub ? `<span>${esc(sub)}</span>` : ""}</div>${locked ? `<span class="lk" title="${esc(S.lang === "ru" ? "Сначала завершите предыдущие уроки" : "Алдымен алдыңғы сабақтарды аяқтаңыз")}">${icon("lock")}</span>` : ""}` })));
     }
     sec.append(ul);
     v.append(sec);
@@ -542,10 +544,55 @@ function pageCourse(v) {
   if (target) setTimeout(() => { const el = document.getElementById(target); if (el) el.scrollIntoView({ block: "start" }); }, 30);
 }
 
+/* ═════════════ окно подтверждения ═════════════ */
+function ask({ title, text, yes, no, icon: ic = "alert" }) {
+  return new Promise(res => {
+    const prev = document.activeElement;
+    const close = v => { wrap.remove(); document.removeEventListener("keydown", onKey); if (prev && prev.focus) prev.focus(); res(v); };
+    const onKey = e => { if (e.key === "Escape") close(false); };
+    const yb = h("button", { class: "btn ghost" }, yes), nb = h("button", { class: "btn" }, no);
+    yb.onclick = () => close(true); nb.onclick = () => close(false);
+    const box = h("div", { class: "modal", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "mdl-t" },
+      h("span", { class: "modal-ic", html: icon(ic) }), h("h2", { id: "mdl-t" }, title), mdEl(text), h("div", { class: "modal-btns" }, nb, yb));
+    const wrap = h("div", { class: "modal-bg" }, box);
+    wrap.onclick = e => { if (e.target === wrap) close(false); };
+    document.body.append(wrap); document.addEventListener("keydown", onKey); nb.focus();
+  });
+}
+
+/* ═════════════ порядок уроков ═════════════ */
+const SKIP_KEY = "iqra.skipOK";
+const skipOK = () => { try { return sessionStorage.getItem(SKIP_KEY) === "1"; } catch (e) { return false; } };
+const isDone = n => !!(S.lessons[n] && S.lessons[n].done);
+const undoneBefore = n => { const u = []; for (let i = 1; i < n; i++) if (!isDone(i)) u.push(i); return u; };
+const plRu = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; };
+function listLessons(u) {
+  const contiguous = u.every((x, i) => i === 0 || x === u[i - 1] + 1);
+  if (contiguous && u.length >= 3) return `${u[0]}–${u[u.length - 1]}`;
+  return u.length <= 4 ? u.join(", ") : `${u.slice(0, 3).join(", ")}…`;
+}
+async function allowLesson(n) {
+  const u = undoneBefore(n);
+  if (!u.length || skipOK()) return true;
+  const ru = S.lang === "ru", one = u.length === 1, cnt = u.length;
+  const title = ru ? (one ? "Предыдущий урок не завершён" : "Предыдущие уроки не завершены") : (one ? "Алдыңғы сабақ аяқталмаған" : "Алдыңғы сабақтар аяқталмаған");
+  const what = ru
+    ? (one ? `Вы ещё не закончили **урок ${u[0]}**.` : `Вы ещё не закончили **уроки ${listLessons(u)}** — всего ${cnt} ${plRu(cnt, "урок", "урока", "уроков")}.`)
+    : (one ? `Сіз әлі **${u[0]}-сабақты** аяқтамадыңыз.` : `Сіз әлі **${listLessons(u)} сабақтарды** аяқтамадыңыз — барлығы ${cnt} сабақ.`);
+  const why = ru ? `Уроки идут по порядку: каждый опирается на предыдущие. Точно хотите перейти к уроку ${n}?\n\nЭто предупреждение больше не появится до конца сеанса.`
+    : `Сабақтар ретімен жүреді: әрқайсысы алдыңғыларына сүйенеді. ${n}-сабаққа өтуге сенімдісіз бе?\n\nБұл ескерту осы сеанстың соңына дейін қайта шықпайды.`;
+  const ok = await ask({ title, text: what + "\n\n" + why, icon: "lock",
+    yes: ru ? `Да, открыть урок ${n}` : `Иә, ${n}-сабақты ашу`,
+    no: ru ? `Вернуться к уроку ${u[0]}` : `${u[0]}-сабаққа оралу` });
+  if (ok) { try { sessionStorage.setItem(SKIP_KEY, "1"); } catch (e) {} }
+  return ok;
+}
+
 /* ═════════════ урок ═════════════ */
 async function pageLesson(v, n) {
   const meta = COURSE.lessons[n - 1];
   if (!meta || !meta.ready) return notFound(v);
+  if (!(await allowLesson(n))) { location.replace(`#/lesson/${undoneBefore(n)[0]}`); return; }
   const M = moduleOf(n);
   const list = await loadModule(M.id);
   const les = list.find(x => x.n === n);
@@ -707,53 +754,162 @@ function ruleCards(keys) {
   for (const k of keys || Object.keys(CORE.rules)) {
     const r = CORE.rules[k];
     const ex = CORE.quiz.filter(q => q.r === k).slice(0, 2);
-    wrap.append(h("div", { class: "rcard", html: `<h4><i style="background:${r.c}"></i>${esc(L(r.name))}</h4><p>${esc(L(r.short))}</p>${ex.map(e => `<div class="ex-ar">${spansHTML(e.sp)}</div>`).join("")}` }));
+    wrap.append(h("a", { class: "rcard", href: `#/ref/rule/${k}`, html: `<h4><i style="background:${r.c}"></i>${esc(L(r.name))}</h4><p>${esc(L(r.short))}</p>${ex.map(e => `<div class="ex-ar">${spansHTML(e.sp)}</div>`).join("")}<span class="more">${esc(S.lang === "ru" ? "Подробнее" : "Толығырақ")} →</span>` }));
   }
   return wrap;
 }
 
 /* ───── махрадж ───── */
-const MK = { jawf: [250, 128, 1], halq_far: [344, 232, 2], halq_mid: [340, 202, 3], halq_near: [330, 172, 4],
-  aqsa_lisan_q: [298, 152, 5], aqsa_lisan_k: [266, 146, 6], wasat: [228, 142, 7], hafa: [196, 130, 8], lam: [160, 134, 9],
-  nun: [130, 136, 10], ra: [146, 116, 11], nitaa: [122, 118, 12], safir: [112, 154, 13], lith: [102, 130, 14],
-  shafa_f: [88, 152, 15], shafa_b: [78, 174, 16], khayshum: [150, 82, 17] };
+// Анатомическая схема махраджей: срединный (сагиттальный) разрез головы, лицо слева.
+// Зона губ, зубов и кончика языка показана во вставке с увеличением.
+let MK_UID = 0;
+function makhrajSVG(lang, hl) {
+  hl = new Set(hl || []);
+  const u = "mk" + (++MK_UID);
+  const OX = 34, OY = 4;
+  const ru = lang === "ru";
+  const A = ru
+    ? { nose: "носовая полость", conch: "носовые раковины", hard: "твёрдое нёбо", soft: "мягкое нёбо", uvula: "язычок", tongue: "язык",
+        alv: "альвеолы", teeth: "резцы", lips: "губы", phar: "глотка", epi: "надгортанник", lar: "гортань", folds: "голосовые связки",
+        trach: "трахея", eso: "пищевод", zoom: "увеличено" }
+    : { nose: "мұрын қуысы", conch: "мұрын қалқандары", hard: "қатты таңдай", soft: "жұмсақ таңдай", uvula: "тілшік", tongue: "тіл",
+        alv: "қызыл иек", teeth: "күрек тістер", lips: "ерін", phar: "жұтқыншақ", epi: "көмей қақпағы", lar: "көмей", folds: "дауыс желбезектері",
+        trach: "кеңірдек", eso: "өңеш", zoom: "үлкейтілген" };
+
+  // точки в координатах головы; z — показывать номер во вставке
+  const P = {
+    jawf: [214, 308], halq_far: [355, 440], halq_mid: [399, 386], halq_near: [401, 318],
+    aqsa_lisan_q: [336, 291], aqsa_lisan_k: [294, 281], wasat: [250, 278], hafa: [205, 282], lam: [160, 288],
+    ra: [118, 289], nun: [110, 292], nitaa: [101, 299], lith: [88, 318], shafa_b: [74, 318], shafa_f: [81, 326], safir: [98, 330],
+    khayshum: [236, 222],
+  };
+  const ZOOM = new Set(["ra", "nun", "nitaa", "lith", "shafa_b", "shafa_f", "safir"]);
+  const NUM = { jawf: 1, halq_far: 2, halq_mid: 3, halq_near: 4, aqsa_lisan_q: 5, aqsa_lisan_k: 6, wasat: 7, hafa: 8, lam: 9, nun: 10,
+    ra: 11, nitaa: 12, safir: 13, lith: 14, shafa_f: 15, shafa_b: 16, khayshum: 17 };
+  const any = hl.size > 0;
+  const id = s => `${u}${s}`;
+
+  const head = `
+  <g id="${id("H")}">
+    <path fill="url(#${id("skin")})" stroke="#cf9576" stroke-width="1.6" d="M262,10 C380,4 492,52 530,150 C552,206 548,262 522,304
+      C500,336 488,366 486,410 L486,606 L300,606 C302,560 304,520 306,486 C300,462 292,450 280,442 C230,434 150,428 112,414
+      C88,406 78,392 78,376 C78,364 84,356 86,350 C82,346 74,342 72,336 C68,328 70,322 76,318 C70,314 66,306 70,298
+      C74,290 82,282 86,278 C72,276 50,270 40,258 C34,250 38,240 50,228 C66,212 82,186 92,160 C98,140 100,118 104,98
+      C116,52 170,16 262,10 Z"/>
+    ${[0, 1, 2, 3, 4, 5].map(i => `<rect x="${428 + i * 2}" y="${238 + i * 62}" width="48" height="52" rx="10" fill="url(#${id("spine")})" stroke="#cdb994" stroke-width="1.2"/>`).join("")}
+    <path fill="url(#${id("cav")})" d="M62,262 C70,236 92,200 120,180 C160,156 240,148 320,164 C360,172 390,190 404,214 C412,230 414,250 414,272
+      L414,500 L386,503 L382,606 L330,606 L328,524 L342,500 L342,458 C350,452 360,450 366,448 C368,430 370,412 372,398
+      C360,406 334,412 300,414 C240,416 168,404 130,382 C112,370 102,352 98,336 L90,330 L84,324 L90,312
+      C84,300 80,290 86,278 C78,272 68,268 62,262 Z"/>
+    <g fill="#b04f5c" opacity=".85">
+      <path d="M150,190 C200,176 280,176 330,190 C318,200 284,206 236,206 C196,206 166,200 150,190 Z"/>
+      <path d="M128,222 C190,208 290,208 344,220 C330,232 290,238 236,238 C184,238 148,232 128,222 Z"/>
+      <path d="M110,252 C180,240 290,240 352,252 C336,262 290,266 236,266 C178,266 136,262 110,252 Z"/></g>
+    <path fill="url(#${id("tooth")})" stroke="#c4b899" stroke-width="1.1" d="M97,293 C95,301 92,310 89,319 L94,320 C99,312 104,304 107,296 C109,287 110,278 108,270 C103,273 99,282 97,293 Z"/>
+    <path fill="url(#${id("tooth")})" stroke="#c4b899" stroke-width="1.1" d="M91,322 L96,321 C98,328 100,334 101,341 C103,350 103,360 101,368 C98,360 96,350 94,342 C92,336 91,329 91,322 Z"/>
+    <path fill="url(#${id("bone")})" stroke="#c8b38c" stroke-width="1.3" d="M86,276 C96,272 112,270 130,268 L322,264 L326,276
+      C300,274 262,272 226,272 C190,272 158,276 136,282 C126,286 118,290 112,294 L105,298 L99,292 C96,286 91,280 86,276 Z"/>
+    <path fill="#e59aa0" d="M100,300 C106,292 116,286 130,284 C136,286 138,290 132,294 C124,298 114,300 106,304 Z"/>
+    <path fill="url(#${id("soft")})" stroke="#a24f5a" stroke-width="1" d="M322,264 C350,262 372,276 382,296 C388,308 388,322 384,332
+      C380,338 375,336 375,328 C374,314 366,300 352,292 C342,286 332,282 324,278 Z"/>
+    <path fill="url(#${id("flesh")})" d="M108,368 C130,396 180,414 240,420 C280,423 310,422 330,420 L338,434 C300,440 230,438 176,430 C136,422 108,404 98,382 Z"/>
+    <path fill="url(#${id("bone")})" stroke="#c8b38c" stroke-width="1.3" d="M95,342 C91,358 90,378 96,396 C102,410 118,414 132,408 C126,386 118,362 108,340 Z"/>
+    <path fill="url(#${id("tongue")})" stroke="#a5444f" stroke-width="1.4" d="M101,327 C104,312 116,302 136,296 C170,288 220,286 262,288
+      C300,290 330,298 350,314 C366,328 372,350 372,372 C372,386 369,398 364,406 C350,414 336,418 322,418
+      C270,420 200,414 150,398 C126,388 112,372 106,358 C103,348 101,338 101,327 Z"/>
+    <path d="M150,300 C200,292 270,292 330,304" fill="none" stroke="#f7c4c7" stroke-width="2" opacity=".6"/>
+    <path d="M200,402 C220,370 250,330 290,300 M160,388 C180,360 210,326 250,296 M240,410 C255,380 285,340 330,308" fill="none" stroke="#c2606b" stroke-width="1" opacity=".35"/>
+    <ellipse cx="330" cy="424" rx="12" ry="6" fill="url(#${id("bone")})" stroke="#c8b38c" stroke-width="1.2"/>
+    <path fill="#eaa8ad" stroke="#b25c66" stroke-width="1" d="M366,446 C368,426 372,404 382,384 C387,384 387,394 384,408 C380,424 376,438 372,450 Z"/>
+    <path fill="url(#${id("bone")})" stroke="#c8b38c" stroke-width="1.2" d="M316,430 C330,428 340,440 342,458 L342,500 C336,506 322,508 314,504 C310,480 310,452 316,430 Z"/>
+    <path fill="#c46a75" stroke="#a24f5a" stroke-width=".8" d="M342,452 L380,458 L380,462 L342,463 Z"/>
+    <path fill="url(#${id("bone")})" stroke="#c8b38c" stroke-width="1" d="M330,504 C350,502 372,500 386,498 L388,518 C366,520 346,522 330,522 Z"/>
+    <g stroke="#ead7bd" stroke-width="4">${[0, 1, 2, 3, 4].map(i => `<line x1="334" y1="${536 + i * 15}" x2="380" y2="${534 + i * 15}"/>`).join("")}</g>
+    <path fill="#9c4d58" d="M386,503 L414,500 L416,606 L384,606 Z"/>
+    <path fill="#fbf7ee" stroke="#cfc3a4" stroke-width="1" opacity=".8" d="M190,272 C194,266 214,266 218,272 L220,282 C212,287 196,287 190,282 Z"/>
+    <path fill="url(#${id("lip")})" stroke="#a24e55" stroke-width="1" d="M86,278 C76,286 68,298 70,306 C71,313 74,317 78,318 L90,318 C92,306 92,292 90,282 Z"/>
+    <path fill="url(#${id("lip")})" stroke="#a24e55" stroke-width="1" d="M78,320 C70,322 66,330 70,338 C74,346 86,348 94,340 C98,334 98,328 96,322 Z"/>
+  </g>`;
+
+  const defs = `<defs>
+    <linearGradient id="${id("skin")}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7d7bf"/><stop offset=".55" stop-color="#eebf9f"/><stop offset="1" stop-color="#dfa686"/></linearGradient>
+    <linearGradient id="${id("flesh")}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e5ab92"/><stop offset="1" stop-color="#d8987e"/></linearGradient>
+    <linearGradient id="${id("cav")}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7a2a35"/><stop offset="1" stop-color="#4f1820"/></linearGradient>
+    <radialGradient id="${id("tongue")}" cx=".42" cy=".22" r=".85"><stop offset="0" stop-color="#f3a3a8"/><stop offset=".5" stop-color="#dd7680"/><stop offset="1" stop-color="#b9505c"/></radialGradient>
+    <linearGradient id="${id("bone")}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcf6ea"/><stop offset="1" stop-color="#e6d6b6"/></linearGradient>
+    <linearGradient id="${id("soft")}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e3949b"/><stop offset="1" stop-color="#c0606c"/></linearGradient>
+    <linearGradient id="${id("tooth")}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e7dfca"/></linearGradient>
+    <linearGradient id="${id("lip")}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d8787a"/><stop offset="1" stop-color="#bb5a60"/></linearGradient>
+    <radialGradient id="${id("spine")}" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#fbf3e2"/><stop offset="1" stop-color="#e2d0ad"/></radialGradient>
+    <clipPath id="${id("clip")}"><rect x="12" y="430" width="196" height="186" rx="16"/></clipPath>
+  </defs>`;
+
+  const ann = [];
+  const T = (x, y) => [x + OX, y + OY];
+  const note = (pt, x2, y2, s) => { const [x1, y1] = T(...pt); ann.push(`<path d="M${x1},${y1} L${x2 - 4},${y2 - 4}" class="mk-lead"/><text x="${x2}" y="${y2}" class="mk-a">${s}</text>`); };
+  const inside = (x, y, s) => { const [a, b] = T(x, y); ann.push(`<text x="${a}" y="${b}" text-anchor="middle" class="mk-in">${s}</text>`); };
+  inside(236, 178, A.nose); inside(236, 350, A.tongue);
+  note([300, 198], 566, 70, A.conch); note([250, 270], 566, 100, A.hard); note([356, 282], 566, 130, A.soft);
+  note([382, 330], 566, 160, A.uvula); note([414, 352], 566, 352, A.phar); note([381, 404], 566, 404, A.epi);
+  note([376, 461], 566, 456, A.folds); note([316, 480], 566, 492, A.lar); note([360, 572], 566, 548, A.trach); note([400, 590], 566, 590, A.eso);
+
+  // вставка: область губ и зубов, масштаб S
+  const RX = 62, RY = 270, RW = 74, RH = 72, S = 2.5, IX = 16, IY = 436;
+  const inset = (x, y) => [IX + (x - RX) * S, IY + (y - RY) * S];
+  const [bx, by] = T(RX, RY);
+  let pts = "";
+  const circle = (x, y, n, r, k) => {
+    const on = hl.has(k), cls = "mk-pt" + (on ? " on" : "") + (any && !on ? " dim" : "");
+    return `<g class="${cls}"><circle cx="${x}" cy="${y}" r="${r}" class="mk-c"/><text x="${x}" y="${y + r * 0.36}" text-anchor="middle" class="mk-n" style="font-size:${r * 1.1}px">${n}</text></g>`;
+  };
+  for (const [k, p] of Object.entries(P)) {
+    const [x, y] = T(...p);
+    if (ZOOM.has(k)) {
+      const on = hl.has(k);
+      pts += `<circle cx="${x}" cy="${y}" r="${on ? 3.2 : 2.2}" class="mk-mini${on ? " on" : ""}"/>`;
+      const [ix, iy] = inset(...p);
+      pts += circle(ix, iy, NUM[k], 10, k);
+    } else pts += circle(x, y, NUM[k], 10.5, k);
+  }
+  const insetEl = `<g class="mk-inset">
+    <rect x="${bx}" y="${by}" width="${RW}" height="${RH}" rx="6" class="mk-zoomrect"/>
+    <path d="M${bx + 10},${by + RH} L${IX + 60},${IY - 6}" class="mk-lead"/>
+    <g clip-path="url(#${id("clip")})"><rect x="12" y="430" width="196" height="186" fill="#f3d2bb"/>
+      <use href="#${id("H")}" transform="translate(${IX + OX * 0 - RX * S},${IY - RY * S}) scale(${S})"/></g>
+    <rect x="12" y="430" width="196" height="186" rx="16" class="mk-zoomframe"/>
+    <text x="22" y="608" class="mk-z">${A.zoom} ×${S}</text>
+    ${[[78, 300, A.lips], [104, 284, A.teeth], [124, 300, A.alv]].map(([x, y, s]) => { const [a, b] = inset(x, y); return ""; }).join("")}
+  </g>`;
+  // подписи внутри вставки
+  const il = [[A.lips, 22, 452], [A.teeth, 118, 452], [A.alv, 140, 520]];
+  const insetLabels = il.map(([s, x, y]) => `<text x="${x}" y="${y}" class="mk-z">${s}</text>`).join("");
+
+  return `<svg viewBox="0 0 708 624" role="img" class="mk-svg">${defs}<g transform="translate(${OX},${OY})">${head}</g>${insetEl}${insetLabels}<g>${ann.join("")}</g>${pts}</svg>`;
+}
+const MK_ORDER = ["jawf", "halq_far", "halq_mid", "halq_near", "aqsa_lisan_q", "aqsa_lisan_k", "wasat", "hafa", "lam", "nun", "ra", "nitaa", "safir", "lith", "shafa_f", "shafa_b", "khayshum"];
 const MK_LETTERS = { jawf: "ا و ي", halq_far: "ء ه", halq_mid: "ع ح", halq_near: "غ خ", aqsa_lisan_q: "ق", aqsa_lisan_k: "ك", wasat: "ج ش ي",
   hafa: "ض", lam: "ل", nun: "ن", ra: "ر", nitaa: "ط د ت", safir: "ص س ز", lith: "ظ ذ ث", shafa_f: "ف", shafa_b: "ب م و", khayshum: "ن م" };
 function makhrajEl(keys = []) {
   const hl = new Set(keys);
-  const lab = (x, y, s) => `<text x="${x}" y="${y}" text-anchor="middle" font-family="Onest,sans-serif" font-size="9" fill="var(--muted)">${esc(s)}</text>`;
-  const tr = S.lang === "ru" ? { nose: "носовая полость", pal: "твёрдое нёбо", soft: "мягкое нёбо", tongue: "язык", teeth: "зубы", lips: "губы", throat: "горло", lar: "гортань" }
-    : { nose: "мұрын қуысы", pal: "қатты таңдай", soft: "жұмсақ таңдай", tongue: "тіл", teeth: "тіс", lips: "ерін", throat: "көмей", lar: "кеңірдек" };
-  let marks = "";
-  for (const [k, [x, y, n]] of Object.entries(MK)) {
-    const on = hl.has(k);
-    marks += `<circle cx="${x}" cy="${y}" r="${on ? 10 : 7.5}" fill="${on ? "var(--mk-hl)" : "var(--surface)"}" stroke="${on ? "var(--mk-hl)" : "var(--muted)"}" stroke-width="1.3"/><text x="${x}" y="${y + 3.3}" text-anchor="middle" font-family="Onest,sans-serif" font-size="${on ? 9 : 8}" font-weight="700" fill="${on ? "#fff" : "var(--muted)"}">${n}</text>`;
-  }
-  const svg = `<svg viewBox="0 0 420 300" role="img" aria-label="${esc(T("makhraj"))}">
-  <path d="M250,16 C150,16 74,62 62,110 C56,134 70,140 70,146 C70,152 58,156 60,164 C62,172 76,170 78,176 C80,184 70,190 76,198 C82,206 96,202 100,208 C104,216 100,232 112,240 C128,250 176,252 212,250 L212,288 L300,288 L300,228 C330,216 352,186 356,150 C362,98 330,16 250,16 Z" fill="var(--mk-skin)" stroke="var(--mk-skin-line)" stroke-width="1.6"/>
-  <path d="M96,96 C130,78 188,74 232,82 C248,85 258,92 262,100 C240,104 190,106 150,104 C126,103 106,100 96,96 Z" fill="var(--mk-cavity)" stroke="var(--mk-skin-line)" stroke-width="1.2"/>
-  ${lab(168, 95, tr.nose)}
-  <path d="M100,122 C140,116 200,114 252,120" fill="none" stroke="var(--mk-skin-line)" stroke-width="2.4"/>
-  <path d="M252,120 C278,124 300,134 312,152" fill="none" stroke="var(--mk-skin-line)" stroke-width="2.4" stroke-dasharray="4 2.5"/>
-  ${lab(196, 112, tr.pal)}${lab(300, 134, tr.soft)}
-  <path d="M100,126 C150,122 210,122 256,128 C290,136 306,154 310,168 C300,182 250,190 196,186 C150,182 116,170 104,156 Z" fill="var(--mk-cavity)"/>
-  <path d="M104,160 C130,146 170,140 208,142 C248,144 282,152 306,170 C296,196 256,208 206,206 C158,204 118,188 104,170 Z" fill="var(--mk-tongue)" stroke="var(--mk-tongue-line)" stroke-width="1.3"/>
-  <text x="212" y="182" text-anchor="middle" font-family="Onest,sans-serif" font-size="10" fill="var(--ink)" opacity=".7">${esc(tr.tongue)}</text>
-  <rect x="98" y="120" width="9" height="13" rx="1.6" fill="var(--mk-bone)" stroke="var(--mk-skin-line)"/>
-  <rect x="98" y="150" width="9" height="13" rx="1.6" fill="var(--mk-bone)" stroke="var(--mk-skin-line)"/>
-  ${lab(84, 114, tr.teeth)}
-  <path d="M80,132 C70,138 70,146 80,150" fill="none" stroke="var(--mk-tongue-line)" stroke-width="3.4" stroke-linecap="round"/>
-  <path d="M80,160 C70,164 70,172 82,176" fill="none" stroke="var(--mk-tongue-line)" stroke-width="3.4" stroke-linecap="round"/>
-  ${lab(60, 196, tr.lips)}
-  <path d="M316,152 C326,180 326,214 318,246" fill="none" stroke="var(--mk-skin-line)" stroke-width="2.2"/>
-  <path d="M340,146 C352,182 350,220 340,252" fill="none" stroke="var(--mk-skin-line)" stroke-width="2.2"/>
-  ${lab(386, 200, tr.throat)}
-  <ellipse cx="330" cy="262" rx="15" ry="11" fill="var(--mk-cavity)" stroke="var(--mk-skin-line)" stroke-width="1.4"/>
-  ${lab(330, 284, tr.lar)}
-  ${marks}</svg>`;
-  const leg = Object.entries(MK).map(([k, [, , n]]) => `<div class="${hl.has(k) ? "on" : ""}"><i>${n}</i><span>${esc(L(CORE.makhraj[k].name))}</span><span class="ar">${MK_LETTERS[k]}</span></div>`);
-  const show = keys.length ? leg.filter((_, i) => hl.has(Object.keys(MK)[i])) : leg;
-  const el = h("div", { class: "mk", html: svg + `<div class="mk-leg">${show.join("")}</div>` });
+  const leg = MK_ORDER.map((k, i) => `<div class="${hl.has(k) ? "on" : ""}"><i>${i + 1}</i><span>${esc(L(CORE.makhraj[k].name))}</span><span class="ar">${MK_LETTERS[k]}</span></div>`);
+  const show = keys.length ? leg.filter((_, i) => hl.has(MK_ORDER[i])) : leg;
+  const el = h("div", { class: "mk", html: makhrajSVG(S.lang, keys) + `<div class="mk-leg">${show.join("")}</div>` });
+  $("svg", el).setAttribute("aria-label", T("makhraj"));
+  const zb = h("button", { class: "mk-zoom", type: "button", html: icon("search") + esc(S.lang === "ru" ? "Увеличить схему" : "Сызбаны үлкейту") });
+  const openZoom = () => {
+    const bg = h("div", { class: "mk-full", role: "dialog", "aria-modal": "true", "aria-label": T("makhraj") });
+    const close = h("button", { class: "iconbtn mk-x", title: T("cancel"), html: icon("close") });
+    const sc = h("div", { class: "mk-scroll", html: makhrajSVG(S.lang, keys) });
+    const done = () => { bg.remove(); document.removeEventListener("keydown", esc_); zb.focus(); };
+    const esc_ = e => { if (e.key === "Escape") done(); };
+    close.onclick = done; document.addEventListener("keydown", esc_);
+    bg.append(close, sc, h("p", { class: "mk-hint" }, S.lang === "ru" ? "Двигайте схему пальцем, приближайте двумя пальцами" : "Сызбаны саусақпен жылжытыңыз, екі саусақпен жақындатыңыз"));
+    document.body.append(bg); close.focus();
+    sc.scrollLeft = 0;
+  };
+  zb.onclick = openZoom;
+  $("svg", el).addEventListener("click", openZoom);
+  el.prepend(zb);
   if (keys.length === 1) el.append(h("p", { class: "muted small", style: "margin-top:6px;text-align:center" }, L(CORE.makhraj[keys[0]].desc)));
   return el;
 }
@@ -1172,8 +1328,67 @@ function pageListen(v) {
 }
 
 /* ═════════════ справочник ═════════════ */
-function pageRef(v, sec, arg) {
+let TJ = null;
+const loadTJ = () => TJ || (TJ = fetchJSON("data/tajweed.json").catch(e => { TJ = null; throw e; }));
+function rexEl(items) {
+  const g = h("div", { class: "rex" });
+  for (const it of items) {
+    const [s, a] = it.src.split(":").map(Number);
+    const row = h("div", { class: "rex-i" });
+    const pb = h("button", { class: "pa", html: icon("play"), title: T("play") });
+    pb.onclick = () => playURL(ayahURL(s, a), row);
+    row.append(h("div", { class: "ar rex-a", html: spansHTML(it.sp) }), h("span", { class: "pill" }, `${L(suraBy(s).name)} ${it.src}`), pb);
+    g.append(row);
+  }
+  return g;
+}
+async function pageTajweed(v) {
+  const d = await loadTJ();
+  const ru = S.lang === "ru";
+  v.append(h("div", { class: "read stack tj-intro" },
+    h("div", { class: "box rule" }, h("h4", { html: icon("bulb") + `<span>${ru ? "Что такое таджвид?" : "Тәжуид деген не?"}</span>` }), mdEl(d.intro.what)),
+    h("div", { class: "box kz" }, h("h4", { html: icon("repeat") + `<span>${ru ? "Как считать харакаты (счёты)" : "Харакатты қалай санаймыз"}</span>` }), mdEl(d.intro.count)),
+    h("p", { class: "muted small" }, L(d.intro.colors))));
+  for (const G of d.groups) {
+    const sec = h("section", { class: "section read" }, h("h2", {}, L(G.t)), h("p", { class: "muted", style: "margin:6px 0 12px" }, L(G.d)));
+    const list = h("div", { class: "tj-list" });
+    G.rules.forEach(k => {
+      const r = d.rules[k], c = CORE.rules[k];
+      list.append(h("a", { class: "tj-card", href: `#/ref/rule/${k}`, style: `--rc:${c.c}`, html:
+        `<span class="tj-sw"></span><div class="tj-tx"><b>${esc(L(c.name))}</b><small>${esc(L(r.remember))}</small></div><span class="ar tj-arname">${r.ar}</span><span class="go">${icon("arrow")}</span>` }));
+    });
+    sec.append(list); v.append(sec);
+  }
+}
+async function pageRule(v, k) {
+  const d = await loadTJ();
+  const r = d.rules[k], c = CORE.rules[k];
+  if (!r) return notFound(v);
+  const ru = S.lang === "ru";
+  const keys = Object.keys(d.rules), i = keys.indexOf(k);
+  const wrap = h("article", { class: "read stack rule-page", style: `--rc:${c.c}` });
+  wrap.append(h("div", { class: "crumbs", html: `<a href="#/ref/tajweed">${esc(T("tajweed"))}</a><span>·</span><span>${esc(L(c.name))}</span>` }),
+    h("header", { class: "rule-h" }, h("span", { class: "rule-sw" }), h("div", {}, h("h1", {}, L(r.tr)), h("p", { class: "ar rule-ar", lang: "ar" }, r.ar))),
+    h("div", { class: "box rule" }, h("h4", { html: icon("bulb") + `<span>${ru ? "Простыми словами" : "Қарапайым тілмен"}</span>` }), mdEl(r.simple)),
+    h("div", { class: "rule-when" }, h("h3", {}, ru ? "Когда?" : "Қашан?"), mdEl(r.when),
+      h("div", { class: "rule-letters", lang: "ar" }, r.letters.split(" ").map(x => h("span", {}, x)))),
+    h("div", {}, h("h3", { style: "margin-bottom:8px" }, ru ? "Как читать — шаг за шагом" : "Қалай оқимыз — қадам бойынша"),
+      h("ol", { class: "rule-steps" }, r.how.map(x => h("li", { html: mdInline(x) })))),
+    h("div", { class: "box kz" }, h("h4", { html: icon("bridge") + `<span>${ru ? "Представьте…" : "Елестетіп көріңіз…"}</span>` }), mdEl(r.image)));
+  if (r.note) wrap.append(h("div", { class: "box tip" }, h("h4", { html: icon("rule") + `<span>${ru ? "Важно" : "Маңызды"}</span>` }), mdEl(r.note)));
+  if (r.examples && r.examples.length) wrap.append(h("h3", {}, ru ? "Послушайте примеры из Корана" : "Құраннан мысалдарды тыңдаңыз"),
+    h("p", { class: "muted small" }, ru ? "Цветом выделено место, где действует правило. Нажмите ▶ и повторите за чтецом." : "Ереже орны түспен белгіленген. ▶ басып, қаридан кейін қайталаңыз."), rexEl(r.examples));
+  wrap.append(h("div", { class: "box warn" }, h("h4", { html: icon("alert") + `<span>${ru ? "Частая ошибка" : "Жиі кездесетін қате"}</span>` }), mdEl(r.mistake)),
+    h("div", { class: "remember" }, h("span", {}, ru ? "Запомните" : "Есте сақтаңыз"), h("b", { html: mdInline(r.remember) })));
+  const pv = keys[i - 1], nx = keys[i + 1];
+  wrap.append(h("div", { class: "lnav" },
+    pv ? h("a", { class: "btn ghost", href: `#/ref/rule/${pv}`, html: icon("back") + esc(L(CORE.rules[pv].name)) }) : h("span"),
+    nx ? h("a", { class: "btn ghost", href: `#/ref/rule/${nx}`, html: esc(L(CORE.rules[nx].name)) + icon("arrow") }) : h("span")));
+  v.append(wrap);
+}
+async function pageRef(v, sec, arg) {
   if (sec === "letter" && arg) return pageLetter(v, arg);
+  if (sec === "rule" && arg) return pageRule(v, arg);
   sec = sec || "alphabet";
   const tabs = h("div", { class: "tabs" }, [["alphabet", "alphabet"], ["tajweed", "tajweed"], ["makhraj", "makhraj"]].map(([k, t]) =>
     h("a", { class: "tog", href: `#/ref/${k}`, "aria-pressed": String(sec === k), style: "display:inline-flex;align-items:center;text-decoration:none" }, T(t))));
@@ -1183,7 +1398,7 @@ function pageRef(v, sec, arg) {
     CORE.letters.forEach(x => { const [nm] = nameParts(L(x.name)); g.append(h("a", { class: "alt", href: `#/ref/letter/${encodeURIComponent(x.ar)}`, html: `<span class="g" lang="ar">${x.ar}</span><span class="n">${esc(nm)}</span><span class="s">${esc(L(x.sound))}</span>` })); });
     v.append(h("p", { class: "muted small", style: "margin-bottom:12px" }, S.lang === "ru" ? "Нажмите на букву: название, звук, махрадж, примеры и озвучка." : "Әріпті басыңыз: аты, дыбысы, махражы, мысалдар және дыбыстау."), g);
   } else if (sec === "tajweed") {
-    v.append(ruleCards());
+    await pageTajweed(v);
   } else if (sec === "makhraj") {
     v.append(makhrajEl([]));
   }
