@@ -166,7 +166,7 @@ let CORE = null, COURSE = null;
 const LESSONS = {};
 const fetchJSON = u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.json(); });
 async function loadModule(m) {
-  if (!LESSONS[m]) LESSONS[m] = fetchJSON(`assets/data/lessons-m${m}.json`).catch(() => []);
+  if (!LESSONS[m]) LESSONS[m] = fetchJSON(`lessons-m${m}.json`).catch(() => []);
   return LESSONS[m];
 }
 const letterBy = ar => CORE.letters.find(x => x.ar === ar);
@@ -1074,7 +1074,7 @@ async function boot() {
   shell();
   $("#view").append(h("div", { class: "loading" }, "…"));
   try {
-    [CORE, COURSE] = await Promise.all([fetchJSON("assets/data/core.json"), fetchJSON("assets/data/course.json")]);
+    [CORE, COURSE] = await Promise.all([fetchJSON("core.json"), fetchJSON("course.json")]);
   } catch (e) {
     $("#view").innerHTML = ""; $("#view").append(h("div", { class: "loading" }, S.lang === "ru" ? "Не удалось загрузить данные. Обновите страницу." : "Деректер жүктелмеді. Бетті жаңартыңыз."));
     return;
