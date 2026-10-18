@@ -7,7 +7,7 @@ const KEY = "qoqu.v1";
 const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const blank = () => ({ lang: null, theme: null, xp: 0, days: {}, lessons: {}, ex: {}, tests: {},
   badges: {}, hifz: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true, tl: true },
-  last: null, listen: { r: "mishary-alafasy/r1", s: 1 }, at: 0 });
+  last: null, listen: { r: "mishary-alafasy/r1", s: 1 }, tsb: { i: 0, c: 0, total: 0 }, nzg: "m", at: 0 });
 let S = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch (e) {}
 S.view = Object.assign({ color: true, tr: true, tl: true }, S.view);
@@ -19,18 +19,19 @@ if (!S.lang) S.lang = /^ru/i.test(navigator.language || "") ? "ru" : "kk";
 const L = o => o == null ? "" : (typeof o === "string" ? o : (o[S.lang] ?? o.kk ?? ""));
 const applyTheme = () => {
   if (S.theme) document.documentElement.dataset.theme = S.theme; else delete document.documentElement.dataset.theme;
-  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#0b1026";
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#e8efe9";
 };
 applyTheme();
-// «Ночь Кадр»: тёмная тема по умолчанию; «system» — как в настройках устройства
-const isDark = () => !S.theme || S.theme === "dark" || (S.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+// светлая тема по умолчанию; «system» — как в настройках устройства
+const isDark = () => S.theme === "dark" || (S.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
 // цвета таджвида: на тёмном фоне — светлее и насыщеннее
 const RC_DARK = { izhar: "#f2c14e", qalqala: "#ff9447", madd2: "#b5d35b", madd46: "#ff6f61", madd6: "#ff4d8d", ghunna: "#e07be0",
   ikhfa: "#3fcf8e", ikhfa_sh: "#8ee3c0", idgham: "#5aa2ff", idgham_ng: "#a9c8ff", idgham_m: "#3fd0e0", iqlab: "#a78bfa" };
 const RC = k => (isDark() && RC_DARK[k]) || (CORE && CORE.rules[k] ? CORE.rules[k].c : "inherit");
 
 const UI = {
-  brand: ["Iqra", "Iqra"],
+  brand: ["Iqra", "Iqra"], today: ["Бүгін", "Сегодня"], learn: ["Оқу", "Учёба"], menu: ["Мәзір", "Меню"], surasT: ["Сүрелер", "Суры"],
+  salam: ["Ассаламу ағалейкум", "Ассаляму алейкум"],
   brandSub: ["Құранды нөлден оқу", "Коран с нуля"],
   home: ["Басты", "Главная"], course: ["Курс", "Курс"], ref: ["Анықтама", "Справочник"],
   suras: ["Құран", "Коран"], practice: ["Жаттығу", "Практика"], me: ["Профиль", "Профиль"],
@@ -77,15 +78,15 @@ const UI = {
   testPass: ["Өтті! Келесі модульге дайынсыз.", "Сдано! Вы готовы к следующему модулю."],
   testFail: ["Әлі ерте. Қате кеткен тақырыптарды қайталап, қайта тапсырыңыз.", "Пока рано. Повторите темы с ошибками и попробуйте снова."],
   best: ["Ең жақсы нәтиже", "Лучший результат"],
-  level: ["Деңгей", "Уровень"], xp: ["ұпай", "очков"], badges: ["Белгілер", "Значки"],
+  level: ["Деңгей", "Уровень"], xp: ["ұпай", "очков"], badges: ["Марапаттар", "Награды"],
   dailyGoal: ["Күнделікті мақсат", "Цель на день"], week: ["Осы апта", "Эта неделя"],
   settings: ["Баптаулар", "Настройки"], theme: ["Тақырып", "Тема"], light: ["Күндізгі", "Дневная"],
   dark: ["Түнгі", "Ночная"], system: ["Жүйелік", "Как в системе"], language: ["Тіл", "Язык"],
   resetAll: ["Барлық прогресті өшіру", "Удалить весь прогресс"],
-  resetAsk: ["Прогресс, ұпайлар мен белгілер өшеді. Сенімдісіз бе?", "Прогресс, очки и значки будут удалены. Вы уверены?"],
+  resetAsk: ["Прогресс, ұпайлар мен марапаттар өшеді. Сенімдісіз бе?", "Прогресс, очки и награды будут удалены. Вы уверены?"],
   yesReset: ["Иә, өшіру", "Да, удалить"], cancel: ["Болдырмау", "Отмена"], resetDone: ["Прогресс өшірілді", "Прогресс удалён"],
   savedHere: ["Прогресс осы құрылғыдағы браузерде сақталады.", "Прогресс хранится в браузере на этом устройстве."],
-  badgeGot: ["Жаңа белгі", "Новый значок"],
+  badgeGot: ["Жаңа марапат", "Новая награда"],
   alphabet: ["Әліпби", "Алфавит"], tajweed: ["Тәжуид ережелері", "Правила таджвида"], makhraj: ["Махраж картасы", "Карта махраджей"],
   forms4: ["жеке", "басында", "ортасында", "соңында"], forms4ru: ["отдельно", "в начале", "в середине", "в конце"],
   sound: ["Дыбысы", "Звук"], name: ["Аты", "Название"], mk: ["Махраж", "Махрадж"], sifat: ["Сипаттары", "Сифаты"],
@@ -179,7 +180,13 @@ const I = {
   play: '<path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"/>',
   pause: '<path d="M8 5h3v14H8zM13 5h3v14h-3z" fill="currentColor" stroke="none"/>',
   sound: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  learn: '<path d="M3 6.5c3-1.2 6-1.2 9 .8 3-2 6-2 9-.8V19c-3-1.2-6-1.2-9 .8-3-2-6-2-9-.8z"/><path d="M12 7.3v12.5"/>',
+  stand: '<path d="M5 21l14-8.5M19 21L5 12.5"/><path d="M4.5 11c2.5-1.8 5-1.8 7.5 0 2.5-1.8 5-1.8 7.5 0V5.5c-2.5-1.8-5-1.8-7.5 0-2.5-1.8-5-1.8-7.5 0z"/>',
+  mat: '<rect x="6" y="4" width="12" height="16" rx="2"/><path d="M8 4V2M10.7 4V2M13.3 4V2M16 4V2M8 22v-2M10.7 22v-2M13.3 22v-2M16 22v-2"/><path d="M12 8.5l3 3.5-3 3.5-3-3.5z"/>',
+  beads: '<circle cx="12" cy="4.2" r="1.3"/><circle cx="16.5" cy="5.8" r="1.3"/><circle cx="18.2" cy="10" r="1.3"/><circle cx="16.5" cy="14.2" r="1.3"/><circle cx="7.5" cy="14.2" r="1.3"/><circle cx="5.8" cy="10" r="1.3"/><circle cx="7.5" cy="5.8" r="1.3"/><path d="M12 15.5v5M10.3 21.5h3.4"/>',
+  flip: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5"/>', vib: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 8v8M20 8v8"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   flame: '<path d="M12 22c4 0 7-3 7-7 0-3-2-5.5-3.5-7-.5 2-1.5 3-3 3 .5-3-1-6-3.5-8 0 3-1.5 5-3 6.5C4.5 11 5 13 5 15c0 4 3 7 7 7z"/>',
   star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
@@ -435,57 +442,68 @@ function toast(msg, glyph) {
 }
 
 /* ═════════════ оболочка ═════════════ */
-const NAV = [["#/", "home", "home", 1], ["#/course", "course", "path", 1], ["#/suras", "suras", "quran", 1], ["#/listen", "readers", "headph", 1], ["#/practice", "practice", "target", 1], ["#/namaz", "namaz", "moon", 0], ["#/ref", "ref", "book", 0]];
-const LOGO = `<svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="var(--primary)"><rect x="16" y="16" width="68" height="68" rx="8"/><rect x="16" y="16" width="68" height="68" rx="8" transform="rotate(45 50 50)"/></g><text x="50" y="66" text-anchor="middle" font-family="Iqra Quran, Amiri Quran, serif" font-size="48" fill="var(--primary-ink)">ق</text></svg>`;
+const NAV = [["#/", "today", "sun"], ["#/course", "learn", "learn"], ["#/suras", "suras", "stand"], ["#/namaz", "namaz", "mat"], ["#/me", "me", "user"]];
+// знак Iqra: восьмиконечная звезда, внутри алиф с фатхой
+const MARK = `<svg class="mark" viewBox="0 0 120 120" aria-hidden="true"><g fill="none" stroke="var(--primary)" stroke-width="6" stroke-linejoin="round"><rect x="20" y="20" width="80" height="80" rx="6"/><rect x="20" y="20" width="80" height="80" rx="6" transform="rotate(45 60 60)"/></g><rect x="56" y="47" width="8" height="30" rx="4" fill="var(--primary)"/><rect x="51.5" y="37.5" width="17" height="5" rx="2.5" fill="var(--brass)" transform="rotate(-18 60 40)"/></svg>`;
+const brandEl = () => h("a", { class: "brand", href: "#/", "aria-label": "Iqra — " + T("brandSub"), html: MARK + '<span class="wm">iqra<i>.</i></span>' });
 function shell() {
   document.body.innerHTML = "";
-  const top = h("header", { class: "top" }, h("div", { class: "top-in" },
-    h("a", { class: "brand", href: "#/", html: LOGO + `<span><b>Iqra <i class="ar" lang="ar">اقرأ</i></b><small>${esc(T("brandSub"))}</small></span>` }),
-    h("nav", { class: "nav", "aria-label": "main" }, NAV.map(([href, k]) => h("a", { href, "data-k": k }, T(k)))),
-    h("a", { class: "chip", href: "#/me", id: "topstats", title: T("me") }),
-    h("div", { class: "lang", role: "group", "aria-label": T("language") },
-      ["kk", "ru"].map(l => h("button", { "aria-pressed": String(S.lang === l), onclick: () => setLang(l) }, l === "kk" ? "ҚАЗ" : "РУС"))),
-    h("button", { class: "iconbtn hide-m", title: T("theme"), html: icon(isDark() ? "sun" : "moon"), onclick: toggleTheme }),
-    h("a", { class: "iconbtn avatar", href: "#/me", id: "avatar", title: T("me"), html: icon("user") }),
-  ));
-  const tabbar = h("nav", { class: "tabbar", "aria-label": "main" }, NAV.filter(x => x[3]).map(([href, k, ic]) => h("a", { href, "data-k": k, html: icon(ic) + `<span>${esc(T(k))}</span>` })));
+  const langSeg = h("div", { class: "lang", role: "group", "aria-label": T("language") },
+    ["kk", "ru"].map(l => h("button", { "aria-pressed": String(S.lang === l), onclick: () => setLang(l) }, l === "kk" ? "ҚАЗ" : "РУС")));
+  const side = h("aside", { class: "side" }, brandEl(),
+    h("nav", { class: "snav", "aria-label": T("menu") }, NAV.map(([href, k, ic]) => h("a", { href, "data-k": k, html: icon(ic) + `<span>${esc(T(k))}</span>` }))),
+    h("a", { class: "side-streak", href: "#/me", id: "sidestreak" }),
+    h("div", { class: "side-f" }, langSeg, h("button", { class: "iconbtn", title: T("theme"), "aria-label": T("theme"), html: icon(isDark() ? "sun" : "moon"), onclick: toggleTheme })));
+  const top = h("header", { class: "top" }, brandEl(), h("a", { class: "chip", href: "#/me", id: "topstats", "aria-label": T("streak") }));
+  const tabbar = h("nav", { class: "tabbar", "aria-label": T("menu") }, NAV.map(([href, k, ic]) => h("a", { href, "data-k": k, "aria-label": T(k), html: icon(ic) + `<span>${esc(T(k))}</span>` })));
   const main = h("main", { id: "view", tabindex: "-1" });
   const foot = h("footer", { class: "site" }, h("p", {}, T("footer")), h("p", { style: "margin-top:6px" }, T("footer2")));
-  document.body.append(top, main, foot, tabbar, toasts);
+  document.body.append(side, top, main, foot, tabbar, toasts);
   document.documentElement.lang = S.lang === "ru" ? "ru" : "kk";
   document.title = S.lang === "ru" ? "Iqra — учимся читать Коран с нуля" : "Iqra — Құранды нөлден оқып үйрену";
   renderTopStats(); renderAvatar(); lpRender();
 }
 function renderTopStats() {
-  const el = $("#topstats"); if (!el) return;
-  el.innerHTML = icon("flame") + `<span class="num">${streak()}</span>` + `<span style="opacity:.35">|</span>` + icon("star") + `<span class="num">${S.xp}</span>`;
-  el.querySelector("svg").style.color = streak() > 0 ? "var(--gold)" : "var(--muted)";
-  el.querySelectorAll("svg")[1].style.color = "var(--gold)";
+  const n = streak();
+  const el = $("#topstats");
+  if (el) { el.innerHTML = icon("flame") + `<span class="num">${n}</span>`; el.classList.toggle("on", n > 0); }
+  const sd = $("#sidestreak");
+  if (sd) { sd.innerHTML = `<span class="ss-ic">${icon("flame")}</span><span><b class="num">${n}</b><small>${esc(T("streak"))}</small></span>`; sd.classList.toggle("on", n > 0); }
 }
 function setLang(l) { S.lang = l; save(); shell(); route(); }
 function toggleTheme() { S.theme = isDark() ? "light" : "dark"; save(); applyTheme(); shell(); route(); }
 function markNav(k) { $$("[data-k]").forEach(a => { if (a.dataset.k === k) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }); }
+const subTabs = (items, cur) => h("nav", { class: "subtabs" }, items.map(([href, label, k]) => h("a", { href, "aria-current": k === cur ? "page" : null }, label)));
+const learnTabs = cur => subTabs([["#/course", T("course"), "course"], ["#/practice", T("practice"), "practice"], ["#/ref", T("ref"), "ref"]], cur);
+const quranTabs = cur => subTabs([["#/suras", T("surasT"), "suras"], ["#/listen", T("readers"), "listen"]], cur);
+const pageHead = (title, sub, extra) => h("header", { class: "phead" }, h("h1", {}, title), sub ? h("p", { class: "muted" }, sub) : null, extra || null);
+const backHead = (href, title, sub, extra) => h("header", { class: "bhead" }, h("a", { class: "iconbtn back", href, "aria-label": T("prev"), html: icon("back") }),
+  h("div", { class: "bh-t" }, h("h1", {}, title), sub ? h("p", { class: "muted small" }, sub) : null), extra || null);
+const fmtN = n => Number(n || 0).toLocaleString(S.lang === "ru" ? "ru-RU" : "kk-KZ");
 
 /* ═════════════ маршрутизация ═════════════ */
 async function route() {
+  if (ASK_DISMISS) ASK_DISMISS();
   stopAudio(); onListenChange = null;
   if ("speechSynthesis" in window) speechSynthesis.cancel();
   const view = $("#view");
   const parts = (location.hash.replace(/^#\/?/, "") || "").split("/").map(decodeURIComponent);
   const [p0, p1, p2] = parts;
   view.innerHTML = "";
+  document.body.dataset.page = p0 || "home";
   window.scrollTo(0, 0);
   try {
-    if (!p0) { markNav("home"); await pageHome(view); }
-    else if (p0 === "course") { markNav("course"); pageCourse(view); }
-    else if (p0 === "lesson") { markNav("course"); await pageLesson(view, +p1); }
-    else if (p0 === "ref") { markNav("ref"); await pageRef(view, p1, p2); }
+    if (!p0) { markNav("today"); await pageHome(view); }
+    else if (p0 === "course") { markNav("learn"); pageCourse(view); }
+    else if (p0 === "lesson") { markNav("learn"); await pageLesson(view, +p1); }
+    else if (p0 === "ref") { markNav("learn"); await pageRef(view, p1, p2); }
     else if (p0 === "suras") { markNav("suras"); pageSuras(view); }
     else if (p0 === "sura") { markNav("suras"); await pageSura(view, +p1, p2 === "hifz", /^\d+$/.test(p2 || "") ? +p2 : 0); }
-    else if (p0 === "listen") { markNav("readers"); pageReaders(view); }
-    else if (p0 === "reader") { markNav("readers"); pageReader(view, p1); }
+    else if (p0 === "listen") { markNav("suras"); pageReaders(view); }
+    else if (p0 === "reader") { markNav("suras"); pageReader(view, p1); }
     else if (p0 === "namaz") { markNav("namaz"); await pageNamaz(view, p1); }
-    else if (p0 === "practice") { markNav("practice"); p1 ? pageTrainer(view, p1) : pagePractice(view); }
+    else if (p0 === "tasbih") { markNav("namaz"); await pageTasbih(view); }
+    else if (p0 === "practice") { markNav("learn"); p1 ? pageTrainer(view, p1) : pagePractice(view); }
     else if (p0 === "me") { markNav("me"); pageMe(view); }
     else notFound(view);
   } catch (e) { console.error(e); notFound(view); }
@@ -494,72 +512,71 @@ async function route() {
 function notFound(v) { v.append(h("div", { class: "loading" }, h("div", { class: "stack", style: "justify-items:center" }, h("h2", {}, T("notFound")), h("a", { class: "btn", href: "#/" }, T("toHome"))))); }
 
 /* ═════════════ главная ═════════════ */
-const NIGHT_SVG = `<svg viewBox="200 0 200 160" preserveAspectRatio="xMaxYMin meet" style="width:100%;height:100%"><g fill="var(--gold)">
-  <path d="M338 46a30 30 0 1 0 28 40 24 24 0 1 1-28-40z" opacity=".95"/>
-  ${[[300, 30, 1.6], [262, 70, 1.1], [372, 132, 1.3], [230, 22, 1], [320, 110, 0.9], [210, 96, 1.2], [386, 34, 1], [180, 40, 0.8]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" opacity=".8"/>`).join("")}
-</g></svg>`;
+// аят дня: короткие известные аяты, один на каждый день
+const AYAH_DAY = [[1, 2], [2, 152], [2, 153], [2, 186], [2, 201], [3, 8], [3, 139], [3, 173], [9, 51], [13, 28], [14, 7], [17, 24], [20, 25], [20, 114],
+  [25, 74], [29, 69], [39, 53], [40, 60], [49, 13], [55, 13], [57, 4], [64, 11], [65, 3], [93, 5], [94, 5], [94, 6], [108, 1], [112, 1]];
 function nextLessonN() {
   for (const l of COURSE.lessons) if (l.ready && !(S.lessons[l.n] && S.lessons[l.n].done)) return l.n;
   return 1;
 }
+const firstAr = o => { const m = String(L(o)).match(AR_RUN); return m ? m[0] : ""; };
+const heroGlyph = les => { const g = firstAr(les.title); return g && g.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\s]/g, "").length <= 3 ? g : "ا"; };
+function ayahOfDay() {
+  const ru = S.lang === "ru";
+  const day = Math.floor((Date.now() - new Date().getTimezoneOffset() * 6e4) / 864e5);
+  const [as, aa] = AYAH_DAY[day % AYAH_DAY.length];
+  const su = suraBy(as);
+  const box = h("section", { class: "aod", "aria-label": ru ? "Аят дня" : "Күн аяты" });
+  const play = h("button", { class: "aod-play", type: "button", "aria-label": T("play"), html: icon("play") });
+  play.onclick = () => playURL(ayahURL(as, aa), box);
+  box.append(h("div", { class: "aod-h", html: `${icon("star")}<b>${esc(ru ? "Аят дня" : "Күн аяты")}</b><a href="#/sura/${as}/${aa}">${esc(L(su.name))}, ${aa}</a>` }, play));
+  const arEl = h("div", { class: "aod-ar", lang: "ar" }, "…"), tlEl = h("p", { class: "aod-tl" });
+  box.append(arEl, tlEl);
+  loadSura(as).then(d => { const a = d.ayat[aa - 1]; arEl.innerHTML = esc(a.sp.map(x => x[0]).join("")) + " " + ayahMark(aa); }).catch(() => { arEl.textContent = ""; });
+  loadTl(as).then(t => { tlEl.textContent = t[aa - 1] || ""; }).catch(() => {});
+  return box;
+}
 async function pageHome(v) {
+  const ru = S.lang === "ru";
   const started = doneCount() > 0;
-  const n = nextLessonN();
-  const les = COURSE.lessons[n - 1];
-  const hero = h("section", { class: "hero" },
-    h("div", { class: "night", "aria-hidden": "true", html: NIGHT_SVG }),
-    h("div", {},
-      h("h1", {}, T("heroTitle")),
-      h("p", { class: "lead" }, T("heroLead")),
-      h("div", { class: "row" },
-        h("a", { class: "btn", href: `#/lesson/${n}`, html: esc(started ? T("cont") : T("start")) + icon("arrow") }),
-        h("a", { class: "btn ghost", href: "#/course" }, T("seeCourse")))),
-    h("div", { class: "hero-art" },
-      h("div", { class: "hero-word", lang: "ar" }, "ٱقْرَأْ"),
-      h("div", { class: "hero-word-cap" }, T("heroWord"))));
-  v.append(hero);
+  const n = nextLessonN(), les = COURSE.lessons[n - 1], M = moduleOf(n);
+  const tx = S.days[today()] || 0, goal = S.goal;
+  const sub = tx >= goal ? (ru ? `Цель дня выполнена: ${tx} очков. Машаллах!` : `Күндік мақсат орындалды: ${tx} ұпай. Машаллаһ!`)
+    : started ? (ru ? `Сегодня ${tx} из ${goal} очков. Ещё один урок — и цель дня ближе.` : `Бүгін ${goal} ұпайдың ${tx}-і жиналды. Тағы бір сабақ — мақсатқа жақындайсыз.`)
+    : T("heroLead");
+  v.append(pageHead(T("salam"), sub));
+  const pct = Math.round(doneCount() / 110 * 100);
+  const hero = h("a", { class: "hero2", href: `#/lesson/${n}`, html:
+    `<span class="h2-g" lang="ar">${esc(heroGlyph(les))}</span><span class="h2-t"><small>${esc(T("lesson"))} ${n} ${ru ? "из" : "/"} 110 · ${esc(T("module"))} ${M.id}</small><b>${mdInline(les.title)}</b>` +
+    `<span class="h2-bar" aria-hidden="true"><i style="width:${Math.max(3, pct)}%"></i></span><span class="h2-btn">${icon("play")}${esc(started ? T("cont") : T("start"))}</span></span>` });
+  v.append(h("div", { class: "home-top" }, hero, ayahOfDay()));
 
-  const goal = S.goal, tx = S.days[today()] || 0;
-  const pct = Math.min(1, tx / goal);
-  const ring = `<svg class="goal-ring" viewBox="0 0 40 40" style="width:36px;height:36px"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--surface-2)" stroke-width="5"/><circle cx="20" cy="20" r="16" fill="none" stroke="var(--gold)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(100.5 * pct).toFixed(1)} 200" transform="rotate(-90 20 20)"/></svg>`;
-  v.append(h("div", { class: "stats" },
-    h("a", { class: "stat", href: "#/me", style: "text-decoration:none;color:inherit", html: `<span style="color:${streak() ? "var(--gold)" : "var(--muted)"}">${icon("flame")}</span><div><b>${streak()}</b><span>${esc(T("streak"))}</span></div>` }),
-    h("a", { class: "stat", href: "#/me", style: "text-decoration:none;color:inherit", html: `${ring}<div><b>${tx}<span style="font-size:14px;color:var(--muted)"> / ${goal}</span></b><span>${esc(T("todayXp"))}</span></div>` }),
-    h("a", { class: "stat", href: "#/course", style: "text-decoration:none;color:inherit", html: `<span style="color:var(--primary)">${icon("path")}</span><div><b>${doneCount()}<span style="font-size:14px;color:var(--muted)"> / 110</span></b><span>${esc(T("lessonsDone"))}</span></div>` })));
-
-  if (les) {
-    const M = moduleOf(n);
-    v.append(h("section", { class: "section" },
-      h("a", { class: "next", href: `#/lesson/${n}`, html: `${rosette(n, "")}<div><small>${esc(T("nextLesson"))} · ${esc(T("module"))} ${M.id}</small><b>${esc(L(les.title))}</b></div><span class="go">${icon("arrow")}</span>` })));
-  }
-
-  const lastS = S.last && suraBy(S.last.s);
-  v.append(h("section", { class: "section quick" },
-    h("a", { class: "qcard", href: lastS ? `#/sura/${lastS.n}/${S.last.a}` : "#/suras", html: `<span class="qi">${icon("quran")}</span><div><b>${esc(lastS ? T("contRead") : T("suras"))}</b><small>${esc(lastS ? `${L(lastS.name)} · ${S.last.a} ${T("ayahN")}` : (S.lang === "ru" ? "114 сур с переводом" : "114 сүре, аудармасымен"))}</small></div>` }),
-    h("a", { class: "qcard", href: "#/listen", html: `<span class="qi">${icon("headph")}</span><div><b>${esc(T("readers"))}</b><small>${esc(S.lang === "ru" ? "11 известных чтецов" : "11 танымал қари")}</small></div>` }),
-    h("a", { class: "qcard", href: "#/namaz", html: `<span class="qi">${icon("moon")}</span><div><b>${esc(T("namaz"))}</b><small>${esc(S.lang === "ru" ? "Что читать в молитве" : "Намазда не оқылады")}</small></div>` }),
-    h("a", { class: "qcard", href: "#/ref", html: `<span class="qi">${icon("book")}</span><div><b>${esc(T("ref"))}</b><small>${esc(S.lang === "ru" ? "Алфавит, таджвид, махрадж" : "Әліпби, тәжуид, махраж")}</small></div>` })));
+  const lastS = S.last && suraBy(S.last.s), st = streak(), ts = S.tsb || {};
+  const tile = (href, ic, title, sub, cls = "") => h("a", { class: "tile " + cls, href, html: `<span class="t-ic">${icon(ic)}</span><b>${esc(title)}</b><small>${esc(sub)}</small>` });
+  v.append(h("div", { class: "tiles" },
+    tile(lastS ? `#/sura/${lastS.n}/${S.last.a}` : "#/suras", "stand", lastS ? T("contRead") : T("suras"),
+      lastS ? `${L(lastS.name)}, ${S.last.a} ${T("ayahN")}` : (ru ? "114 сур с переводом" : "114 сүре, аудармасымен")),
+    tile("#/me", "flame", ru ? `${st} ${plRu(st, "день", "дня", "дней")} подряд` : `${st} күн қатарынан`, ru ? `Цель на день — ${goal} очков` : `Күндік мақсат — ${goal} ұпай`, "warm"),
+    tile("#/tasbih", "beads", ru ? "Тасбих" : "Тәсбих", ts.total ? fmtN(ts.total) : (ru ? "После намаза" : "Намаздан кейін")),
+    tile("#/listen", "headph", T("listen"), ru ? `${READERS.length} чтецов` : `${READERS.length} қари`)));
 
   const mods = h("div", { class: "mods" });
-  for (const M of COURSE.modules) {
-    let d = 0, tot = M.to - M.from + 1;
-    for (let i = M.from; i <= M.to; i++) if (S.lessons[i] && S.lessons[i].done) d++;
-    mods.append(h("a", { class: "mod", href: `#/course#m${M.id}`, html:
-      `<div><h3>${esc(T("module"))} ${M.id}. ${esc(L(M.title))}</h3></div><span class="mar">${M.ar}</span>
-       <p>${esc(L(M.desc))}</p><div class="bar"><i style="width:${(d / tot * 100).toFixed(0)}%"></i></div>
-       <div class="meta"><span>${esc(T("lesson"))} ${M.from}–${M.to}</span><span class="num">${d} / ${tot}</span></div>` }));
+  for (const Mo of COURSE.modules) {
+    let d = 0; const tot = Mo.to - Mo.from + 1;
+    for (let i = Mo.from; i <= Mo.to; i++) if (S.lessons[i] && S.lessons[i].done) d++;
+    mods.append(h("a", { class: "mod", href: `#/course#m${Mo.id}`, html:
+      `<div><h3>${esc(T("module"))} ${Mo.id}. ${esc(L(Mo.title))}</h3></div><span class="mar">${Mo.ar}</span>
+       <p>${esc(L(Mo.desc))}</p><div class="bar"><i style="width:${(d / tot * 100).toFixed(0)}%"></i></div>
+       <div class="meta"><span>${esc(T("lesson"))} ${Mo.from}–${Mo.to}</span><span class="num">${d} / ${tot}</span></div>` }));
   }
   v.append(h("section", { class: "section" }, h("div", { class: "section-h" }, h("h2", {}, T("modules")), h("a", { href: "#/course" }, T("seeCourse"))), mods));
-
-  v.append(h("section", { class: "section" }, h("div", { class: "section-h" }, h("h2", {}, T("how"))),
+  if (!started) v.append(h("section", { class: "section" }, h("div", { class: "section-h" }, h("h2", {}, T("how"))),
     h("div", { class: "steps" }, [1, 2, 3].map(i => h("div", { class: "step", html: `<b><i>${i}</i>${esc(T("how" + i + "t"))}</b><p>${esc(T("how" + i))}</p>` })))));
 }
 
 /* ═════════════ карта курса ═════════════ */
 function pageCourse(v) {
-  v.append(h("div", { class: "read" },
-    h("h1", {}, T("course")),
-    h("p", { class: "muted", style: "margin-top:8px" }, T("wordsLearned"))));
+  v.append(h("div", { class: "read" }, pageHead(T("learn"), T("wordsLearned"), learnTabs("course"))));
   const cur = nextLessonN();
   for (const M of COURSE.modules) {
     const sec = h("section", { class: "path-mod read", id: "m" + M.id });
@@ -583,10 +600,12 @@ function pageCourse(v) {
 }
 
 /* ═════════════ окно подтверждения ═════════════ */
+let ASK_DISMISS = null; // закрыть открытый диалог без ответа (при переходе на другую страницу)
 function ask({ title, text, yes, no, icon: ic = "alert" }) {
   return new Promise(res => {
     const prev = document.activeElement;
-    const close = v => { wrap.remove(); document.removeEventListener("keydown", onKey); if (prev && prev.focus) prev.focus(); res(v); };
+    const close = v => { wrap.remove(); document.removeEventListener("keydown", onKey); ASK_DISMISS = null; if (v !== null && prev && prev.focus) prev.focus(); res(v); };
+    if (ASK_DISMISS) ASK_DISMISS(); ASK_DISMISS = () => close(null);
     const onKey = e => { if (e.key === "Escape") close(false); };
     const yb = h("button", { class: "btn ghost" }, yes), nb = h("button", { class: "btn" }, no);
     yb.onclick = () => close(true); nb.onclick = () => close(false);
@@ -630,7 +649,9 @@ async function allowLesson(n) {
 async function pageLesson(v, n) {
   const meta = COURSE.lessons[n - 1];
   if (!meta || !meta.ready) return notFound(v);
-  if (!(await allowLesson(n))) { location.replace(`#/lesson/${undoneBefore(n)[0]}`); return; }
+  const okL = await allowLesson(n);
+  if (okL === null) return; // ушли на другую страницу, пока был открыт диалог
+  if (!okL) { location.replace(`#/lesson/${undoneBefore(n)[0]}`); return; }
   const M = moduleOf(n);
   const list = await loadModule(M.id);
   const les = list.find(x => x.n === n);
@@ -1187,7 +1208,7 @@ function suraSearch(onChange) {
   return h("div", { class: "sfind" }, h("label", { class: "sbox", html: icon("search") }, inp), seg);
 }
 function pageSuras(v) {
-  v.append(h("h1", {}, T("suras")), h("p", { class: "muted", style: "margin:8px 0 16px" }, T("quranLead")));
+  v.append(pageHead(T("suras"), T("quranLead"), quranTabs("suras")));
   const ls = S.last && suraBy(S.last.s);
   if (ls) v.append(h("a", { class: "next", style: "margin-bottom:16px", href: `#/sura/${ls.n}/${S.last.a}`, html: `${rosette(ls.n)}<div><small>${esc(T("contRead"))}</small><b>${esc(L(ls.name))} · ${S.last.a} ${esc(T("ayahN"))}</b></div><span class="go">${icon("arrow")}</span>` }));
   const g = h("div", { class: "slist" });
@@ -1325,14 +1346,20 @@ async function pageSura(v, n, hifz, goto) {
   wrap.append(h("div", { class: "lnav" },
     pv ? h("a", { class: "btn ghost", href: `#/sura/${pv.n}${hifz ? "/hifz" : ""}`, html: icon("back") + esc(L(pv.name)) }) : h("span"),
     nx ? h("a", { class: "btn ghost", href: `#/sura/${nx.n}${hifz ? "/hifz" : ""}`, html: esc(L(nx.name)) + icon("arrow") }) : h("span")));
-  v.append(wrap);
+  const sl = h("div", { class: "slist" });
+  const sHref = hifz ? x => `#/sura/${x.n}/hifz` : null;
+  const markCur = () => { const a = sl.querySelector(`a[href="#/sura/${n}${hifz ? "/hifz" : ""}"]`); if (a) a.classList.add("now"); };
+  const side = h("aside", { class: "sura-side", "aria-label": T("surasT") }, suraSearch((q, m) => { suraFilter(sl, q, m, sHref); markCur(); }), sl);
+  suraFilter(sl, "", "all", sHref); markCur();
+  v.append(h("div", { class: "sura-layout" }, side, wrap));
+  setTimeout(() => { const a = sl.querySelector(".now"); if (a && sl.offsetParent) sl.scrollTop = a.offsetTop - sl.offsetTop - 140; }, 40);
   if (goto && cards[goto - 1]) { idx = goto - 1; setTimeout(() => cards[goto - 1].scrollIntoView({ block: "center" }), 60); cards[goto - 1].classList.add("flash"); }
 }
 
 /* ═════════════ чтецы ═════════════ */
 function pageReaders(v) {
   const ru = S.lang === "ru";
-  v.append(h("h1", {}, T("readers")), h("p", { class: "muted", style: "margin:8px 0 18px" }, T("listenLead")));
+  v.append(pageHead(T("suras"), T("listenLead"), quranTabs("listen")));
   if (LP && LP.a.src) {
     const r = readerOf(S.listen.r), su = suraBy(S.listen.s);
     v.append(h("a", { class: "next", style: "margin-bottom:16px", href: `#/reader/${r.id}`, html: `${readerAva(r, "sm")}<div><small>${esc(ru ? "Сейчас звучит" : "Қазір ойнап тұр")}</small><b>${esc(L(su.name))} · ${esc(L({ kk: r.n[0], ru: r.n[1] }))}</b></div><span class="go">${icon("arrow")}</span>` }));
@@ -1408,58 +1435,153 @@ function duaCard(t, opts = {}) {
   card.append(h("div", { class: "dua-f" }, pb, t.au ? null : h("small", { class: "muted" }, ru ? "голос устройства" : "құрылғы дауысы")));
   return card;
 }
-function tasbihEl(d) {
+// позы намаза (ханафитский мазхаб): m_ — мужчины, f_ — женщины; лица не рисуем
+const POSES = {"m_qiyam": "<path d=\"M48 58 L48 90\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 58 L54 90\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M48 90 L42 91\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 90 L48 91\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M51 28 L51 56\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"51\" cy=\"15\" r=\"7.5\" fill=\"currentColor\"/><path d=\"M43.4 13.5a7.6 7.6 0 0 1 15.2 0z\" fill=\"#b88a4e\" transform=\"rotate(0 51 15)\"/><path d=\"M55 31 L55 44 L44 49\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "m_ruku": "<path d=\"M64 56 L64 90\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"10\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M64 90 L57 91\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M64 54 L34 54\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"24\" cy=\"54\" r=\"7.5\" fill=\"currentColor\"/><path d=\"M16.4 52.5a7.6 7.6 0 0 1 15.2 0z\" fill=\"#b88a4e\" transform=\"rotate(-90 24 54)\"/><path d=\"M38 58 L46 68 L60 70\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "m_sujud": "<path d=\"M68 58 L62 88\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"10\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M62 88 L80 86 L76 91\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 59 L34 78\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"14\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"23\" cy=\"83\" r=\"7.5\" fill=\"currentColor\"/><path d=\"M15.4 81.5a7.6 7.6 0 0 1 15.2 0z\" fill=\"#b88a4e\" transform=\"rotate(-125 23 83)\"/><path d=\"M36 80 L46 83 L30 91\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "m_julus": "<path d=\"M58 80 L34 86\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"11\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M34 89 L64 89\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M68 89 L70 79\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M58 40 L58 78\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"58\" cy=\"27\" r=\"7.5\" fill=\"currentColor\"/><path d=\"M50.4 25.5a7.6 7.6 0 0 1 15.2 0z\" fill=\"#b88a4e\" transform=\"rotate(0 58 27)\"/><path d=\"M54 44 L50 62 L38 80\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "f_qiyam": "<path d=\"M43 30h16l6 60H37z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linejoin=\"round\"/><g transform=\"rotate(0 51 16)\"><path d=\"M51 6a10 10 0 0 1 10 10c0 6-2 10-2 14H43c0-4-2-8-2-14A10 10 0 0 1 51 6z\" fill=\"#b88a4e\"/></g><circle cx=\"51\" cy=\"16\" r=\"6\" fill=\"#f3e3c8\"/><path d=\"M56 34 L54 41 L44 41\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "f_ruku": "<path d=\"M60 54L62 90H48L50 60z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"7\" stroke-linejoin=\"round\"/><path d=\"M60 56 L36 42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><g transform=\"rotate(-60 30 38)\"><path d=\"M30 28a10 10 0 0 1 10 10c0 6-2 10-2 14H22c0-4-2-8-2-14A10 10 0 0 1 30 28z\" fill=\"#b88a4e\"/></g><circle cx=\"30\" cy=\"38\" r=\"6\" fill=\"#f3e3c8\"/><path d=\"M40 48 L46 60 L51 68\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "f_sujud": "<path d=\"M50 92C51 78 60 66 70 66C79 66 84 78 84 92Z\" fill=\"currentColor\"/><path d=\"M64 72 L36 84\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"14\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><g transform=\"rotate(-120 25 85)\"><path d=\"M25 75a10 10 0 0 1 10 10c0 6-2 10-2 14H17c0-4-2-8-2-14A10 10 0 0 1 25 75z\" fill=\"#b88a4e\"/></g><circle cx=\"25\" cy=\"85\" r=\"6\" fill=\"#f3e3c8\"/><path d=\"M38 86 L47 91 L30 91\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "f_julus": "<path d=\"M30 92C30 80 40 72 56 72C70 72 77 82 79 92Z\" fill=\"currentColor\"/><path d=\"M80 90 L87 90\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M56 42 L56 74\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><g transform=\"rotate(0 56 25)\"><path d=\"M56 15a10 10 0 0 1 10 10c0 6-2 10-2 14H48c0-4-2-8-2-14A10 10 0 0 1 56 15z\" fill=\"#b88a4e\"/></g><circle cx=\"56\" cy=\"25\" r=\"6\" fill=\"#f3e3c8\"/><path d=\"M52 46 L49 62 L40 77\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"};
+const POSE_NAMES = { qiyam: ["Қиям", "Стояние"], ruku: ["Рукуғ", "Поклон"], sujud: ["Сәжде", "Суджуд"], julus: ["Отырыс", "Сидение"] };
+const POSE_OF = ["qiyam", "qiyam", "qiyam", "qiyam", "qiyam", "qiyam", "ruku", "qiyam", "sujud", "qiyam", "julus", "julus"];
+const poseSVG = k => `<svg class="pose" viewBox="6 4 88 92" aria-hidden="true">${POSES[(S.nzg === "f" ? "f" : "m") + "_" + k]}</svg>`;
+function genderSeg(onChange, cls = "") {
   const ru = S.lang === "ru";
-  const seq = [["subhan", 33], ["hamd", 33], ["akbar", 33], ["tahlil", 1]];
-  let i = 0, c = 0;
-  const box = h("div", { class: "tasbih" });
-  const lab = h("div", { class: "ts-ar", lang: "ar" }), tr = h("div", { class: "ts-tr" }), num = h("b", { class: "ts-n num" });
-  const btn = h("button", { class: "ts-btn", type: "button", "aria-label": ru ? "Счёт" : "Санау" }, num);
-  const dots = h("div", { class: "ts-dots" });
-  const reset = h("button", { class: "linkbtn", type: "button" }, ru ? "Начать заново" : "Қайта бастау");
-  const draw = () => {
-    const done = i >= seq.length;
-    const [k, n] = done ? seq[seq.length - 1] : seq[i];
-    lab.textContent = done ? "✓" : d.texts[k].ar; tr.textContent = done ? (ru ? "Тасбих завершён. Да примет Аллах!" : "Тәсбих аяқталды. Аллаһ қабыл етсін!") : L(d.texts[k].tr);
-    num.textContent = done ? "" : `${c} / ${n}`;
-    dots.innerHTML = seq.map((_, j) => `<i class="${j < i ? "on" : j === i ? "cur" : ""}"></i>`).join("");
-    btn.disabled = done;
-  };
-  btn.onclick = () => {
-    c++; if (navigator.vibrate) navigator.vibrate(12);
-    if (c >= seq[i][1]) { i++; c = 0; if (navigator.vibrate) navigator.vibrate([40, 40, 40]); }
-    draw();
-  };
-  reset.onclick = () => { i = 0; c = 0; draw(); };
-  draw();
-  box.append(h("h3", {}, ru ? "Счётчик тасбиха" : "Тәсбих санағыш"), h("p", { class: "muted small" }, ru ? "Нажимайте на круг на каждый зикр: 33 + 33 + 33 и в конце тахлиль." : "Әр зікірде шеңберді басыңыз: 33 + 33 + 33, соңында тәһлил."), lab, tr, btn, dots, reset);
-  return box;
+  const seg = h("div", { class: "gseg " + cls, role: "group", "aria-label": ru ? "Для кого" : "Кім үшін" });
+  [["m", ru ? "Мужчины" : "Ер адамдар"], ["f", ru ? "Женщины" : "Әйелдер"]].forEach(([g, t]) => {
+    const b = h("button", { type: "button", "aria-pressed": String((S.nzg === "f" ? "f" : "m") === g) }, t);
+    b.onclick = e => { e.preventDefault(); e.stopPropagation(); S.nzg = g; save(); $$("button", seg).forEach(x => x.setAttribute("aria-pressed", String(x === b))); onChange(); };
+    seg.append(b);
+  });
+  return seg;
 }
-async function pageNamaz(v) {
+const shelf = (title, note, href) => h("div", { class: "shelf" }, h("h2", {}, title), note ? h(href ? "a" : "span", { href: href || null }, note) : null);
+const prayerName = p => L(p.n).replace(/\s*\(.*\)\s*$/, "");
+async function pageNamaz(v, sub) {
   const d = await loadNZ();
-  await loadSura(2);
   const ru = S.lang === "ru";
-  const wrap = h("div", { class: "read stack namaz" });
-  wrap.append(h("h1", {}, T("namaz")), mdEl(d.intro),
-    h("nav", { class: "nz-jump", "aria-label": ru ? "Разделы" : "Бөлімдер" }, [["nz-r", ru ? "Ракааты" : "Рәкағаттар"], ["nz-s", ru ? "Порядок чтения" : "Оқу реті"], ["nz-w", ru ? "Витр" : "Үтір"], ["nz-a", ru ? "После намаза" : "Намаздан кейін"]].map(([id, t]) => {
-      const a = h("a", { href: "#" + id }, t); a.onclick = e => { e.preventDefault(); document.getElementById(id).scrollIntoView({ behavior: "smooth", block: "start" }); }; return a; })));
-  const pr = h("div", { class: "nz-pr" }, d.prayers.map(p => h("div", { class: "nz-p", html: `<div><b>${esc(L(p.n))}</b><span class="ar" lang="ar">${p.ar}</span></div><div class="nz-k">${p.r.map(([k, n]) => `<span class="nz-${k}"><b>${n}</b> ${esc(L(d.kinds[k]))}</span>`).join("")}</div>` })));
-  wrap.append(h("h2", { id: "nz-r" }, ru ? "Сколько ракаатов в каждом намазе" : "Әр намаз неше рәкағат"), pr);
-  wrap.append(h("h2", { id: "nz-s" }, ru ? "Что читать — по порядку (намаз из 2 ракаатов)" : "Не оқылады — ретімен (2 рәкағатты намаз)"));
+  if (sub === "how") return nzHow(v, d);
+  if (sub === "prayers") return nzPrayers(v, d);
+  if (sub === "read") return nzRead(v, d);
+  if (sub === "after") { await loadSura(2); return nzAfter(v, d); }
+  if (sub === "witr") return nzWitr(v, d);
+  if (sub) return notFound(v);
+  v.append(pageHead(T("namaz"), ru ? "Ханафитский мазхаб · шаг за шагом" : "Ханафи мазһабы · қадам-қадаммен"));
+  const poses = h("span", { class: "nz-poses" });
+  const drawP = () => { poses.innerHTML = ["qiyam", "ruku", "sujud", "julus"].map(k => `<span class="nz-pose"><span class="pz">${poseSVG(k)}</span><small>${esc(L({ kk: POSE_NAMES[k][0], ru: POSE_NAMES[k][1] }))}</small></span>`).join(""); };
+  drawP();
+  v.append(h("div", { class: "nz-hero" },
+    h("a", { class: "nz-hero-h", href: "#/namaz/how", html: `<span><b>${esc(ru ? "Как совершать намаз" : "Намаз қалай оқылады")}</b><small>${d.steps.length} ${esc(ru ? "шагов: что читать и когда" : "қадам: не және қашан оқылады")}</small></span><span class="go">${icon("chev")}</span>` }),
+    genderSeg(drawP), h("a", { class: "nz-poses-a", href: "#/namaz/how", "aria-label": ru ? "Пошаговая инструкция" : "Қадамдық нұсқаулық" }, poses)));
+
+  const fardOf = p => (p.r.find(([k]) => k === "f") || [0, 0])[1];
+  v.append(shelf(ru ? "Пять намазов" : "Бес уақыт намаз", ru ? "ракааты фарда" : "парыз рәкағаттары"),
+    h("div", { class: "nz-five" }, d.prayers.map(p => h("a", { href: "#/namaz/prayers", html: `<b class="num">${fardOf(p)}</b><small>${esc(prayerName(p))}</small>` }))));
+
+  const firstW = s => String(s).split(/\s+/)[0];
+  v.append(shelf(ru ? "Что читать в намазе" : "Намазда не оқылады", ru ? "все тексты →" : "барлық мәтін →", "#/namaz/read"),
+    h("div", { class: "nz-rlist" }, [[L(d.texts.sana.t), firstW(d.texts.sana.ar)], [ru ? "Аль-Фатиха" : "Әл-Фатиха", "ٱلْحَمْدُ"], [L(d.texts.tashahhud.t), firstW(d.texts.tashahhud.ar)]].map(([t, ar], i) =>
+      h("a", { href: "#/namaz/read", html: `<i>${i + 1}</i><b>${esc(t)}</b><span class="ar" lang="ar">${esc(ar)}</span>` }))));
+
+  const ts = S.tsb || {};
+  v.append(shelf(ru ? "После намаза" : "Намаздан кейін"),
+    h("div", { class: "nz-after" },
+      h("a", { class: "glass", href: "#/tasbih", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(ru ? "Тасбих" : "Тәсбих")}</b><small class="num">${esc(ts.total ? fmtN(ts.total) : "33 · 33 · 33")}</small></span>` }),
+      h("a", { class: "glass", href: "#/namaz/after", html: `<span class="t-ic ar" lang="ar">ٱللَّهُ</span><span><b>${esc(ru ? "Аят аль-Курси" : "Аятул-Күрси")}</b><small>${esc(ru ? "и азкары" : "және зікірлер")}</small></span>` })),
+    h("a", { class: "nz-row", href: "#/namaz/witr", html: `<b>${esc(ru ? "Витр и дуа «Кунут»" : "Үтір және «Құнут» дұғасы")}</b>${icon("chev")}` }),
+    h("div", { class: "box tip nz-note" }, mdEl(d.intro)));
+}
+function nzHow(v, d) {
+  const ru = S.lang === "ru";
+  const figs = [];
+  v.append(backHead("#/namaz", ru ? "Как совершать намаз" : "Намаз қалай оқылады", ru ? "Намаз из 2 ракаатов — по порядку" : "2 рәкағатты намаз — ретімен"),
+    genderSeg(() => figs.forEach(([el, k]) => { el.innerHTML = poseSVG(k); }), "light"));
   const ol = h("ol", { class: "nz-steps" });
-  d.steps.forEach(st => {
-    const li = h("li", {}, h("h3", {}, L(st.t)), mdEl(st.d));
-    st.items.forEach(k => li.append(duaCard(d.texts[k])));
-    if (st.sura) li.append(h("a", { class: "btn ghost", href: `#/sura/${st.sura}` , html: icon("quran") + esc(ru ? "Открыть «Аль-Фатиху» с аудио" : "«Фатиханы» аудиомен ашу") }));
+  d.steps.forEach((st, i) => {
+    const k = POSE_OF[i] || "qiyam";
+    const fig = h("span", { class: "pz", html: poseSVG(k) }); figs.push([fig, k]);
+    const li = h("li", {}, h("div", { class: "nz-st-h" }, fig, h("div", {}, h("small", { class: "muted" }, `${ru ? "Шаг" : "Қадам"} ${i + 1} · ${L({ kk: POSE_NAMES[k][0], ru: POSE_NAMES[k][1] })}`), h("h3", {}, L(st.t)))), mdEl(st.d));
+    st.items.forEach(key => li.append(duaCard(d.texts[key])));
+    if (st.sura) li.append(h("a", { class: "btn ghost", href: `#/sura/${st.sura}`, html: icon("stand") + esc(ru ? "Открыть «Аль-Фатиху» с аудио" : "«Фатиханы» аудиомен ашу") }));
     if (st.suras) li.append(h("div", { class: "nz-suras" }, st.suras.map(n => { const s = suraBy(n); return h("a", { class: "pill primary", href: `#/sura/${n}` }, `${n}. ${L(s.name)}`); })));
     ol.append(li);
   });
-  wrap.append(ol);
-  wrap.append(h("h2", { id: "nz-w" }, ru ? "Намаз витр" : "Үтір намазы"), h("div", { class: "box tip" }, mdEl(d.witr)), duaCard(d.texts.qunut));
-  wrap.append(h("h2", { id: "nz-a" }, ru ? "После намаза" : "Намаздан кейін"));
-  d.after.forEach(k => wrap.append(duaCard(d.texts[k])));
-  wrap.append(tasbihEl(d));
+  v.append(ol);
+}
+function nzPrayers(v, d) {
+  const ru = S.lang === "ru";
+  v.append(backHead("#/namaz", ru ? "Пять намазов" : "Бес уақыт намаз", ru ? "Сколько ракаатов в каждом намазе" : "Әр намаз неше рәкағат"));
+  v.append(h("div", { class: "nz-pr" }, d.prayers.map(p => h("div", { class: "nz-p", html: `<div><b>${esc(L(p.n))}</b><span class="ar" lang="ar">${p.ar}</span></div><div class="nz-k">${p.r.map(([k, n]) => `<span class="nz-${k}"><b>${n}</b> ${esc(L(d.kinds[k]))}</span>`).join("")}</div>` }))));
+  v.append(h("p", { class: "muted small", style: "margin-top:12px" }, ru ? "Порядок внутри каждого намаза — слева направо." : "Әр намаздың ішіндегі реті — солдан оңға қарай."));
+}
+function nzRead(v, d) {
+  const ru = S.lang === "ru";
+  v.append(backHead("#/namaz", ru ? "Что читать в намазе" : "Намазда не оқылады", ru ? "Все тексты по порядку, с озвучкой" : "Барлық мәтін ретімен, дыбысымен"));
+  const wrap = h("div", { class: "stack" });
+  d.steps.forEach(st => {
+    if (!st.items.length && !st.sura) return;
+    wrap.append(h("h3", { class: "nz-rh" }, L(st.t)));
+    if (st.sura) wrap.append(h("a", { class: "nz-row", href: `#/sura/${st.sura}`, html: `<b>${esc(ru ? "Сура «Аль-Фатиха» — с аудио и переводом" : "«Фатиха» сүресі — аудиосы және аудармасымен")}</b>${icon("chev")}` }));
+    st.items.forEach(key => wrap.append(duaCard(d.texts[key])));
+  });
   v.append(wrap);
+}
+function nzAfter(v, d) {
+  const ru = S.lang === "ru";
+  v.append(backHead("#/namaz", ru ? "После намаза" : "Намаздан кейін", ru ? "Истигфар, дуа и Аят аль-Курси" : "Истиғфар, дұға және Аятул-Күрси"));
+  const wrap = h("div", { class: "stack" });
+  d.after.filter(k => !["subhan", "hamd", "akbar", "tahlil"].includes(k)).forEach(k => wrap.append(duaCard(d.texts[k])));
+  wrap.append(h("a", { class: "glass", href: "#/tasbih", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(ru ? "Тасбих: 33 · 33 · 33 и тахлиль" : "Тәсбих: 33 · 33 · 33 және тәһлил")}</b><small>${esc(ru ? "Счётчик с карточками" : "Карточкалы санағыш")}</small></span>` }));
+  v.append(wrap);
+}
+function nzWitr(v, d) {
+  const ru = S.lang === "ru";
+  v.append(backHead("#/namaz", ru ? "Витр" : "Үтір намазы", ru ? "3 ракаата после ночного намаза" : "Құптан намазынан кейін 3 рәкағат"),
+    h("div", { class: "stack" }, h("div", { class: "box tip" }, mdEl(d.witr)), duaCard(d.texts.qunut)));
+}
+
+/* ───── тасбих: карточка-зикр переворачивается, счёт сохраняется ───── */
+const TS_FACT = {
+  subhan: { kk: ["«Субханаллаһ» мен «Әлхамдулиллаһ» аспан мен жердің арасын толтырады", "Пайғамбар ﷺ осы екі қысқа сөздің сауабы соншалықты үлкен екенін айтқан.", "Хадис, Муслим, 223"],
+    ru: ["«Субханаллах» и «Альхамдулиллях» наполняют пространство между небесами и землёй", "Пророк ﷺ сказал, что награда за эти два коротких слова настолько велика.", "Хадис, Муслим, 223"] },
+  hamd: { kk: ["«Әлхамдулиллаһ» таразыны толтырады", "Пайғамбар ﷺ осы бір қысқа сөз Қиямет күні таразы табағын толтыратындай салмақты екенін айтқан.", "Хадис, Муслим, 223"],
+    ru: ["«Альхамдулиллях» наполняет Весы", "Пророк ﷺ сказал, что одно это короткое слово так весомо, что заполняет чашу Весов в Судный день.", "Хадис, Муслим, 223"] },
+  akbar: { kk: ["Аллаһқа ең сүйікті төрт сөз", "«Субханаллаһ, Әлхамдулиллаһ, Лә иләһә илләллаһ, Аллаһу әкбар». Қайсысынан бастасаң да, бәрібір.", "Хадис, Муслим, 2137"],
+    ru: ["Четыре самых любимых Аллахом слова", "«Субханаллах, Альхамдулиллях, Ля иляха илляллах, Аллаху акбар». Неважно, с какого из них начать.", "Хадис, Муслим, 2137"] },
+  tahlil: { kk: ["Күнәлар теңіз көбігіндей болса да кешіріледі", "Әр намаздан кейін 33 тәсбих, 33 тахмид, 33 тәкбір айтып, жүзін осы тәһлилмен толықтырған адамға осылай уәде етілген.", "Хадис, Муслим, 597"],
+    ru: ["Грехи простятся, даже если их как морской пены", "Так обещано тому, кто после каждого намаза скажет 33 раза тасбих, 33 — тахмид, 33 — такбир и завершит сотню этим тахлилем.", "Хадис, Муслим, 597"] },
+};
+const TS_SEQ = [["subhan", 33], ["hamd", 33], ["akbar", 33], ["tahlil", 1]];
+async function pageTasbih(v) {
+  const d = await loadNZ();
+  const ru = S.lang === "ru";
+  const st = S.tsb = Object.assign({ i: 0, c: 0, total: 0 }, S.tsb);
+  if (!(st.i >= 0 && st.i < TS_SEQ.length)) { st.i = 0; st.c = 0; }
+  const canVib = typeof navigator.vibrate === "function";
+  v.append(backHead("#/namaz", ru ? "Тасбих" : "Тәсбих", null,
+    canVib ? h("span", { class: "pill vib", html: icon("vib") + esc(ru ? "Вибрация каждые 33" : "Әр 33-те діріл") }) : null));
+  const front = h("span", { class: "ts-face ts-front" }), back = h("span", { class: "ts-face ts-back" });
+  const card = h("button", { class: "ts-card", type: "button" }, h("span", { class: "ts-inner" }, front, back));
+  const btn = h("button", { class: "ts-count", type: "button" });
+  v.append(h("div", { class: "ts-wrap" }, card, btn));
+  const draw = () => {
+    const [k] = TS_SEQ[st.i], tx = d.texts[k], f = TS_FACT[k][ru ? "ru" : "kk"];
+    front.innerHTML = `<span class="ts-stages" aria-label="${st.i + 1} / 4">${TS_SEQ.map((_, j) => `<i class="${j < st.i ? "on" : j === st.i ? "cur" : ""}${j === 3 ? " sm" : ""}"></i>`).join("")}<small>${st.i + 1} ${ru ? "из" : "/"} 4</small></span>` +
+      `<span class="ts-ar${tx.ar.length > 30 ? " long" : ""}" lang="ar">${esc(tx.ar)}</span><span class="ts-tl">${esc(L(tx.tr))}</span><span class="ts-m">${esc(L(tx.m))}</span>` +
+      `<span class="ts-hint">${icon("flip")}${esc(ru ? "Нажмите — узнаете об этом зикре" : "Басыңыз — осы зікір туралы біліңіз")}</span>`;
+    back.innerHTML = `<span class="ts-know">${icon("bulb")}${esc(ru ? "Знаете ли вы" : "Білесіз бе")}</span><b class="ts-q">«${esc(f[0])}»</b><span class="ts-d">${esc(f[1])}</span><span class="pill">${esc(f[2])}</span>` +
+      `<span class="ts-hint">${icon("flip")}${esc(ru ? "Нажмите, чтобы вернуться" : "Қайту үшін басыңыз")}</span>`;
+    card.setAttribute("aria-label", (card.classList.contains("flipped") ? f[0] : L(tx.m)) + ". " + (ru ? "Нажмите, чтобы перевернуть карточку" : "Карточканы аудару үшін басыңыз"));
+    btn.innerHTML = `<b class="num">${st.c}</b><small class="num" aria-label="${ru ? "Всего" : "Барлығы"}">${fmtN(st.total)}</small>`;
+    btn.setAttribute("aria-label", `${ru ? "Посчитать" : "Санау"}: ${st.c}`);
+  };
+  card.onclick = () => { card.classList.toggle("flipped"); draw(); };
+  btn.onclick = () => {
+    st.c++; st.total++;
+    if (st.c >= TS_SEQ[st.i][1]) {
+      if (TS_SEQ[st.i][1] === 33 && canVib) navigator.vibrate(250);
+      st.i++; st.c = 0; card.classList.remove("flipped");
+      if (st.i >= TS_SEQ.length) { st.i = 0; toast(ru ? "Тасбих завершён. Да примет Аллах!" : "Тәсбих аяқталды. Аллаһ қабыл етсін!", "✓"); }
+    }
+    save(); draw();
+    btn.classList.remove("tap"); void btn.offsetWidth; btn.classList.add("tap");
+  };
+  draw();
 }
 
 /* ═════════════ справочник ═════════════ */
@@ -1527,7 +1649,7 @@ async function pageRef(v, sec, arg) {
   sec = sec || "alphabet";
   const tabs = h("div", { class: "tabs" }, [["alphabet", "alphabet"], ["tajweed", "tajweed"], ["makhraj", "makhraj"]].map(([k, t]) =>
     h("a", { class: "tog", href: `#/ref/${k}`, "aria-pressed": String(sec === k), style: "display:inline-flex;align-items:center;text-decoration:none" }, T(t))));
-  v.append(h("h1", {}, T("ref")), h("div", { style: "height:14px" }), tabs);
+  v.append(pageHead(T("learn"), null, learnTabs("ref")), tabs);
   if (sec === "alphabet") {
     const g = h("div", { class: "agrid" });
     CORE.letters.forEach(x => { const [nm] = nameParts(L(x.name)); g.append(h("a", { class: "alt", href: `#/ref/letter/${encodeURIComponent(x.ar)}`, html: `<span class="g" lang="ar">${x.ar}</span><span class="n">${esc(nm)}</span><span class="s">${esc(L(x.sound))}</span>` })); });
@@ -1586,7 +1708,7 @@ const TRAINERS = [
       return { kind: "mcq", q: { kk: `Неше харакат? (${q.src})`, ru: `Сколько счётов? (${q.src})` }, promptHTML: spansTarget(q.sp), options: o.map(t => ({ t })), answer: { madd2: 0, madd46: 1, madd6: 2 }[q.r] }; } },
 ];
 function pagePractice(v) {
-  v.append(h("h1", {}, T("trainers")), h("p", { class: "muted", style: "margin:8px 0 18px" }, S.lang === "ru" ? "Короткие сессии по 10 вопросов. Каждый верный ответ — +2 очка." : "10 сұрақтан тұратын қысқа жаттығулар. Әр дұрыс жауап — +2 ұпай."));
+  v.append(pageHead(T("learn"), null, learnTabs("practice")), h("h2", {}, T("trainers")), h("p", { class: "muted", style: "margin:6px 0 16px" }, S.lang === "ru" ? "Короткие сессии по 10 вопросов. Каждый верный ответ — +2 очка." : "10 сұрақтан тұратын қысқа жаттығулар. Әр дұрыс жауап — +2 ұпай."));
   const g = h("div", { class: "trs" });
   TRAINERS.forEach(t => g.append(h("a", { class: "tr-card", href: `#/practice/${t.id}`, html: `<span class="ic">${esc(t.ic)}</span><b>${esc(L({ kk: t.t[0], ru: t.t[1] }))}</b><p>${esc(L({ kk: t.d[0], ru: t.d[1] }))}</p>` })));
   v.append(g);
@@ -1631,17 +1753,29 @@ function pageTrainer(v, id) {
 }
 
 /* ═════════════ профиль ═════════════ */
+const BADGE_IC = { first: "learn", m1: "ab", m2: "stand", m3: "rule", m4: "star", s3: "flame", s7: "flame", s30: "flame", t100: "target", perfect: "check", fatiha: "stand", hifz5: "star" };
+const badgeIcon = id => BADGE_IC[id] === "ab" ? '<span class="ar" lang="ar">أ ب</span>' : icon(BADGE_IC[id] || "star");
 function pageMe(v) {
+  const ru = S.lang === "ru";
   const lv = levelOf(S.xp), [lo, hi] = levelBounds(lv);
-  const wrap = h("div", { class: "read stack" });
-  wrap.append(h("h1", {}, T("me")));
+  const u = AUTH.user;
+  const name = u ? (u.displayName || u.email) : (ru ? "Гость" : "Қонақ");
+  const ava = u && u.photoURL ? `<img src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer">` : esc((String(name).trim()[0] || "?").toUpperCase());
+  const wrap = h("div", { class: "read" });
+  wrap.append(h("header", { class: "me-h", html: `<span class="me-ava">${ava}</span><div><h1>${esc(name)}</h1><p class="muted small">${esc(T("level"))} ${lv} · ${S.xp} ${esc(T("xp"))}</p><div class="bar"><i style="width:${((S.xp - lo) / (hi - lo) * 100).toFixed(0)}%"></i></div></div>` }));
   wrap.append(accountPanel());
-  wrap.append(h("div", { class: "panel stack" },
-    h("div", { class: "row", style: "justify-content:space-between" },
-      h("div", { html: `<b style="font-size:22px">${esc(T("level"))} ${lv}</b><div class="muted small">${S.xp} ${esc(T("xp"))}</div>` }),
-      h("div", { class: "row", html: `<span class="pill gold">${icon("flame")} ${streak()} ${esc(T("streak"))}</span><span class="pill primary">${doneCount()} / 110</span>` })),
-    h("div", { class: "bar gold" }, h("i", { style: `width:${((S.xp - lo) / (hi - lo) * 100).toFixed(0)}%` }))));
-  // неделя
+  const memN = CORE.suras.filter(s => suraMemorized(s.n)).length, st = streak(), dc = doneCount();
+  wrap.append(h("div", { class: "me-stats" },
+    h("a", { href: "#/course", html: `<b class="num">${dc}</b><small>${esc(ru ? plRu(dc, "урок", "урока", "уроков") : "сабақ")}</small>` }),
+    h("div", { class: "warm", html: `<b class="num">${st}</b><small>${esc(T("streak"))}</small>` }),
+    h("a", { href: "#/practice", html: `<b class="num">${memN}</b><small>${esc(ru ? plRu(memN, "сура наизусть", "суры наизусть", "сур наизусть") : "сүре жатқа")}</small>` })));
+  // награды
+  const got = BADGES.filter(b => S.badges[b[0]]).length;
+  const aw = h("div", { class: "awards" });
+  [...BADGES].sort((a, b) => (!!S.badges[b[0]]) - (!!S.badges[a[0]])).forEach(([id, , nm, desc]) =>
+    aw.append(h("div", { class: "award" + (S.badges[id] ? " on" : ""), html: `<span class="aw-ic">${S.badges[id] ? badgeIcon(id) : icon("lock")}</span><b>${esc(L({ kk: nm[0], ru: nm[1] }))}</b><small>${esc(L({ kk: desc[0], ru: desc[1] }))}</small>` })));
+  wrap.append(h("section", { class: "card" }, h("div", { class: "card-h" }, h("h2", {}, ru ? "Награды" : "Марапаттар"), h("span", { class: "muted small" }, `${got} ${ru ? "из" : "/"} ${BADGES.length}`)), aw));
+  // неделя и цель
   const days = S.lang === "ru" ? UI.dayNames[1] : UI.dayNames[0];
   const wk = h("div", { class: "week" });
   const d0 = new Date(); const dow = (d0.getDay() + 6) % 7; d0.setDate(d0.getDate() - dow);
@@ -1652,20 +1786,16 @@ function pageMe(v) {
     wk.append(h("div", { class: k === today() ? "today" : "", html: `<i><b style="height:${Math.min(100, x / S.goal * 100)}%"></b></i>${days[i]}` }));
   }
   const goalSeg = h("div", { class: "seg" }, [[15, "goals"], [30, "goalm"], [60, "goalh"]].map(([g, k]) => h("button", { "aria-pressed": String(S.goal === g), onclick: () => { S.goal = g; save(); route(); } }, `${T(k)} · ${g}`)));
-  wrap.append(h("div", { class: "panel stack" }, h("h3", {}, T("week")), wk, h("h3", {}, T("dailyGoal")), goalSeg));
-  // значки
-  const bg = h("div", { class: "badges" });
-  BADGES.forEach(([id, glyph, name, desc]) => bg.append(h("div", { class: "badge" + (S.badges[id] ? " on" : ""), html: `${rosette(glyph)}<b>${esc(L({ kk: name[0], ru: name[1] }))}</b><span>${esc(L({ kk: desc[0], ru: desc[1] }))}</span>` })));
-  wrap.append(h("h2", { style: "margin-top:10px" }, T("badges")), bg);
+  wrap.append(h("section", { class: "card stack" }, h("h2", {}, T("week")), wk, h("h3", {}, T("dailyGoal")), goalSeg));
   // настройки
-  const themeSeg = h("div", { class: "seg" }, [["dark", "dark"], ["light", "light"], ["system", "system"]].map(([th, k]) => h("button", { "aria-pressed": String((S.theme || "dark") === th), onclick: () => { S.theme = th; save(); applyTheme(); shell(); route(); } }, T(k))));
+  const themeSeg = h("div", { class: "seg" }, [["light", "light"], ["dark", "dark"], ["system", "system"]].map(([th, k]) => h("button", { "aria-pressed": String((S.theme || "light") === th), onclick: () => { S.theme = th; save(); applyTheme(); shell(); route(); } }, T(k))));
   const langSeg = h("div", { class: "seg" }, [["kk", "Қазақша"], ["ru", "Русский"]].map(([l, t]) => h("button", { "aria-pressed": String(S.lang === l), onclick: () => setLang(l) }, t)));
   const confirmBox = h("div", { class: "box warn", hidden: true }, h("p", {}, T("resetAsk")),
     h("div", { class: "row", style: "margin-top:10px" }, h("button", { class: "btn", style: "background:var(--bad);color:#fff", onclick: () => { const keep = { lang: S.lang, theme: S.theme }; S = Object.assign(blank(), keep); save(); toast(T("resetDone")); shell(); route(); } }, T("yesReset")),
       h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = true }, T("cancel"))));
-  wrap.append(h("div", { class: "panel stack" }, h("h3", {}, T("settings")),
-    h("div", { class: "row", style: "justify-content:space-between" }, h("span", {}, T("language")), langSeg),
-    h("div", { class: "row", style: "justify-content:space-between" }, h("span", {}, T("theme")), themeSeg),
+  wrap.append(h("section", { class: "card stack" }, h("h2", {}, T("settings")),
+    h("div", { class: "setrow" }, h("span", {}, T("language")), langSeg),
+    h("div", { class: "setrow" }, h("span", {}, T("theme")), themeSeg),
     h("p", { class: "muted small" }, AUTH.user ? T("synced") : T("savedHere")),
     h("div", {}, h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = false }, T("resetAll"))), confirmBox));
   v.append(wrap);
@@ -1715,6 +1845,7 @@ function mergeState(a, b) { // объединяем прогресс двух у
   m.lessons = union(a.lessons, b.lessons); m.ex = union(a.ex, b.ex); m.badges = union(a.badges, b.badges);
   m.hifz = {}; for (const k of new Set([...Object.keys(a.hifz || {}), ...Object.keys(b.hifz || {})])) m.hifz[k] = union((a.hifz || {})[k], (b.hifz || {})[k]);
   m.tr = { n: Math.max(a.tr?.n || 0, b.tr?.n || 0), ok: Math.max(a.tr?.ok || 0, b.tr?.ok || 0) };
+  m.tsb = ((a.tsb && a.tsb.total) || 0) >= ((b.tsb && b.tsb.total) || 0) ? a.tsb : b.tsb;
   m.at = Math.max(a.at || 0, b.at || 0);
   return m;
 }
@@ -1818,7 +1949,7 @@ async function boot() {
     return;
   }
   window.addEventListener("hashchange", route);
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (!S.theme) { shell(); route(); } });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.theme === "system") { applyTheme(); shell(); route(); } });
   route();
   checkBadges();
   initAuth();
