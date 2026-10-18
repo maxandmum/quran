@@ -13,6 +13,6 @@ self.addEventListener("fetch", e => {
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => { if (res.ok || res.type === "opaque") { const cp = res.clone(); caches.open(V).then(c => c.put(e.request, cp)); } return res; })));
     return;
   }
-  e.respondWith(fetch(e.request).then(res => { if (res.ok) { const cp = res.clone(); caches.open(V).then(c => c.put(e.request, cp)); } return res; })
+  e.respondWith(fetch(e.request, { cache: "no-cache" }).then(res => { if (res.ok) { const cp = res.clone(); caches.open(V).then(c => c.put(e.request, cp)); } return res; })
     .catch(() => caches.match(e.request).then(r => r || caches.match("index.html"))));
 });
