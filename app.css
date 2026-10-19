@@ -1534,3 +1534,55 @@ details>summary>svg{transition:transform .25s cubic-bezier(.2,.7,.2,1)}
 /* транскрипция дуа, азкаров и зикров — спокойным прямым шрифтом, без курсива */
 .dua-tr,:root[data-theme="light"] .dua-tr{font-style:normal;font-weight:500;font-size:15px;line-height:1.65;color:var(--warm-ink)}
 .ts-tl{font-weight:600;line-height:1.5}
+
+/* зикр — список как в Sajda: заголовок со звёздочкой, транскрипция в две строки, счёт «0 / 33 (всего)» */
+.zk-list{display:grid;gap:10px}
+.zk-item{display:grid;gap:4px;padding:15px 16px 14px;border-radius:20px;background:var(--surface);color:var(--ink);text-decoration:none;position:relative;overflow:hidden}
+.zk-h{display:flex;align-items:flex-start;gap:8px}
+.zk-h b{font-size:16.5px;line-height:1.3;font-weight:700}
+.zk-h .fav-b.sm{width:30px;height:30px;margin:-3px 0 0;background:transparent;flex:none}
+.zk-tl{font-size:14px;line-height:1.45;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.zk-n{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13.5px;font-weight:600;color:var(--muted)}
+.zk-n span{font-weight:500;opacity:.8}
+.zk-n svg{width:15px;height:15px;color:var(--accent)}
+.zk-item.done .zk-n{color:var(--primary)}
+.zk-p{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);border-radius:0 3px 3px 0;transition:width .4s}
+.zk-bar{height:4px;border-radius:4px;background:color-mix(in srgb,var(--ink) 10%,transparent);overflow:hidden;margin:-4px 4px 2px}
+.zk-bar i{display:block;height:100%;background:var(--primary);border-radius:4px;transition:width .35s cubic-bezier(.2,.7,.2,1)}
+.zk-say{justify-self:center;margin:-2px auto 0}
+.zk-say[hidden]{display:none}
+.ts-count small{font-size:14px}
+.ts-count.done{background:linear-gradient(140deg,var(--hero),color-mix(in srgb,var(--hero) 70%,var(--accent)))}
+.ts-front.long .ts-ar{font-size:22px;line-height:2}
+.ts-face{max-height:none}
+
+/* календарь Рамадана — все времена */
+.ram-wrap{padding:4px 2px;overflow-x:auto}
+.ram{width:100%;border-collapse:collapse;font-size:13px;min-width:330px}
+.ram th{font-size:10.5px;font-weight:700;color:var(--muted);text-align:center;padding:8px 2px;line-height:1.2}
+.ram td{padding:8px 2px;text-align:center;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.ram td.rd{text-align:left;padding-left:8px;white-space:nowrap}
+.ram td.rd b{display:inline-block;min-width:20px;font-size:15px}
+.ram td.rd small{display:inline-block;vertical-align:middle;margin-left:4px;font-size:10.5px;line-height:1.15;color:var(--muted)}
+.ram th.suh,.ram td.suh{color:var(--warm-ink);font-weight:700}
+.ram th.ift,.ram td.ift{color:var(--primary);font-weight:700}
+.ram tr.now td{background:var(--primary-soft)}
+.ram tr.qadr td.rd b{color:var(--warm-ink)}
+/* длинные азкары: карточка не выше экрана, текст листается внутри */
+.ts-face{max-height:min(58vh,560px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.ts-front.long{justify-content:flex-start}
+.ts-front.long .ts-ar{margin-top:4px}
+.ts-face>*{flex-shrink:0}
+.ts-nav{min-width:0}
+.ts-nav .tn-t{flex:1;min-width:0;text-align:center}
+.ts-nav .tn-t b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts-wrap{grid-template-columns:minmax(0,1fr)}
+
+/* ───── быстродействие и «ощущение приложения» (пригодится для будущего приложения) ───── */
+a,button,summary,[role=tab]{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button,.tile,.glass,.nz-row,.zk-item,.sitem,.rv-card,.ram-card,.mod,.tr-card{-webkit-user-select:none;user-select:none}
+/* длинные списки рисуются по мере прокрутки — быстрее на слабых телефонах */
+.zk-list>.zk-item{content-visibility:auto;contain-intrinsic-size:auto 118px}
+.slist>.sitem{content-visibility:auto;contain-intrinsic-size:auto 72px}
+.path>li{content-visibility:auto;contain-intrinsic-size:auto 70px}
+@media (display-mode:standalone){html,body{overscroll-behavior-y:none}}
