@@ -1,8 +1,8 @@
 /* Iqra: офлайн-кэш. Свои файлы — «сначала сеть», тексты сур — «сначала кэш».
    Суры, сохранённые пользователем (текст, перевод, аудио), лежат в отдельном кэше iqra-off — его обновления не удаляют;
    аудио и перевод оттуда берёт само приложение, текст суры находит caches.match ниже. */
-const V = "iqra-v16", OFF = "iqra-off";
-const SHELL = ["./", "index.html", "app.js?v=16", "app.css?v=16", "icon.svg", "fonts/iqra-quran.woff", "manifest.webmanifest", "data/core.json", "data/course.json"];
+const V = "iqra-v17", OFF = "iqra-off";
+const SHELL = ["./", "index.html", "app.js?v=17", "app.css?v=17", "icon.svg", "fonts/iqra-quran.woff", "manifest.webmanifest", "data/core.json", "data/course.json"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V && k !== OFF).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 

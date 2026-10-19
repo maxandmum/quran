@@ -1937,7 +1937,7 @@ const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 // расчёт по солнцу (алгоритм PrayTimes, упрощённый): возвращает часы в локальном времени устройства
-function calcTimes(date, lat, lng, tzh) {
+function calcTimes(date, lat, lng, tzh, fA = 18, iA = 17) { // углы: MWL 18°/17°; ДУМК (Казахстан) ≈ 15°/15°
   const rad = Math.PI / 180, deg = 180 / Math.PI;
   const tz = tzh != null ? tzh : -date.getTimezoneOffset() / 60;
   const y = date.getFullYear(), m = date.getMonth() + 1, dd = date.getDate();
@@ -1954,11 +1954,11 @@ function calcTimes(date, lat, lng, tzh) {
     return n + (ccw ? -v : v); };
   const asrT = (f, t) => { const s = sun(t); const ang = -Math.atan(1 / (f + Math.tan(Math.abs(lat - s.dec) * rad))) * deg; return hourAngle(ang, t); };
   const sr = hourAngle(0.833, 6 / 24, true), ss = hourAngle(0.833, 18 / 24);
-  let fj = hourAngle(18, 5 / 24, true), is = hourAngle(17, 18 / 24);
+  let fj = hourAngle(fA, 5 / 24, true), is = hourAngle(iA, 18 / 24);
   // высокие широты (Москва, Казань, север России): летом сумерки не кончаются — берём долю ночи по углу
   const night = 24 - (ss - sr);
-  if (!isFinite(fj) || sr - fj > night * 18 / 60) fj = sr - night * 18 / 60;
-  if (!isFinite(is) || is - ss > night * 17 / 60) is = ss + night * 17 / 60;
+  if (!isFinite(fj) || sr - fj > night * fA / 60) fj = sr - night * fA / 60;
+  if (!isFinite(is) || is - ss > night * iA / 60) is = ss + night * iA / 60;
   const adj = h => h + tz - lng / 15;
   const r = { fajr: adj(fj), sunrise: adj(sr), dhuhr: adj(noon(12 / 24)) + 2 / 60, asr: adj(asrT(2, 13 / 24)), maghrib: adj(ss) + 3 / 60, isha: adj(is) };
   const out = {};
@@ -1994,8 +1994,10 @@ async function timesFor(city, date) {
     try { const rows = await dyRows(city, ymd(date)); const r = rows.find(x => x[0] === ymd(date)); if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; } } catch (e) {}
   }
   if (city.src === "dumk") {
-    const rows = await dumkYear(city, date.getFullYear()); const r = rows.find(x => x[0] === ymd(date));
+    let rows = null; try { rows = await dumkYear(city, date.getFullYear()); } catch (e) {}
+    const r = rows && rows.find(x => x[0] === ymd(date));
     if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; }
+    return calcTimes(date, +city.lat, +city.lng, cityOff(city, date), 15, 15); // как у ДУМК, если на эту дату расписания ещё нет
   }
   return calcTimes(date, +city.lat, +city.lng, cityOff(city, date));
 }
@@ -2153,7 +2155,7 @@ async function nzRamadan(v) {
   // официальное расписание, если оно уже опубликовано на эти даты; иначе — расчёт
   let rows = null, calc = false;
   try { if (c.src === "dumk") rows = await dumkYear(c, R[0][0].getFullYear()); else if (c.src === "dy") rows = await dyRows(c, ymd(R[0][0])); } catch (e) {}
-  const T0 = R.map(([d]) => { const r = rows && rows.find(x => x[0] === ymd(d)); if (r) return { fajr: r[1], maghrib: r[5] }; calc = true; return calcTimes(d, +c.lat, +c.lng, cityOff(c, d)); });
+  const T0 = R.map(([d]) => { const r = rows && rows.find(x => x[0] === ymd(d)); if (r) return { fajr: r[1], maghrib: r[5] }; calc = true; return c.src === "dumk" ? calcTimes(d, +c.lat, +c.lng, cityOff(c, d), 15, 15) : calcTimes(d, +c.lat, +c.lng, cityOff(c, d)); });
   loading.remove();
   const fmt = new Intl.DateTimeFormat(S.lang === "kk" ? "ru" : S.lang, { day: "numeric", month: "short", weekday: "short" });
   const td = ymd(new Date());
