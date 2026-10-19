@@ -204,7 +204,7 @@ const I = {
   beads: '<circle cx="12" cy="4.2" r="1.3"/><circle cx="16.5" cy="5.8" r="1.3"/><circle cx="18.2" cy="10" r="1.3"/><circle cx="16.5" cy="14.2" r="1.3"/><circle cx="7.5" cy="14.2" r="1.3"/><circle cx="5.8" cy="10" r="1.3"/><circle cx="7.5" cy="5.8" r="1.3"/><path d="M12 15.5v5M10.3 21.5h3.4"/>',
   flip: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5"/>', vib: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 8v8M20 8v8"/>',
   chev: '<path d="M9 6l6 6-6 6"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
-  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', bookmark: '<path d="M6 3.5h12v17l-6-4.2-6 4.2z"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', bookmark: '<path d="M6 3.5h12v17l-6-4.2-6 4.2z"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>', gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   flame: '<path d="M12 22c4 0 7-3 7-7 0-3-2-5.5-3.5-7-.5 2-1.5 3-3 3 .5-3-1-6-3.5-8 0 3-1.5 5-3 6.5C4.5 11 5 13 5 15c0 4 3 7 7 7z"/>',
   star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
@@ -246,9 +246,45 @@ const loadSura = n => SURA_P[n] || (SURA_P[n] = fetchJSON(`quran/${String(n).pad
   .then(d => (SURA_D[n] = d)).catch(e => { delete SURA_P[n]; throw e; }));
 // перевод смыслов: Кулиев (ru) и Халифа Алтай (kk) — api.alquran.cloud, запасной источник — jsDelivr
 const TL = {};
+/* ───── суры без интернета: текст, перевод и аудио чтеца — в отдельный кэш (его не трогают обновления сайта) ───── */
+const OFF_CACHE = "iqra-off";
+const offURLs = (n, rec = S.reciter) => { const s = suraBy(n), u = [new URL(`quran/${pad3(n)}.json`, location.href).href,
+  `https://api.alquran.cloud/v1/surah/${n}/${LX("ru.kuliev", "kk.khalifahaltai", "tr.diyanet")}`];
+  for (let a = 1; a <= s.c; a++) u.push(ayahURL(n, a, rec)); return u; };
+const isOff = n => !!(S.off && S.off[n]);
+async function offSave(n, onP) {
+  if (!("caches" in window)) throw new Error("nocache");
+  const c = await caches.open(OFF_CACHE), urls = offURLs(n); let k = 0, bad = 0;
+  const one = async u => { try { if (!(await c.match(u))) { let r = await fetch(u, { mode: "cors" }).catch(() => null); if (!r || !r.ok) r = await fetch(u, { mode: "no-cors" }); await c.put(u, r); } } catch (e) { bad++; } onP(++k / urls.length); };
+  const q = [...urls]; await Promise.all([0, 1, 2, 3, 4].map(async () => { while (q.length) await one(q.shift()); }));
+  if (bad > 2) throw new Error("net");
+  S.off = S.off || {}; S.off[n] = { rec: S.reciter, lang: S.lang }; save();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+}
+// для сохранённой суры заранее готовим локальные ссылки на аудио — плеер берёт их без сети и без задержки (важно для iPhone)
+let OFF_MAP = {};
+async function offPrep(n) {
+  for (const u of Object.values(OFF_MAP)) URL.revokeObjectURL(u); OFF_MAP = {};
+  if (!isOff(n) || !("caches" in window)) return;
+  try { const c = await caches.open(OFF_CACHE); for (const u of offURLs(n, S.off[n].rec).slice(2)) { const r = await c.match(u); if (r && r.type !== "opaque") OFF_MAP[u] = URL.createObjectURL(await r.blob()); } } catch (e) {}
+}
+async function offDrop(n) { const c = await caches.open(OFF_CACHE), o = S.off[n]; for (const u of offURLs(n, o.rec)) await c.delete(u); delete S.off[n]; save(); }
+function offBtn(n) {
+  const b = h("button", { class: "tog off-b" });
+  const draw = () => { b.innerHTML = icon(isOff(n) ? "check" : "download") + esc(isOff(n) ? LX("Сохранена офлайн", "Офлайн сақталған", "Çevrimdışı kayıtlı") : LX("Скачать для офлайна", "Офлайнға жүктеу", "Çevrimdışı için indir")); b.setAttribute("aria-pressed", String(isOff(n))); };
+  b.onclick = async () => {
+    if (isOff(n)) { if (await ask({ title: LX("Удалить из офлайна?", "Офлайннан өшіру керек пе?", "Çevrimdışından silinsin mi?"), text: LX("Текст и аудио этой суры будут снова загружаться из интернета.", "Бұл сүренің мәтіні мен аудиосы қайтадан интернеттен жүктеледі.", "Bu surenin metni ve sesi yeniden internetten yüklenecek."), yes: LX("Удалить", "Өшіру", "Sil"), no: LX("Оставить", "Қалдыру", "Kalsın"), icon: "download" })) { await offDrop(n); draw(); } return; }
+    b.disabled = true;
+    try { await offSave(n, p => { b.innerHTML = icon("download") + `<span class="num">${Math.round(p * 100)}%</span>`; }); toast(LX("Сура доступна без интернета", "Сүре интернетсіз қолжетімді", "Sure internetsiz kullanılabilir")); offPrep(n); }
+    catch (e) { toast(LX("Не удалось скачать — проверьте интернет", "Жүктеу мүмкін болмады — интернетті тексеріңіз", "İndirilemedi — interneti kontrol edin")); }
+    b.disabled = false; draw(); };
+  draw(); return b;
+}
 function loadTl(n) {
   const ru = S.lang === "ru", k = (LX("ru", "kk", "tr")) + n;
-  if (!TL[k]) TL[k] = fetch(`https://api.alquran.cloud/v1/surah/${n}/${LX("ru.kuliev", "kk.khalifahaltai", "tr.diyanet")}`)
+  const api = `https://api.alquran.cloud/v1/surah/${n}/${LX("ru.kuliev", "kk.khalifahaltai", "tr.diyanet")}`;
+  const get = () => isOff(n) && "caches" in window ? caches.open(OFF_CACHE).then(c => c.match(api)).then(r => r && r.type !== "opaque" ? r : fetch(api)).catch(() => fetch(api)) : fetch(api);
+  if (!TL[k]) TL[k] = get()
     .then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => j.data.ayahs.map(a => a.text))
     .catch(() => fetchJSON(`https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/${LX("rus-elmirkuliev", "kaz-khalifahaltai", "tur-diyanetisleri")}/${n}.json`).then(j => j.chapter.map(a => a.text)))
     .then(a => a.map(t => String(t).replace(/\r/g, "").trim()))
@@ -291,7 +327,7 @@ function playURL(url, el, rate = 1) {
     if (LP && !LP.a.paused) LP.a.pause();
     audioDone = res; audioEl = el || null;
     if (el) el.classList.add("playing");
-    Audio1.src = url; Audio1.playbackRate = rate;
+    Audio1.src = OFF_MAP[url] || url; Audio1.playbackRate = rate;
     Audio1.onended = () => { if (el) el.classList.remove("playing"); audioEl = null; audioDone = null; res(true); };
     Audio1.onerror = () => { if (el) el.classList.remove("playing"); audioEl = null; audioDone = null; toast(T("audioErr")); res(false); };
     Audio1.play().catch(() => { if (audioDone === res) { audioDone = null; if (el) el.classList.remove("playing"); res(false); } });
@@ -542,6 +578,8 @@ async function route() {
     else if (p0 === "tasbih") { markNav("namaz"); await pageTasbih(view); }
     else if (p0 === "bookmarks") { markNav("suras"); await pageBookmarks(view); }
     else if (p0 === "exam") { markNav("learn"); pageExam(view, +p1); }
+    else if (p0 === "review") { markNav("learn"); await pageReview(view); }
+    else if (p0 === "placement") { markNav("learn"); pagePlacement(view); }
     else if (p0 === "practice") { markNav("learn"); p1 ? pageTrainer(view, p1) : pagePractice(view); }
     else if (p0 === "me") { markNav("me"); pageMe(view); }
     else notFound(view);
@@ -555,7 +593,7 @@ function notFound(v) { v.append(h("div", { class: "loading" }, h("div", { class:
 const AYAH_DAY = [[1, 2], [2, 152], [2, 153], [2, 186], [2, 201], [3, 8], [3, 139], [3, 173], [9, 51], [13, 28], [14, 7], [17, 24], [20, 25], [20, 114],
   [25, 74], [29, 69], [39, 53], [40, 60], [49, 13], [55, 13], [57, 4], [64, 11], [65, 3], [93, 5], [94, 5], [94, 6], [108, 1], [112, 1]];
 function nextLessonN() {
-  for (const l of COURSE.lessons) if (l.ready && !(S.lessons[l.n] && S.lessons[l.n].done)) return l.n;
+  for (const l of COURSE.lessons) if (l.n >= (S.placeFrom || 1) && l.ready && !(S.lessons[l.n] && S.lessons[l.n].done)) return l.n;
   return 1;
 }
 const firstAr = o => { const m = String(L(o)).match(AR_RUN); return m ? m[0] : ""; };
@@ -605,28 +643,30 @@ async function pageHome(v) {
     tile("#/tasbih", "beads", LX("Тасбих", "Тәсбих", "Tesbih"), tsbTotal() ? fmtN(tsbTotal()) : (LX("После намаза", "Намаздан кейін", "Namazdan sonra"))),
     nextPrayerTile()));
 
-  const mods = h("div", { class: "mods" });
-  for (const Mo of COURSE.modules) {
-    let d = 0; const tot = Mo.to - Mo.from + 1;
-    for (let i = Mo.from; i <= Mo.to; i++) if (S.lessons[i] && S.lessons[i].done) d++;
-    mods.append(h("a", { class: "mod", href: `#/course#m${Mo.id}`, html:
-      `<div><h3>${esc(T("module"))} ${Mo.id}. ${esc(L(Mo.title))}</h3></div><span class="mar">${Mo.ar}</span>
-       <p>${esc(L(Mo.desc))}</p><div class="bar"><i style="width:${(d / tot * 100).toFixed(0)}%"></i></div>
-       <div class="meta"><span>${esc(T("lesson"))} ${Mo.from}–${Mo.to}</span><span class="num">${d} / ${tot}</span></div>` }));
-  }
-  v.append(h("section", { class: "section" }, h("div", { class: "section-h" }, h("h2", {}, T("modules")), h("a", { href: "#/course" }, T("seeCourse"))), mods));
-  if (!started) v.append(h("section", { class: "section" }, h("div", { class: "section-h" }, h("h2", {}, T("how"))),
-    h("div", { class: "steps" }, [1, 2, 3].map(i => h("div", { class: "step", html: `<b><i>${i}</i>${esc(T("how" + i + "t"))}</b><p>${esc(T("how" + i))}</p>` })))));
+  // курс — компактной сеткой 2×2; повторение — если есть что повторить
+  if (rvDue().length) v.append(rvCard());
+  else if (!started && !S.placeFrom) v.append(h("a", { class: "rv-card pl-card", href: "#/placement", html: `<span class="rv-ic">${icon("bulb")}</span><span><b>${esc(LX("Уже немного читаете?", "Аздап оқи аласыз ба?", "Biraz okuyabiliyor musunuz?"))}</b><small>${esc(LX("Входной тест подскажет, с какого модуля начать", "Кіріс тест қай модульден бастауды айтады", "Seviye testi hangi modülden başlayacağınızı söyler"))}</small></span>${icon("chev")}` }));
+  const mods = h("div", { class: "mods mini" }, COURSE.modules.map(Mo => {
+    const tot = Mo.to - Mo.from + 1, d = modDoneN(Mo);
+    return h("a", { class: "mod" + (M.id === Mo.id ? " cur" : ""), href: `#/course#m${Mo.id}`, html:
+      `<span class="mar" lang="ar">${Mo.ar}</span><b>${esc(L(Mo.title))}</b><span class="bar"><i style="width:${(d / tot * 100).toFixed(0)}%"></i></span><small class="num">${esc(T("module"))} ${Mo.id} · ${d}/${tot}</small>` });
+  }));
+  v.append(h("div", { class: "section-h sm" }, h("h2", {}, T("modules")), h("a", { class: "small", href: "#/course" }, T("seeCourse"))), mods);
 }
 
 /* ═════════════ карта курса ═════════════ */
 function pageCourse(v) {
   v.append(h("div", { class: "read" }, pageHead(T("learn"), T("wordsLearned"), learnTabs("course"))));
   const cur = nextLessonN();
+  if (!Object.keys(S.lessons).length && !S.placeFrom) v.append(h("a", { class: "rv-card pl-card", href: "#/placement", html: `<span class="rv-ic">${icon("bulb")}</span><span><b>${esc(LX("Уже немного читаете?", "Аздап оқи аласыз ба?", "Biraz okuyabiliyor musunuz?"))}</b><small>${esc(LX("Входной тест за 3 минуты подскажет, с какого модуля начать", "3 минуттық кіріс тест қай модульден бастауды айтады", "3 dakikalık test hangi modülden başlayacağınızı söyler"))}</small></span>${icon("chev")}` }));
   for (const M of COURSE.modules) {
-    const sec = h("section", { class: "path-mod read", id: "m" + M.id });
-    sec.append(h("header", {}, h("span", { class: "mar" }, M.ar),
-      h("div", {}, h("h2", {}, `${T("module")} ${M.id}. ${L(M.title)}`), h("p", { class: "muted small" }, L(M.result)))));
+    // модуль — раскрывающаяся карточка; открыт только тот, где следующий урок (или куда ведёт ссылка)
+    const target0 = location.hash.split("#")[2];
+    let dn = 0; for (let i = M.from; i <= M.to; i++) if (isDone(i)) dn++;
+    const tot = M.to - M.from + 1, open = target0 ? target0 === "m" + M.id : (cur >= M.from && cur <= M.to);
+    const sec = h("details", { class: "path-mod read", id: "m" + M.id, open: open ? "" : null });
+    sec.append(h("summary", { html: `<span class="mar" lang="ar">${M.ar}</span><span class="pm-t"><b>${esc(T("module"))} ${M.id}. ${esc(L(M.title))}</b><small>${esc(L(M.result))}</small>` +
+      `<span class="pm-bar"><i style="width:${Math.round(dn / tot * 100)}%"></i></span></span><span class="pm-n num">${dn}/${tot}</span>${icon("chev")}` }));
     const ul = h("ol", { class: "path" });
     for (let n = M.from; n <= M.to; n++) {
       const les = COURSE.lessons[n - 1];
@@ -634,14 +674,18 @@ function pageCourse(v) {
       const locked = !done && n > cur;
       const cls = done ? "done" : (n === cur ? "cur" : "");
       const sub = done ? T("doneL") : (!les.ready ? T("soon") : (n === cur ? T("nextLesson") : ""));
-      ul.append(h("li", { class: locked ? "locked" : null }, h("a", { href: les.ready ? `#/lesson/${n}` : null, "aria-disabled": les.ready ? null : "true",
+      const far = n < cur - 2 || n > cur + 4; // в длинном модуле показываем только уроки рядом с текущим
+      ul.append(h("li", { class: [locked ? "locked" : "", far ? "far" : ""].join(" ").trim() || null }, h("a", { href: les.ready ? `#/lesson/${n}` : null, "aria-disabled": les.ready ? null : "true",
         html: `${rosette(n, cls)}<div class="lt"><b>${mdInline(les.title)}</b>${sub ? `<span>${esc(sub)}</span>` : ""}</div>${locked ? `<span class="lk" title="${esc(LX("Сначала завершите предыдущие уроки", "Алдымен алдыңғы сабақтарды аяқтаңыз", "Önce önceki dersleri bitirin"))}">${icon("lock")}</span>` : ""}` })));
     }
-    sec.append(ul, examRow(M));
+    sec.append(ul);
+    if (ul.querySelector("li.far")) sec.append(h("button", { class: "pm-more", onclick: e => { sec.classList.add("all"); e.currentTarget.remove(); } },
+      LX(`Все уроки модуля (${tot})`, `Модульдің барлық сабақтары (${tot})`, `Modülün tüm dersleri (${tot})`)));
+    sec.append(examRow(M));
     v.append(sec);
   }
   const target = location.hash.split("#")[2];
-  if (target) setTimeout(() => { const el = document.getElementById(target); if (el) el.scrollIntoView({ block: "start" }); }, 30);
+  setTimeout(() => { const el = target ? document.getElementById(target) : document.querySelector(".path li a .ros.cur"); if (el) el.scrollIntoView({ block: target ? "start" : "center" }); }, 30);
 }
 
 /* ═════════════ окно подтверждения ═════════════ */
@@ -666,7 +710,7 @@ function ask({ title, text, yes, no, icon: ic = "alert" }) {
 const SKIP_KEY = "iqra.skipOK";
 const skipOK = () => { try { return sessionStorage.getItem(SKIP_KEY) === "1"; } catch (e) { return false; } };
 const isDone = n => !!(S.lessons[n] && S.lessons[n].done);
-const undoneBefore = n => { const u = []; for (let i = 1; i < n; i++) if (!isDone(i)) u.push(i); return u; };
+const undoneBefore = n => { const u = []; for (let i = n >= (S.placeFrom || 1) ? (S.placeFrom || 1) : 1; i < n; i++) if (!isDone(i)) u.push(i); return u; };
 const plRu = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; };
 function listLessons(u) {
   const contiguous = u.every((x, i) => i === 0 || x === u[i - 1] + 1);
@@ -1245,13 +1289,14 @@ function ayahLine(sura, ay, mode = 0, peek) {
 /* ═════════════ суры ═════════════ */
 function suraItem(s, href) {
   const st = S.hifz[s.n] || {}; const m = Object.keys(st).length;
-  return h("a", { class: "sitem", href: href || `#/sura/${s.n}`, html: `${rosette(s.n, suraMemorized(s.n) ? "done" : "")}<div class="si-t"><b>${esc(L(s.name))}</b><small>${esc(ayatN(s.c))} · ${esc(T(s.p === "m" ? "mecca" : "medina"))}${m ? ` · ${m} ✓` : ""}</small></div><span class="ar" lang="ar">${s.ar}</span>` });
+  return h("a", { class: "sitem", href: href || `#/sura/${s.n}`, html: `${rosette(s.n, suraMemorized(s.n) ? "done" : "")}<div class="si-t"><b>${esc(L(s.name))}</b><small>${esc(ayatN(s.c))} · ${esc(T(s.p === "m" ? "mecca" : "medina"))}${m ? ` · ${m} ✓` : ""}${isOff(s.n) ? ` · <span class="si-off">${icon("download")}${esc(LX("офлайн", "офлайн", "çevrimdışı"))}</span>` : ""}</small></div><span class="ar" lang="ar">${s.ar}</span>` });
 }
 const norm = x => String(x).toLowerCase().replace(/ё/g, "е").replace(/[әғқңөұүһі]/g, c => ({ ә: "а", ғ: "г", қ: "к", ң: "н", ө: "о", ұ: "у", ү: "у", һ: "х", і: "и" }[c])).replace(/^(аль|ал|ан|ар|ас|аш|ат|ад|аз|әл)[-\s]/, "").replace(/[^a-zа-я0-9ء-ي]/g, "");
 function suraFilter(listEl, q, mode, hrefOf) {
   const nq = norm(q);
   const items = CORE.suras.filter(s => {
     if (mode === "j30" && !(s.n === 1 || s.n >= 78)) return false;
+    if (mode === "off" && !isOff(s.n)) return false;
     if (mode === "st" && !(S.hifz[s.n] && Object.keys(S.hifz[s.n]).length) && !(S.last && S.last.s === s.n)) return false;
     if (!nq) return true;
     return String(s.n) === q.trim() || norm(s.name.kk).includes(nq) || norm(s.name.ru).includes(nq) || norm(String(s.name.tr || "").normalize("NFD").replace(/[\u0300-\u036f']/g, "")).includes(norm(q.trim().normalize("NFD").replace(/[\u0300-\u036f']/g, ""))) || s.ar.includes(q.trim());
@@ -1263,8 +1308,10 @@ function suraFilter(listEl, q, mode, hrefOf) {
 function suraSearch(onChange) {
   let mode = "all";
   const inp = h("input", { type: "search", class: "search", placeholder: T("search"), "aria-label": T("search"), enterkeyhint: "search" });
-  const seg = h("div", { class: "seg" }, [["all", "all"], ["j30", "juz30"], ["st", "started"]].map(([k, t]) => {
-    const b = h("button", { "aria-pressed": String(k === mode) }, T(t));
+  const tabs = [["all", T("all")], ["j30", T("juz30")], ["st", T("started")]];
+  if (S.off && Object.keys(S.off).length) tabs.push(["off", LX("Офлайн", "Офлайн", "Çevrimdışı")]);
+  const seg = h("div", { class: "seg" }, tabs.map(([k, t]) => {
+    const b = h("button", { "aria-pressed": String(k === mode) }, t);
     b.onclick = () => { mode = k; $$("button", seg).forEach(x => x.setAttribute("aria-pressed", String(x === b))); onChange(inp.value, mode); };
     return b;
   }));
@@ -1301,6 +1348,7 @@ async function pageSura(v, n, hifz, goto) {
   const s = suraBy(n);
   if (!s) return notFound(v);
   if (WBW_SURAS.has(n)) { try { WBW_D = await loadWBW(); } catch (e) {} }
+  offPrep(n);
   const loading = h("div", { class: "loading" }, "…"); v.append(loading);
   let d;
   try { d = await loadSura(n); } catch (e) { loading.textContent = T("audioErr"); return; }
@@ -1308,7 +1356,7 @@ async function pageSura(v, n, hifz, goto) {
   const wrap = h("div", { class: "read" });
   wrap.append(h("div", { class: "crumbs", html: `<a href="#/suras">${esc(T("suras"))}</a><span>·</span><span>${s.n}</span>` }),
     h("div", { class: "shead" },
-      h("div", {}, h("h1", {}, L(s.name)), h("p", { class: "muted" }, `${ayatN(s.c)} · ${T(s.p === "m" ? "mecca" : "medina")}`)),
+      h("div", {}, h("h1", {}, L(s.name)), h("p", { class: "muted" }, `${ayatN(s.c)} · ${T(s.p === "m" ? "mecca" : "medina")}`, isOff(n) ? h("span", { class: "off-pill", html: icon("download") + esc(LX("офлайн", "офлайн", "çevrimdışı")) }) : null)),
       h("div", { class: "ar sname", lang: "ar" }, s.ar)));
   const modeTabs = h("div", { class: "seg", style: "margin-bottom:12px" },
     h("button", { "aria-pressed": String(!hifz), onclick: () => location.hash = `#/sura/${n}` }, T("read")),
@@ -1333,7 +1381,7 @@ async function pageSura(v, n, hifz, goto) {
   const tlT = h("button", { class: "tog", "aria-pressed": String(S.view.tl) }, T("tl"));
   recSel.classList.add("rec");
   const moreBtn = h("button", { class: "iconbtn more", title: T("settings"), "aria-expanded": "false", html: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' });
-  const player = h("div", { class: "player" }, playBtn, recSel, moreBtn, h("div", { class: "xtra" }, repSel, rateSel, hifz ? null : colorT, hifz ? null : trT, hifz ? null : tlT));
+  const player = h("div", { class: "player" }, playBtn, recSel, moreBtn, h("div", { class: "xtra" }, repSel, rateSel, hifz ? null : colorT, hifz ? null : trT, hifz ? null : tlT, offBtn(n)));
   moreBtn.onclick = () => { player.classList.toggle("open"); moreBtn.setAttribute("aria-expanded", String(player.classList.contains("open"))); };
   wrap.append(player);
 
@@ -1546,8 +1594,10 @@ async function pageNamaz(v, sub) {
   if (sub === "times") return nzTimes(v);
   if (sub === "azkar") return nzAzkar(v);
   if (sub === "duas") return nzDuas(v);
+  if (sub === "ramadan") return nzRamadan(v);
   if (sub) return notFound(v);
   v.append(pageHead(T("namaz"), LX("Ханафитский мазхаб · шаг за шагом", "Ханафи мазһабы · қадам-қадаммен", "Hanefi mezhebi · adım adım")), nextPrayerCard());
+  { const R = ramadanDays(); if (R.length && (R[0][0] - new Date()) / 864e5 < 45) v.append(ramadanRow()); }
   const poses = h("span", { class: "nz-poses" });
   const drawP = () => { poses.innerHTML = ["qiyam", "ruku", "sujud", "julus"].map(k => `<span class="nz-pose"><span class="pz">${poseSVG(k)}</span><small>${esc(L({ kk: POSE_NAMES[k][0], ru: POSE_NAMES[k][1], tr: POSE_NAMES[k][2] }))}</small></span>`).join(""); };
   drawP();
@@ -1581,7 +1631,7 @@ function nzHow(v, d) {
   const figs = [];
   v.append(backHead("#/namaz", LX("Как совершать намаз", "Намаз қалай оқылады", "Namaz nasıl kılınır"), LX("Намаз из 2 ракаатов — по порядку", "2 рәкағатты намаз — ретімен", "2 rekâtlı namaz — sırasıyla")),
     genderSeg(() => figs.forEach(([el, k]) => { el.innerHTML = poseSVG(k); }), "light"));
-  const ol = h("ol", { class: "nz-steps" });
+  const ol = h("ol", { class: "nz-steps car" });
   d.steps.forEach((st, i) => {
     const k = POSE_OF[i] || "qiyam";
     const fig = h("span", { class: "pz", html: poseSVG(k) }); figs.push([fig, k]);
@@ -1591,23 +1641,74 @@ function nzHow(v, d) {
     if (st.suras) li.append(h("div", { class: "nz-suras" }, st.suras.map(n => { const s = suraBy(n); return h("a", { class: "pill primary", href: `#/sura/${n}` }, `${n}. ${L(s.name)}`); })));
     ol.append(li);
   });
-  v.append(ol);
+  const c = carousel([...ol.children], ol, "nzStep", LX("Шаг", "Қадам", "Adım"));
+  v.append(c.nav, ol, c.foot);
+}
+/* карусель «по одному»: стрелки, точки, свайп, кнопки внизу; позиция помнится в рамках вкладки */
+function carousel(lis, box, key, word, mark) {
+  const N = lis.length;
+  let at = 0; try { at = Math.min(+(sessionStorage.getItem(key) || 0), N - 1); } catch (e) {}
+  const lbl = h("b", { class: "num" });
+  const prev = h("button", { class: "tn-b", "aria-label": LX("Назад", "Артқа", "Geri"), html: icon("chev") });
+  const next = h("button", { class: "tn-b", "aria-label": LX("Дальше", "Келесі", "İleri"), html: icon("chev") });
+  const dots = h("div", { class: "st-dots" }, lis.map((_, i) => h("button", { "aria-label": `${word} ${i + 1}`, onclick: () => go(i) })));
+  const nav = h("div", { class: "st-nav" }, prev, h("div", { class: "st-mid" }, lbl, dots), next);
+  const fb = h("button", { class: "btn ghost", onclick: () => go(at - 1, 1) }, LX("← Назад", "← Артқа", "← Geri"));
+  const fn = h("button", { class: "btn", onclick: () => go(at + 1, 1) }, LX("Дальше →", "Келесі →", "İleri →"));
+  const foot = h("div", { class: "st-foot" }, fb, fn);
+  const paint = () => [...dots.children].forEach((b, k) => b.className = [k === at ? "on" : k < at ? "past" : "", mark && mark(k) ? "ok" : ""].join(" ").trim());
+  const go = (i, scroll) => { at = Math.max(0, Math.min(N - 1, i)); try { sessionStorage.setItem(key, at); } catch (e) {}
+    lis.forEach((li, k) => li.hidden = k !== at); paint();
+    lbl.textContent = `${at + 1} / ${N}`; prev.disabled = fb.disabled = at === 0; next.disabled = fn.disabled = at === N - 1;
+    if (scroll && nav.getBoundingClientRect().top < 0) nav.scrollIntoView({ block: "start" }); };
+  prev.onclick = () => go(at - 1, 1); next.onclick = () => go(at + 1, 1);
+  let x0 = null, y0 = 0;
+  box.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  box.addEventListener("touchend", e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(at + (dx < 0 ? 1 : -1), 1); });
+  go(at);
+  return { nav, foot, go, paint, get at() { return at; } };
 }
 function nzPrayers(v, d) {
-  const ru = S.lang === "ru";
   v.append(backHead("#/namaz", LX("Пять намазов", "Бес уақыт намаз", "Beş vakit namaz"), LX("Сколько ракаатов в каждом намазе", "Әр намаз неше рәкағат", "Her namaz kaç rekât")));
-  v.append(h("div", { class: "nz-pr" }, d.prayers.map(p => h("div", { class: "nz-p", html: `<div><b>${esc(L(p.n))}</b><span class="ar" lang="ar">${p.ar}</span></div><div class="nz-k">${p.r.map(([k, n]) => `<span class="nz-${k}"><b>${n}</b> ${esc(L(d.kinds[k]))}</span>`).join("")}</div>` }))));
-  v.append(h("p", { class: "muted small", style: "margin-top:12px" }, LX("Порядок внутри каждого намаза — слева направо.", "Әр намаздың ішіндегі реті — солдан оңға қарай.", "Her namazın içindeki sıra — soldan sağa.")));
+  // таблица: сунна до · фард · сунна после · витр · всего
+  const sn = LX("Сунна", "Сүннет", "Sünnet");
+  const cols = [["sb", sn, LX("до", "алдында", "önce")], ["f", LX("Фард", "Парыз", "Farz")], ["sa", sn, LX("после", "кейін", "sonra")], ["w", LX("Витр", "Үтір", "Vitir")], ["all", LX("Всего", "Жалпы", "Toplam")]];
+  const rowOf = p => { const o = { sb: 0, f: 0, sa: 0, w: 0 }; let seenF = false;
+    p.r.forEach(([k, n]) => { if (k === "f") { o.f += n; seenF = true; } else if (k === "s") o[seenF ? "sa" : "sb"] += n; else o.w += n; });
+    o.all = o.sb + o.f + o.sa + o.w; return o; };
+  const sum = { sb: 0, f: 0, sa: 0, w: 0, all: 0 };
+  const cell = (k, n) => `<td class="rk-${k}">${n ? `<span class="num">${n}</span>` : `<i>—</i>`}</td>`;
+  const rows = d.prayers.map(p => { const o = rowOf(p); for (const k in sum) sum[k] += o[k];
+    const [main, sub] = L(p.n).split(/\s*\(/);
+    return `<tr><th scope="row"><b>${esc(main)}</b>${sub ? `<small>${esc(sub.replace(")", ""))}</small>` : ""}</th>${cols.map(([k]) => cell(k, o[k])).join("")}</tr>`; }).join("");
+  v.append(h("div", { class: "rk-wrap", html: `<table class="rk"><thead><tr><th></th>${cols.map(([k, t, u]) => `<th class="rk-${k}" scope="col">${esc(t)}${u ? `<small>${esc(u)}</small>` : ""}</th>`).join("")}</tr></thead>` +
+    `<tbody>${rows}</tbody><tfoot><tr><th scope="row">${esc(LX("За день", "Күніне", "Günde"))}</th>${cols.map(([k]) => cell(k, sum[k])).join("")}</tr></tfoot></table>` }));
+  v.append(h("p", { class: "muted small rk-note" }, LX("Читаются по порядку слева направо: сначала сунна, затем фард, затем сунна после него.", "Солдан оңға қарай ретімен оқылады: алдымен сүннет, сосын парыз, одан кейін соңғы сүннет.", "Soldan sağa sırayla kılınır: önce sünnet, sonra farz, ardından son sünnet.")));
+  const leg = [["f", LX("Фард — обязательная часть. Пропускать нельзя; пропущенный фард восполняют (каза).", "Парыз — міндетті бөлім. Қалдыруға болмайды; қалған парызды қаза етеді.", "Farz — zorunlu kısım. Terk edilmez; kaçırılan farz kaza edilir.")],
+    ["s", LX("Сунна — то, что постоянно совершал Пророк ﷺ. За неё большая награда.", "Сүннет — Пайғамбар ﷺ үнемі орындаған намаз. Сауабы мол.", "Sünnet — Peygamber ﷺ'in devamlı kıldığı namaz. Sevabı büyüktür.")],
+    ["w", LX("Витр — ваджиб: 3 ракаата после ночного намаза, с дуа «Кунут».", "Үтір — уәжіп: құптаннан кейін 3 рәкағат, «Құнут» дұғасымен.", "Vitir — vâcip: yatsıdan sonra 3 rekât, Kunut duası ile.")]];
+  v.append(h("div", { class: "rk-leg" }, leg.map(([k, t]) => h("p", { html: `<i class="rk-dot rk-${k === "s" ? "sb" : k}"></i><span>${esc(t)}</span>` }))),
+    h("a", { class: "nz-row", href: "#/namaz/witr", html: `<b>${esc(LX("Как читать витр и «Кунут»", "Үтір мен «Құнутты» қалай оқу керек", "Vitir ve Kunut nasıl kılınır"))}</b>${icon("chev")}` }));
 }
 function nzRead(v, d) {
   const ru = S.lang === "ru";
   v.append(backHead("#/namaz", LX("Что читать в намазе", "Намазда не оқылады", "Namazda ne okunur"), LX("Все тексты по порядку, с озвучкой", "Барлық мәтін ретімен, дыбысымен", "Tüm metinler sırasıyla, sesli")));
-  const wrap = h("div", { class: "stack" });
+  // аккордеон: по шагам, каждый раскрывается отдельно
+  const wrap = h("div", { class: "acco" });
+  let n = 0;
   d.steps.forEach(st => {
     if (!st.items.length && !st.sura) return;
-    wrap.append(h("h3", { class: "nz-rh" }, L(st.t)));
-    if (st.sura) wrap.append(h("a", { class: "nz-row", href: `#/sura/${st.sura}`, html: `<b>${esc(LX("Сура «Аль-Фатиха» — с аудио и переводом", "«Фатиха» сүресі — аудиосы және аудармасымен", "Fâtiha suresi — ses ve meal ile"))}</b>${icon("chev")}` }));
-    st.items.forEach(key => wrap.append(duaCard(d.texts[key])));
+    n++;
+    const names = st.items.map(k => L(d.texts[k].t)).filter(Boolean);
+    if (st.sura) names.unshift(LX("Аль-Фатиха", "Әл-Фатиха", "Fâtiha"));
+    const det = h("details", { class: "acc-i" }, h("summary", { html: `<i class="num">${n}</i><span><b>${esc(L(st.t))}</b><small>${esc(names.join(" · "))}</small></span>${icon("chev")}` }));
+    const body = h("div", { class: "stack acc-b" });
+    if (st.sura) body.append(h("a", { class: "nz-row", href: `#/sura/${st.sura}`, html: `<b>${esc(LX("Сура «Аль-Фатиха» — с аудио и переводом", "«Фатиха» сүресі — аудиосы және аудармасымен", "Fâtiha suresi — ses ve meal ile"))}</b>${icon("chev")}` }));
+    st.items.forEach(key => body.append(duaCard(d.texts[key])));
+    det.append(body);
+    det.addEventListener("toggle", () => { if (det.open) wrap.querySelectorAll("details[open]").forEach(o => { if (o !== det) o.open = false; }); });
+    wrap.append(det);
   });
   v.append(wrap);
 }
@@ -1788,10 +1889,14 @@ async function nzAzkar(v) {
   if (d.morning.some(x => x.quran)) await loadSura(2);
   azkState();
   v.append(backHead("#/namaz", LX("Утренние и вечерние азкары", "Таңғы және кешкі зікірлер", "Sabah ve akşam zikirleri"), LX("После фаджра и после асра", "Таң намазынан және екінтіден кейін", "Sabah namazından ve ikindiden sonra")), azkProgress());
-  const wrap = h("div", { class: "stack azk" });
-  d.morning.forEach(t => wrap.append(duaCard(t, { count: true })));
-  wrap.append(h("p", { class: "muted small" }, L(d.intro)));
-  v.append(wrap);
+  const wrap = h("div", { class: "azk car" });
+  const cards = d.morning.map(t => duaCard(t, { count: true }));
+  wrap.append(...cards);
+  const st = azkState(), c = carousel(cards, wrap, "azkAt", LX("Азкар", "Зікір", "Zikir"), k => st.c[d.morning[k].id] === "done");
+  // карточка дочитана — точка отмечается, через мгновение следующая
+  wrap.addEventListener("click", e => { if (!e.target.closest(".azk-c")) return; c.paint();
+    const id = d.morning[c.at].id; if (st.c[id] === "done") setTimeout(() => { if (st.c[id] === "done" && c.at < cards.length - 1) c.go(c.at + 1, 1); }, 650); });
+  v.append(c.nav, wrap, c.foot, h("p", { class: "muted small", style: "margin-top:14px" }, L(d.intro)));
 }
 async function nzDuas(v) {
   const ru = S.lang === "ru";
@@ -2021,6 +2126,45 @@ function hijriStr(d) {
     return `${+p.day} ${m[+p.month - 1]} ${y} ${LX("г. х.", "ж. һ.", "")}`.trim();
   } catch (e) { return ""; }
 }
+/* ───── Рамадан: имсакия для выбранного города ───── */
+const hijriParts = d => { try { const f = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura-nu-latn", { day: "numeric", month: "numeric", year: "numeric" });
+  if (!/islamic/.test(f.resolvedOptions().calendar)) return null; const p = f.formatToParts(d).reduce((o, x) => (o[x.type] = x.value, o), {}); return { d: +p.day, m: +p.month, y: +String(p.year).replace(/\D/g, "") }; } catch (e) { return null; } };
+function ramadanDays() { // дни ближайшего (или текущего) Рамадана
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  const p0 = hijriParts(d); if (!p0) return [];
+  if (p0.m === 9) d.setDate(d.getDate() - (p0.d - 1));
+  else for (let i = 0; i < 400; i++) { d.setDate(d.getDate() + 1); const p = hijriParts(d); if (p && p.m === 9) break; }
+  const out = []; for (let i = 0; i < 31; i++) { const x = new Date(d); x.setDate(d.getDate() + i); const p = hijriParts(x); if (!p || p.m !== 9) break; out.push([x, p]); }
+  return out;
+}
+function ramadanRow() {
+  const R = ramadanDays(); if (!R.length) return null;
+  const left = Math.round((R[0][0] - new Date()) / 864e5), on = left <= 0;
+  const fmt = new Intl.DateTimeFormat(S.lang === "kk" ? "ru" : S.lang, { day: "numeric", month: "long" });
+  return h("a", { class: "nz-row ram-row", href: "#/namaz/ramadan", html: `<span class="ram-ic">☾</span><b>${esc(LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"))}<small>${esc(on ? LX("Идёт Рамадан", "Рамазан айы жүріп жатыр", "Ramazan devam ediyor") : `${fmt.format(R[0][0])} · ${LX(`через ${left} дн.`, `${left} күннен кейін`, `${left} gün sonra`)}`)}</small></b>${icon("chev")}` });
+}
+async function nzRamadan(v) {
+  v.append(backHead("#/namaz/times", LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"), LX("Сухур и ифтар по дням", "Сәресі мен ауызашар күн сайын", "Gün gün sahur ve iftar")));
+  const c = S.city;
+  if (!c) { v.append(h("div", { class: "card stack" }, h("p", {}, LX("Сначала выберите город — расписание считается для него.", "Алдымен қаланы таңдаңыз — кесте соған есептеледі.", "Önce şehir seçin — takvim ona göre hesaplanır.")), h("a", { class: "btn", href: "#/namaz/times" }, LX("Выбрать город", "Қаланы таңдау", "Şehir seç")))); return; }
+  const R = ramadanDays();
+  if (!R.length) { v.append(h("p", { class: "muted" }, LX("Ваш браузер не знает исламский календарь.", "Браузеріңіз ислам күнтізбесін білмейді.", "Tarayıcınız Hicri takvimi desteklemiyor."))); return; }
+  const loading = h("div", { class: "loading" }, "…"); v.append(loading);
+  // официальное расписание, если оно уже опубликовано на эти даты; иначе — расчёт
+  let rows = null, calc = false;
+  try { if (c.src === "dumk") rows = await dumkYear(c, R[0][0].getFullYear()); else if (c.src === "dy") rows = await dyRows(c, ymd(R[0][0])); } catch (e) {}
+  const T0 = R.map(([d]) => { const r = rows && rows.find(x => x[0] === ymd(d)); if (r) return { fajr: r[1], maghrib: r[5] }; calc = true; return calcTimes(d, +c.lat, +c.lng, cityOff(c, d)); });
+  loading.remove();
+  const fmt = new Intl.DateTimeFormat(S.lang === "kk" ? "ru" : S.lang, { day: "numeric", month: "short", weekday: "short" });
+  const td = ymd(new Date());
+  const body = R.map(([d, p], i) => { const t = T0[i], q = p.d === 27;
+    return `<tr class="${ymd(d) === td ? "now" : ""}${q ? " qadr" : ""}"><td class="num"><b>${p.d}</b></td><td>${esc(fmt.format(d))}${q ? `<small>${esc(LX("ночь Предопределения — накануне", "Қадір түні — алдыңғы түні", "Kadir gecesi — önceki gece"))}</small>` : ""}</td><td class="num">${esc(t.fajr || "")}</td><td class="num ift">${esc(t.maghrib || "")}</td></tr>`; }).join("");
+  const year = R[0][1].y;
+  v.append(h("div", { class: "ram-h" }, h("span", { class: "ar", lang: "ar" }, "رَمَضَان"), h("div", {}, h("b", {}, `${LX("Рамадан", "Рамазан", "Ramazan")} ${year}`), h("small", { class: "muted" }, `${c.title}${calc ? " · " + LX("расчёт", "есеп", "hesaplama") : ""}`))),
+    h("div", { class: "rk-wrap", html: `<table class="ram"><thead><tr><th>${esc(LX("День", "Күн", "Gün"))}</th><th>${esc(LX("Дата", "Күні", "Tarih"))}</th><th>${esc(LX("Сухур до", "Сәресі", "İmsak"))}</th><th>${esc(LX("Ифтар", "Ауызашар", "İftar"))}</th></tr></thead><tbody>${body}</tbody></table>` }),
+    h("p", { class: "muted small", style: "margin-top:10px" }, calc ? LX("Официальное расписание на эти дни ещё не опубликовано — время рассчитано по координатам и может отличаться на 1–3 минуты. Ближе к Рамадану сверьтесь с мечетью.", "Бұл күндерге ресми кесте әлі жарияланбаған — уақыт координаттар бойынша есептелді, 1–3 минутқа өзгеше болуы мүмкін. Рамазанға жақын мешітпен тексеріңіз.", "Bu günlerin resmî takvimi henüz yayımlanmadı — vakitler koordinatlara göre hesaplandı, 1–3 dakika farklı olabilir. Ramazan yaklaşınca camiden teyit edin.") : LX("Сухур заканчивается с началом утреннего намаза (имсак). Ифтар — с наступлением магриба.", "Сәресі таң намазының уақыты кіргенде аяқталады. Ауызашар — ақшам уақытымен.", "Sahur imsak vaktinde biter. İftar akşam ezanıyla açılır.")));
+  setTimeout(() => { const n = $(".ram tr.now"); if (n) n.scrollIntoView({ block: "center" }); }, 50);
+}
 async function nzTimes(v) {
   const ru = S.lang === "ru";
   v.append(backHead("#/namaz", LX("Время намазов", "Намаз уақыттары", "Namaz vakitleri"), LX("И направление киблы", "Және құбыла бағыты", "Ve kıble yönü")));
@@ -2048,7 +2192,7 @@ async function nzTimes(v) {
         : c.src === "dy" ? (LX("Официальное расписание Diyanet (Турция). Фаджр — время имсака.", "Diyanet ресми кестесі (Түркия). Таң — имсак уақыты.", "Diyanet'in resmî vakitleri. Sabah — imsak vakti."))
         : (LX("Расчёт по солнцу: фаджр 18°, иша 17°, аср по ханафитскому мазхабу. Уточняйте у местной мечети.", "Күн бойынша есеп: таң 18°, құптан 17°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз.", "Güneşe göre hesap: sabah 18°, yatsı 17°, ikindi Hanefi'ye göre. Yerel camiye danışın.")))
         + (foreignTz ? (LX(" Время указано местное для этого города.", " Уақыт осы қаланың жергілікті уақытымен.", " Saatler bu şehrin yerel saatidir.")) : "")));
-    box.append(...[card, c.lat != null ? qiblaCard(+c.lat, +c.lng) : null, remindCard("prayer")].filter(Boolean));
+    box.append(...[card, ramadanRow(), c.lat != null ? qiblaCard(+c.lat, +c.lng) : null, remindCard("prayer")].filter(Boolean));
   };
   draw();
 }
@@ -2251,16 +2395,120 @@ const TRAINERS = [
       return { kind: "mcq", q: { kk: `Неше харакат? (${q.src})`, ru: `Сколько счётов? (${q.src})` }, promptHTML: spansTarget(q.sp), options: o.map(t => ({ t })), answer: { madd2: 0, madd46: 1, madd6: 2 }[q.r] }; } },
 ];
 function pagePractice(v) {
-  v.append(pageHead(T("learn"), null, learnTabs("practice")), h("h2", {}, T("trainers")), h("p", { class: "muted", style: "margin:6px 0 16px" }, LX("Короткие сессии по 10 вопросов. Каждый верный ответ — +2 очка.", "10 сұрақтан тұратын қысқа жаттығулар. Әр дұрыс жауап — +2 ұпай.", "10 soruluk kısa oturumlar. Her doğru cevap +2 puan.")));
-  const g = h("div", { class: "trs" });
-  TRAINERS.forEach(t => g.append(h("a", { class: "tr-card", href: `#/practice/${t.id}`, html: `<span class="ic">${esc(t.ic)}</span><b>${esc(L({ kk: t.t[0], ru: t.t[1], tr: t.t[2] }))}</b><p>${esc(L({ kk: t.d[0], ru: t.d[1], tr: t.d[2] }))}</p>` })));
-  v.append(g);
-  v.append(h("section", { class: "section" }, h("div", { class: "section-h" }, h("h2", {}, T("hifz"))),
-    h("p", { class: "muted", style: "margin-bottom:12px" }, LX("Выберите суру и учите её по аятам: слушайте с повтором, скрывайте слова, отмечайте выученное.", "Сүрені таңдап, аятпен жаттаңыз: қайталап тыңдаңыз, сөздерді жасырыңыз, жаттағаныңызды белгілеңіз.", "Bir sure seçin ve ayet ayet ezberleyin: tekrarla dinleyin, kelimeleri gizleyin, ezberlediklerinizi işaretleyin.")),
-    h("div", { class: "slist" }, CORE.suras.filter(s => s.n === 1 || (s.n >= 93 && s.c <= 11)).map(s => suraItem(s, `#/sura/${s.n}/hifz`))),
-    h("p", { style: "margin-top:12px" }, h("a", { href: "#/suras" }, LX("Любая из 114 сур — откройте её и выберите «Режим заучивания» →", "114 сүренің кез келгенін ашып, «Жаттау режимін» таңдаңыз →", "114 sureden herhangi biri — açın ve «Ezber modu»nu seçin →")))));
-  v.append(h("section", { class: "section" }, h("a", { class: "qcard", href: "#/ref", html: `<span class="qi">${icon("book")}</span><div><b>${esc(T("ref"))}</b><small>${esc(LX("Алфавит с озвучкой, правила таджвида, карта махраджей", "Дыбысталған әліпби, тәжуид ережелері, махраж картасы", "Sesli alfabe, tecvid kuralları, mahreç haritası"))}</small></div>` })));
+  v.append(pageHead(T("learn"), null, learnTabs("practice")), rvCard());
+  v.append(h("div", { class: "section-h sm" }, h("h2", {}, T("trainers")), h("small", { class: "muted" }, LX("по 10 вопросов", "10 сұрақтан", "10'ar soru"))));
+  v.append(h("div", { class: "trs mini" }, TRAINERS.map(t => h("a", { class: "tr-card", href: `#/practice/${t.id}`, title: L({ kk: t.d[0], ru: t.d[1], tr: t.d[2] }), html: `<span class="ic">${esc(t.ic)}</span><b>${esc(L({ kk: t.t[0], ru: t.t[1], tr: t.t[2] }))}</b>` }))));
+  const hs = CORE.suras.filter(s => s.n === 1 || (s.n >= 93 && s.c <= 11));
+  // сначала суры, которые уже начали учить; остальные — под кнопкой
+  const started = n => S.hifz[n] && Object.keys(S.hifz[n]).length;
+  hs.sort((a, b) => (started(b.n) ? 1 : 0) - (started(a.n) ? 1 : 0));
+  const list = h("div", { class: "slist hz-l" }, hs.map((s, i) => { const it = suraItem(s, `#/sura/${s.n}/hifz`); if (i >= 5) it.classList.add("far"); return it; }));
+  v.append(h("div", { class: "section-h sm" }, h("h2", {}, T("hifz")), h("a", { class: "small", href: "#/suras" }, LX("все 114 сур →", "114 сүре →", "114 sure →"))), list,
+    h("button", { class: "pm-more", onclick: e => { list.classList.add("all"); e.currentTarget.remove(); } }, LX(`Ещё ${hs.length - 5} коротких сур`, `Тағы ${hs.length - 5} қысқа сүре`, `${hs.length - 5} kısa sure daha`)));
 }
+/* ═════════════ повторение: интервалы 1 → 3 → 7 → 16 → 35 → 75 дней ═════════════ */
+const RV_INT = [1, 3, 7, 16, 35, 75], RV_MAX = 12;
+const LESSON_RULE = { 70: "qalqala", 73: "izhar", 74: "idgham", 75: "idgham_ng", 76: "iqlab", 77: "ikhfa", 80: "ikhfa_sh", 81: "idgham_m", 83: "ghunna", 85: "madd2", 86: "madd46", 90: "madd6" };
+const dayPlus = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+function rvPool() { // всё, что уже пройдено: буквы, правила, выученные аяты
+  const ids = [];
+  for (let n = 1; n <= 30; n++) if (isDone(n)) for (const ch of COURSE.lessons[n - 1].title.ru) if (letterBy(ch)) ids.push("l:" + ch);
+  for (const [n, k] of Object.entries(LESSON_RULE)) if (isDone(+n) && CORE.rules[k]) ids.push("r:" + k);
+  for (const [s, st] of Object.entries(S.hifz || {})) for (const a of Object.keys(st)) if (st[a]) ids.push(`a:${s}:${a}`);
+  return [...new Set(ids)];
+}
+function rvDue() { const rv = S.rv || {}, t = today(); return rvPool().filter(id => !rv[id] || rv[id].due <= t); }
+function rvCard() { // плитка «Повторить сегодня»
+  const pool = rvPool(), due = rvDue(), n = Math.min(due.length, RV_MAX);
+  if (!pool.length) return h("div", { class: "rv-card empty", html: `<span class="rv-ic">${icon("clock")}</span><span><b>${esc(LX("Повторение", "Қайталау", "Tekrar"))}</b><small>${esc(LX("Пройдите первые уроки — здесь появятся буквы и правила для повторения", "Алғашқы сабақтардан өтіңіз — мұнда қайталайтын әріптер мен ережелер шығады", "İlk dersleri bitirin — tekrar edilecek harfler ve kurallar burada görünecek"))}</small></span>` });
+  return h("a", { class: "rv-card" + (n ? "" : " ok"), href: n ? "#/review" : null, html: `<span class="rv-ic">${icon(n ? "clock" : "check")}</span><span><b>${esc(n ? LX("Повторить сегодня", "Бүгін қайталау", "Bugün tekrar et") : LX("На сегодня всё повторено", "Бүгінге бәрі қайталанды", "Bugünlük tekrar tamam"))}</b>` +
+    `<small>${esc(n ? LX(`${n} ${plRu(n, "карточка", "карточки", "карточек")} · ${n > 6 ? "3–5" : "1–2"} минуты`, `${n} карточка · ${n > 6 ? "3–5" : "1–2"} минут`, `${n} kart · ${n > 6 ? "3–5" : "1–2"} dakika`) : LX(`В памяти: ${pool.length}. Следующие — завтра`, `Есте: ${pool.length}. Келесісі — ертең`, `Hafızada: ${pool.length}. Sonrakiler yarın`))}</small></span>${n ? `<b class="rv-n num">${n}</b>` : ""}` });
+}
+async function pageReview(v) {
+  v.append(backHead("#/practice", LX("Повторение", "Қайталау", "Tekrar"), LX("Вспомните — затем проверьте себя", "Есіңізге түсіріңіз — сосын тексеріңіз", "Hatırlayın — sonra kendinizi kontrol edin")));
+  const rv = S.rv = S.rv || {};
+  const queue = shuffle(rvDue()).slice(0, RV_MAX);
+  if (!queue.length) { v.append(rvCard()); return; }
+  const total = queue.length; let done = 0, okN = 0;
+  const bar = h("div", { class: "bar" }, h("i")), box = h("div", { class: "rv-box" });
+  v.append(h("div", { class: "rv-top" }, bar, h("small", { class: "muted num" })), box);
+  const show = async () => {
+    bar.firstChild.style.width = `${Math.round(done / total * 100)}%`; bar.nextSibling.textContent = `${Math.min(done + 1, total)} / ${total}`;
+    box.innerHTML = "";
+    if (!queue.length) {
+      const nx = Object.values(rv).map(x => x.due).filter(d => d > today()).sort()[0];
+      box.append(h("div", { class: "panel result" }, h("div", { class: "big" }, `${okN} / ${total}`),
+        h("p", { class: "muted" }, LX("Отлично! То, что вспомнили, вернётся позже — с каждым разом всё реже.", "Керемет! Есте қалғандары кейін қайта шығады — әр жолы сирегірек.", "Harika! Hatırladıklarınız daha sonra tekrar gelecek — her seferinde daha seyrek.")),
+        nx ? h("p", { class: "small muted" }, LX(`Следующее повторение: ${nx.split("-").reverse().join(".")}`, `Келесі қайталау: ${nx.split("-").reverse().join(".")}`, `Sonraki tekrar: ${nx.split("-").reverse().join(".")}`)) : null,
+        h("a", { class: "btn", href: "#/practice" }, LX("Готово", "Дайын", "Tamam"))));
+      addXP(okN, null); return;
+    }
+    const id = queue[0], [kind, a, b] = id.split(":");
+    const front = h("div", { class: "rv-front" }), back = h("div", { class: "rv-back", hidden: true });
+    if (kind === "l") {
+      const Lt = letterBy(a);
+      front.append(h("small", { class: "rv-k" }, LX("Буква", "Әріп", "Harf")), h("div", { class: "rv-big ar", lang: "ar" }, pick(Lt.forms)), h("p", {}, LX("Как называется и как звучит?", "Атауы қандай және қалай дыбысталады?", "Adı ne ve nasıl okunur?")));
+      const sb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); sb.onclick = () => speakAr(AR_NAMES[a] || a, sb);
+      back.append(h("div", { class: "rv-ans" }, h("b", {}, `${L(Lt.name)} · «${L(Lt.sound)}»`), sb), h("a", { class: "small", href: `#/ref/letter/${a}` }, LX("Открыть букву →", "Әріпті ашу →", "Harfi aç →")));
+    } else if (kind === "r") {
+      const r = CORE.rules[a], ex = pick(CORE.quiz.filter(q => q.r === a));
+      front.append(h("small", { class: "rv-k" }, LX("Правило таджвида", "Тәжуид ережесі", "Tecvid kuralı")), h("h3", {}, L(r.name)), h("p", {}, LX("Когда оно применяется и как читать?", "Қашан қолданылады және қалай оқылады?", "Ne zaman uygulanır ve nasıl okunur?")));
+      back.append(h("div", { class: "rv-ans" }, h("b", {}, L(r.short))), ex ? h("div", { class: "ex-ar ar", lang: "ar", html: spansHTML(ex.sp) }) : null, h("a", { class: "small", href: `#/ref/rule/${a}` }, LX("Правило подробно →", "Ереже толығырақ →", "Kural ayrıntılı →")));
+    } else {
+      const s = +a, n = +b, sd = await loadSura(s), ay = sd.ayat[n - 1], words = ay.sp.map(x => x[0]).join("").split(" ");
+      front.append(h("small", { class: "rv-k" }, `${LX("Сура", "Сүре", "Sure")} ${L(suraBy(s).name)} · ${LX("аят", "аят", "ayet")} ${n}`),
+        h("div", { class: "rv-ay ar", lang: "ar" }, words.slice(0, words.length > 3 ? 2 : 1).join(" ") + " …"), h("p", {}, LX("Прочитайте аят по памяти", "Аятты жатқа оқыңыз", "Ayeti ezberden okuyun")));
+      const sb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); sb.onclick = () => playURL(ayahURL(s, n), sb);
+      back.append(h("div", { class: "rv-ay ar full", lang: "ar", html: esc(words.join(" ")) + " " + ayahMark(n) }), h("div", { class: "rv-ans" }, sb));
+    }
+    const reveal = h("button", { class: "btn", onclick: () => { back.hidden = false; reveal.remove(); acts.hidden = false; } }, LX("Показать ответ", "Жауапты көрсету", "Cevabı göster"));
+    const grade = good => { const it = rv[id] || { i: -1 };
+      if (good) { it.i = Math.min(it.i + 1, RV_INT.length - 1); it.due = dayPlus(RV_INT[it.i]); okN++; queue.shift(); done++; }
+      else { it.i = -1; it.due = dayPlus(1); queue.push(queue.shift()); } // не вспомнил — ещё раз в конце сессии
+      rv[id] = it; save(); show(); };
+    const acts = h("div", { class: "rv-acts", hidden: true },
+      h("button", { class: "btn ghost", onclick: () => grade(false) }, LX("Не вспомнил", "Есімде жоқ", "Hatırlamadım")),
+      h("button", { class: "btn", onclick: () => grade(true) }, LX("Помню", "Есімде", "Hatırladım")));
+    box.append(h("div", { class: "rv-c" }, front, back), reveal, acts);
+  };
+  show();
+}
+
+/* ═════════════ входной тест: с какого модуля начать ═════════════ */
+const PLACE = [[1, "letters"], [2, "harakat"], [3, "tajweed"]], PLACE_N = 4, PLACE_OK = 3;
+function pagePlacement(v) {
+  v.append(backHead("#/course", LX("Входной тест", "Кіріс тест", "Seviye testi"), LX("Подберём модуль под ваш уровень", "Деңгейіңізге сай модуль таңдаймыз", "Seviyenize uygun modülü bulalım")));
+  const box = h("div", { class: "session" }); v.append(box);
+  const intro = () => { box.innerHTML = "";
+    box.append(h("div", { class: "panel pl-intro" }, h("span", { class: "pl-ic", html: icon("bulb") }),
+      h("p", {}, LX("До 12 вопросов: буквы, чтение слогов, правила таджвида. Если что-то пока незнакомо — тест остановится и подскажет, с чего начать.", "12 сұраққа дейін: әріптер, буын оқу, тәжуид ережелері. Бірдеңе әлі таныс болмаса — тест тоқтап, неден бастау керегін айтады.", "En fazla 12 soru: harfler, hece okuma, tecvid kuralları. Bilmediğiniz bir şey çıkarsa test durur ve nereden başlayacağınızı söyler.")),
+      h("div", { class: "row" }, h("button", { class: "btn", onclick: run }, LX("Начать тест", "Тестті бастау", "Teste başla")), h("a", { class: "btn ghost", href: "#/lesson/1" }, LX("Начну с нуля", "Басынан бастаймын", "Sıfırdan başlayacağım"))))); };
+  const run = () => {
+    let bi = 0, qi = 0, ok = 0;
+    const finish = level => { // level = номер модуля, с которого начать
+      box.innerHTML = "";
+      const M = COURSE.modules[level - 1];
+      box.append(h("div", { class: "panel result pl-res" }, h("small", { class: "muted" }, LX("Рекомендуем начать с", "Бастауға кеңес береміз", "Şuradan başlamanızı öneririz")),
+        h("div", { class: "pl-mod" }, h("span", { class: "ar", lang: "ar" }, M.ar), h("b", {}, `${T("module")} ${M.id}. ${L(M.title)}`)), h("p", { class: "muted" }, L(M.desc || M.result)),
+        h("div", { class: "row", style: "justify-content:center" },
+          h("button", { class: "btn", onclick: () => { S.placeFrom = M.from; save(); location.hash = `#/lesson/${nextLessonN()}`; } }, LX(`Начать модуль ${M.id}`, `${M.id}-модульді бастау`, `${M.id}. modüle başla`)),
+          level > 1 ? h("a", { class: "btn ghost", href: "#/lesson/1" }, LX("Всё же с начала", "Бәрібір басынан", "Yine de baştan")) : null)));
+    };
+    const step = () => {
+      if (qi === PLACE_N) { if (ok < PLACE_OK) return finish(PLACE[bi][0]); bi++; qi = 0; ok = 0; if (bi === PLACE.length) return finish(4); }
+      box.innerHTML = "";
+      const tr = TRAINERS.find(t => t.id === PLACE[bi][1]), q = tr.make(), k = bi * PLACE_N + qi;
+      box.append(h("div", { class: "tprog", style: "display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted);margin-bottom:6px" }, h("span", {}, L({ kk: tr.t[0], ru: tr.t[1], tr: tr.t[2] })), h("span", { class: "num" }, `${k + 1} / ${PLACE.length * PLACE_N}`)),
+        h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${k / (PLACE.length * PLACE_N) * 100}%` })));
+      const el = exEl(q, "pl", null, { noTag: true, single: true, onDone: good => { if (good) ok++; qi++; setTimeout(step, good ? 400 : 1100); } });
+      if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
+      box.append(el);
+    };
+    step();
+  };
+  intro();
+}
+
 function pageTrainer(v, id) {
   const tr = TRAINERS.find(t => t.id === id);
   if (!tr) return notFound(v);
@@ -2417,7 +2665,7 @@ function pageMe(v) {
   const ava = u && u.photoURL ? `<img src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer">` : esc((String(name).trim()[0] || "?").toUpperCase());
   const wrap = h("div", { class: "read" });
   wrap.append(h("header", { class: "me-h", html: `<span class="me-ava">${ava}</span><div><h1>${esc(name)}</h1><p class="muted small">${esc(T("level"))} ${lv} · ${S.xp} ${esc(T("xp"))}</p><div class="bar"><i style="width:${((S.xp - lo) / (hi - lo) * 100).toFixed(0)}%"></i></div></div>` }));
-  wrap.append(accountPanel());
+  if (!AUTH.off) wrap.append(accountPanel());
   const memN = CORE.suras.filter(s => suraMemorized(s.n)).length, st = streak(), dc = doneCount();
   wrap.append(h("div", { class: "me-stats" },
     h("a", { href: "#/course", html: `<b class="num">${dc}</b><small>${esc(LX(plRu(dc, "урок", "урока", "уроков"), "сабақ", "ders"))}</small>` }),
@@ -2428,7 +2676,9 @@ function pageMe(v) {
   const aw = h("div", { class: "awards" });
   [...BADGES].sort((a, b) => (!!S.badges[b[0]]) - (!!S.badges[a[0]])).forEach(([id, , nm, desc]) =>
     aw.append(h("div", { class: "award" + (S.badges[id] ? " on" : ""), html: `<span class="aw-ic">${S.badges[id] ? badgeIcon(id) : icon("lock")}</span><b>${esc(L({ kk: nm[0], ru: nm[1], tr: nm[2] }))}</b><small>${esc(L({ kk: desc[0], ru: desc[1], tr: desc[2] }))}</small>` })));
-  wrap.append(h("section", { class: "card" }, h("div", { class: "card-h" }, h("h2", {}, LX("Награды", "Марапаттар", "Ödüller")), h("span", { class: "muted small" }, `${got} ${LX("из", "/", "/")} ${BADGES.length}`)), aw));
+  [...aw.children].forEach((x, i) => { if (i >= 6) x.classList.add("far"); });
+  wrap.append(h("section", { class: "card" }, h("div", { class: "card-h" }, h("h2", {}, LX("Награды", "Марапаттар", "Ödüller")), h("span", { class: "muted small" }, `${got} ${LX("из", "/", "/")} ${BADGES.length}`)), aw,
+    h("button", { class: "pm-more", onclick: e => { aw.classList.add("all"); e.currentTarget.remove(); } }, LX("Все награды", "Барлық марапаттар", "Tüm ödüller"))));
   // неделя и цель
   const days = S.lang === "ru" ? UI.dayNames[1] : S.lang === "tr" ? UI.dayTr : UI.dayNames[0];
   const wk = h("div", { class: "week" });
@@ -2441,19 +2691,22 @@ function pageMe(v) {
   }
   const goalSeg = h("div", { class: "seg" }, [[15, "goals"], [30, "goalm"], [60, "goalh"]].map(([g, k]) => h("button", { "aria-pressed": String(S.goal === g), onclick: () => { S.goal = g; save(); route(); } }, `${T(k)} · ${g}`)));
   wrap.append(h("section", { class: "card stack" }, h("h2", {}, T("week")), wk, h("h3", {}, T("dailyGoal")), goalSeg));
-  wrap.append(remindCard("lesson"));
+  // напоминание и настройки — свёрнутыми пунктами
+  const fold = (ic, title, sub, node) => { const d = h("details", { class: "acc-i me-f" }, h("summary", { html: `<i>${icon(ic)}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span>${icon("chev")}` }), node); return d; };
+  const rc = remindCard("lesson"); rc.classList.add("bare");
+  wrap.append(fold("bell", LX("Напоминание об уроке", "Сабақ туралы еске салу", "Ders hatırlatıcısı"), LX(`Каждый день в ${S.remT || "20:00"}`, `Күн сайын ${S.remT || "20:00"}`, `Her gün ${S.remT || "20:00"}`), rc));
   // настройки
   const themeSeg = h("div", { class: "seg" }, [["light", "light"], ["dark", "dark"], ["system", "system"]].map(([th, k]) => h("button", { "aria-pressed": String((S.theme || "light") === th), onclick: () => { S.theme = th; save(); applyTheme(); shell(); route(); } }, T(k))));
   const langSeg = h("div", { class: "seg" }, [["kk", "Қазақша"], ["ru", "Русский"], ["tr", "Türkçe"]].map(([l, t]) => h("button", { "aria-pressed": String(S.lang === l), onclick: () => setLang(l) }, t)));
   const confirmBox = h("div", { class: "box warn", hidden: true }, h("p", {}, T("resetAsk")),
     h("div", { class: "row", style: "margin-top:10px" }, h("button", { class: "btn", style: "background:var(--bad);color:#fff", onclick: () => { const keep = { lang: S.lang, theme: S.theme }; S = Object.assign(blank(), keep); save(); toast(T("resetDone")); shell(); route(); } }, T("yesReset")),
       h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = true }, T("cancel"))));
-  wrap.append(h("section", { class: "card stack" }, h("h2", {}, T("settings")),
+  wrap.append(fold("gear", T("settings"), [T("language"), T("theme"), LX("размер шрифта", "қаріп өлшемі", "yazı boyutu")].join(" · "), h("section", { class: "card stack bare" },
     h("div", { class: "setrow" }, h("span", {}, T("language")), langSeg),
     h("div", { class: "setrow" }, h("span", {}, T("theme")), themeSeg),
     arzRow(),
     h("p", { class: "muted small" }, AUTH.user ? T("synced") : T("savedHere")),
-    h("div", {}, h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = false }, T("resetAll"))), confirmBox));
+    h("div", {}, h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = false }, T("resetAll"))), confirmBox)));
   v.append(wrap);
 }
 
