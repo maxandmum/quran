@@ -296,13 +296,13 @@ const READERS = [
   { id: "afasy", f: [50, 30, 1], n: ["Мишари Рашид әл-Афаси", "Мишари Рашид аль-Афаси"], c: ["Кувейт", "Кувейт"], v: [["mishary-alafasy/r1", "m"]],
     img: [WM + "2/24/%D0%9C%D0%B8%D1%88%D0%B0%D1%80%D0%B8_%D0%A0%D0%B0%D1%88%D0%B8%D0%B4.jpg/250px-%D0%9C%D0%B8%D1%88%D0%B0%D1%80%D0%B8_%D0%A0%D0%B0%D1%88%D0%B8%D0%B4.jpg", "quranic.ru", "Copyrighted free use", "https://commons.wikimedia.org/wiki/File:%D0%9C%D0%B8%D1%88%D0%B0%D1%80%D0%B8_%D0%A0%D0%B0%D1%88%D0%B8%D0%B4.jpg"],
     b: ["Кувейттегі Үлкен мешіттің имамы. Қазіргі ең танымал қарилардың бірі: таза, әуенді әрі асықпай оқиды.", "Имам Большой мечети Кувейта. Один из самых известных современных чтецов: чистое, мелодичное и неторопливое чтение."] },
-  { id: "minshawi", f: [50, 24, 1.15], n: ["Мұхаммед Сыддық әл-Миншауи", "Мухаммад Сиддик аль-Миншави"], c: ["Мысыр, 1920–1969", "Египет, 1920–1969"], v: [["muhammad-minshawi/r3", "t"], ["muhammad-minshawi/r1", "m"], ["muhammad-minshawi/r2", "j"]],
+  { id: "minshawi", f: [50, 30, 1.2], n: ["Мұхаммед Сыддық әл-Миншауи", "Мухаммад Сиддик аль-Миншави"], c: ["Мысыр, 1920–1969", "Египет, 1920–1969"], v: [["muhammad-minshawi/r3", "t"], ["muhammad-minshawi/r1", "m"], ["muhammad-minshawi/r2", "j"]],
     img: [WM + "e/ee/Elminshwey.jpg/250px-Elminshwey.jpg", "", "Public domain", "https://commons.wikimedia.org/wiki/File:Elminshwey.jpg"],
     b: ["Оның «үйретуші мусхафы» балалармен бірге жазылған: қари оқиды, балалар қайталайды. Жаңа бастағандарға ең қолайлы қари.", "Его «обучающий мусхаф» записан вместе с детьми: чтец читает, дети повторяют. Лучший выбор для начинающих."] },
-  { id: "husary", f: [50, 20, 1], n: ["Махмұд Халил әл-Хусари", "Махмуд Халиль аль-Хусари"], c: ["Мысыр, 1917–1980", "Египет, 1917–1980"], v: [["mahmoud-husary/r1", "m"], ["mahmoud-husary/r2", "j"]],
+  { id: "husary", f: [50, 28, 1.15], n: ["Махмұд Халил әл-Хусари", "Махмуд Халиль аль-Хусари"], c: ["Мысыр, 1917–1980", "Египет, 1917–1980"], v: [["mahmoud-husary/r1", "m"], ["mahmoud-husary/r2", "j"]],
     img: [WM + "7/70/Hussary.jpg/250px-Hussary.jpg", "Zubairkhan1", "Public domain", "https://commons.wikimedia.org/wiki/File:Hussary.jpg"],
     b: ["Мысыр қарилерінің басшысы болған. Құранды толық «мураттал» оқуымен алғаш жазғандардың бірі. Оқуы өте анық — тәжуидтің үлгісі.", "Был главой чтецов Египта, одним из первых записал весь Коран чтением муратталь. Очень чёткое чтение — образец таджвида."] },
-  { id: "basit", f: [45, 32, 1.4], n: ["Абдулбасит Абдуссамад", "Абдул-Басит Абдус-Самад"], c: ["Мысыр, 1927–1988", "Египет, 1927–1988"], v: [["abdulbasit-abdulsamad/r3", "m"], ["abdulbasit-abdulsamad/r1", "j"]],
+  { id: "basit", f: [52, 44, 1.6], n: ["Абдулбасит Абдуссамад", "Абдул-Басит Абдус-Самад"], c: ["Мысыр, 1927–1988", "Египет, 1927–1988"], v: [["abdulbasit-abdulsamad/r3", "m"], ["abdulbasit-abdulsamad/r1", "j"]],
     img: [WM + "b/b9/Abdul_Basit_Abd_us-Samad_in_South_Africa_in_1966_%283%29_%28cropped%29.jpg/250px-Abdul_Basit_Abd_us-Samad_in_South_Africa_in_1966_%283%29_%28cropped%29.jpg", "", "Public domain", "https://commons.wikimedia.org/wiki/File:Abdul_Basit_Abd_us-Samad_in_South_Africa_in_1966_(3)_(cropped).jpg"],
     b: ["Құранның «алтын дауысы»: әуенді мужәууад оқуы мен өте ұзақ тынысымен әйгілі.", "«Золотой голос» Корана: знаменит мелодичным чтением муджаввад и необычайно долгим дыханием."] },
   { id: "ghamdi", f: [50, 36, 1], n: ["Сағд әл-Ғамиди", "Саад аль-Гамиди"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["saad-ghamdi/r1", "m"]],
@@ -311,19 +311,19 @@ const READERS = [
   { id: "maher", f: [50, 30, 1.1], n: ["Махир әл-Мұғайқли", "Махер аль-Муайкли"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["maher-muaiqly/r1", "m"]],
     img: [WM + "c/c4/Professor_Maher_Al-Mu%27aiqly.jpg/250px-Professor_Maher_Al-Mu%27aiqly.jpg", "Real avdulmouhd", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Professor_Maher_Al-Mu%27aiqly.jpg"],
     b: ["Меккедегі Харам мешітінің имамы. Жұмсақ, таза оқу.", "Имам Запретной мечети в Мекке. Мягкое, чистое чтение."] },
-  { id: "shuraim", f: [45, 17, 2.6], n: ["Сағуд әш-Шурайм", "Сауд аш-Шурайм"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["saud-shuraim/r1", "m"]],
+  { id: "shuraim", f: [44, 19, 2.3], n: ["Сағуд әш-Шурайм", "Сауд аш-Шурайм"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["saud-shuraim/r1", "m"]],
     img: ["https://upload.wikimedia.org/wikipedia/commons/8/8f/Saud_Shuraim.png", "Sazwanmisuari", "CC0", "https://commons.wikimedia.org/wiki/File:Saud_Shuraim.png"],
     b: ["Ұзақ жылдар Меккедегі Харам мешітінің имамы болды. Күшті әрі жинақы, бірден танылатын оқу.", "Долгие годы был имамом Запретной мечети в Мекке. Сильное, собранное, узнаваемое чтение."] },
-  { id: "dosari", f: [42, 28, 1.6], n: ["Ясир әд-Дәусари", "Ясир ад-Даусари"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["yasser-dosari/r1", "m"]],
+  { id: "dosari", f: [43, 32, 1.5], n: ["Ясир әд-Дәусари", "Ясир ад-Даусари"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["yasser-dosari/r1", "m"]],
     img: [WM + "8/8b/Yasser_Al-Dosari_%28cropped%29.jpg/250px-Yasser_Al-Dosari_%28cropped%29.jpg", "MAL MALDIVE", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Yasser_Al-Dosari_(cropped).jpg"],
     b: ["Меккедегі Харам мешітінің имамы. Жүрекке жететін, әсерлі оқу.", "Имам Запретной мечети в Мекке. Проникновенное, трогающее сердце чтение."] },
-  { id: "qatami", f: [50, 30, 1.1], n: ["Насир әл-Қатами", "Насер аль-Катами"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["nasser-qatami/r1", "m"]],
+  { id: "qatami", f: [50, 28, 1.3], n: ["Насир әл-Қатами", "Насер аль-Катами"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["nasser-qatami/r1", "m"]],
     img: [WM + "a/aa/%D8%B5%D9%88%D8%B1%D8%A9_%D8%B4%D8%AE%D8%B5%D9%8A%D8%A9_%D9%86%D8%A7%D8%B5%D8%B1_%D8%A7%D9%84%D9%82%D8%B7%D8%A7%D9%85%D9%8A.jpg/250px-%D8%B5%D9%88%D8%B1%D8%A9_%D8%B4%D8%AE%D8%B5%D9%8A%D8%A9_%D9%86%D8%A7%D8%B5%D8%B1_%D8%A7%D9%84%D9%82%D8%B7%D8%A7%D9%85%D9%8A.jpg", "Ayman dhū alghiná", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:%D8%B5%D9%88%D8%B1%D8%A9_%D8%B4%D8%AE%D8%B5%D9%8A%D8%A9_%D9%86%D8%A7%D8%B5%D8%B1_%D8%A7%D9%84%D9%82%D8%B7%D8%A7%D9%85%D9%8A.jpg"],
     b: ["Әсерлі, жүрекке жақын оқуымен танымал.", "Известен проникновенным, трогающим сердце чтением."] },
-  { id: "ajmi", f: [50, 34, 1.1], n: ["Ахмад әл-Ажми", "Ахмад аль-Аджми"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["ahmad-ajmi/r1", "m"]],
+  { id: "ajmi", f: [52, 36, 1.1], n: ["Ахмад әл-Ажми", "Ахмад аль-Аджми"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["ahmad-ajmi/r1", "m"]],
     img: [WM + "e/e5/Ahmad_bin_Ali_Al-Ajmi.png/250px-Ahmad_bin_Ali_Al-Ajmi.png", "أحمد زين", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Ahmad_bin_Ali_Al-Ajmi.png"],
     b: ["Күшті әрі әуенді оқу, бүкіл әлемде танымал.", "Сильное и мелодичное чтение, популярное во всём мире."] },
-  { id: "sudais", f: [50, 28, 1.1], n: ["Абдуррахман әс-Судайс", "Абдуррахман ас-Судайс"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["abdulrahman-sudais/r1", "m"]],
+  { id: "sudais", f: [50, 40, 1.5], n: ["Абдуррахман әс-Судайс", "Абдуррахман ас-Судайс"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["abdulrahman-sudais/r1", "m"]],
     img: [WM + "1/18/Abdul-Rahman_Al-Sudais_%28Cropped%2C_2011%29.jpg/250px-Abdul-Rahman_Al-Sudais_%28Cropped%2C_2011%29.jpg", "Prime Minister's Office (India)", "GODL-India", "https://commons.wikimedia.org/wiki/File:Abdul-Rahman_Al-Sudais_(Cropped,_2011).jpg"],
     b: ["1984 жылдан бері Меккедегі Харам мешітінің имамы әрі хатибі. Жылдам, әуезді, бірден танылатын оқу.", "С 1984 года имам и хатиб Запретной мечети в Мекке. Быстрое, звонкое, сразу узнаваемое чтение."] },
 ];
@@ -332,7 +332,12 @@ const readerOf = rid => READERS.find(r => r.v.some(v => v[0] === rid)) || READER
 const LRECITERS = READERS.flatMap(r => r.v.map(([id, st]) => [id, r.n[0] + (r.v.length > 1 ? " — " + STYLE[st][0].split(" — ")[0].toLowerCase() : ""), r.n[1] + (r.v.length > 1 ? " — " + STYLE[st][1].split(" — ")[0].toLowerCase() : "")]));
 const recName = id => { const r = LRECITERS.find(x => x[0] === id) || LRECITERS[0]; return S.lang === "ru" ? r[2] : r[1]; };
 const initials = n => n.replace(/\b(әл|аль|аш|әш|ад|әд|ас)-/gi, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
-const faceStyle = r => { const [x, y, z] = r.f || [50, 30, 1]; return `object-position:${x}% ${y}%;transform-origin:${x}% ${y}%;transform:scale(${z})`; };
+// лицо — в центр круга: object-position выбирает кадр, затем увеличение и сдвиг точки лица к центру (без пустых краёв)
+const faceStyle = r => {
+  const [x, y, z] = r.f || [50, 30, 1], lim = (z - 1) * 50, cl = v => Math.max(-lim, Math.min(lim, v));
+  const tx = cl(-z * (x - 50)).toFixed(1), ty = cl(-z * (y - 50)).toFixed(1);
+  return `object-position:${x}% ${y}%;transform:translate(${tx}%,${ty}%) scale(${z})`;
+};
 const readerAva = (r, cls = "") => r.img ? `<span class="rava ${cls}" data-i="${esc(initials(r.n[1]))}"><img src="${r.img[0]}" alt="" loading="lazy" referrerpolicy="no-referrer" style="${faceStyle(r)}" onerror="this.parentNode.classList.add('mono');this.parentNode.textContent=this.parentNode.dataset.i"></span>` : `<span class="rava mono ${cls}">${esc(initials(r.n[1]))}</span>`;
 const fmtT = t => { if (!isFinite(t)) return "0:00"; t = Math.floor(t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0"); };
 let LP = null; // { a: Audio, bar: Element }
