@@ -7,7 +7,7 @@ const KEY = "qoqu.v1";
 const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const blank = () => ({ lang: null, theme: null, xp: 0, days: {}, lessons: {}, ex: {}, tests: {},
   badges: {}, hifz: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true, tl: true },
-  last: null, listen: { r: "mishary-alafasy/r1", s: 1 }, tsb: { i: 0, c: 0, total: 0 }, nzg: "m", at: 0 });
+  last: null, listen: { r: "mishary-alafasy/r1", s: 1 }, tsb: { k: 0, day: "", d: {}, t: {}, vib: true }, nzg: "m", at: 0 });
 let S = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch (e) {}
 S.view = Object.assign({ color: true, tr: true, tl: true }, S.view);
@@ -125,8 +125,8 @@ const UI = {
   needEmail: ["Алдымен поштаңызды жазыңыз.", "Сначала введите почту."], hello: ["Сәлем", "Здравствуйте"],
   authErr: ["Кіру сәтсіз аяқталды", "Не удалось войти"], syncOk: ["Прогресс синхрондалды", "Прогресс синхронизирован"],
   install: ["Телефонға орнату", "Установить на телефон"],
-  footer: ["Құран мәтіні — османдық жазу, Хафс риуаяты (Tanzil). Мағына аудармасы — Халифа Алтай. Аудио: EveryAyah, Quran.com, mp3quran.net.",
-    "Текст Корана — усманский рисм, риваят Хафс (Tanzil). Перевод смыслов — Эльмир Кулиев. Аудио: EveryAyah, Quran.com, mp3quran.net."],
+  footer: ["Құран мәтіні — османдық жазу, Хафс риуаяты (Tanzil). Мағына аудармасы — Халифа Алтай. Аудио: EveryAyah, Quran.com, mp3quran.net, «Хисну-л-муслим» (hisnmuslim.com).",
+    "Текст Корана — усманский рисм, риваят Хафс (Tanzil). Перевод смыслов — Эльмир Кулиев. Аудио: EveryAyah, Quran.com, mp3quran.net, «Хиснуль-муслим» (hisnmuslim.com)."],
   footer2: ["Бұл курс оқуды үйретеді; мағынасын білу үшін сенімді тәпсірді оқыңыз. Мүмкіндігінше оқуыңызды ұстазға тексертіңіз.",
     "Курс учит чтению; для понимания смысла читайте надёжный тафсир. По возможности проверяйте чтение у преподавателя."],
 };
@@ -186,7 +186,7 @@ const I = {
   mat: '<rect x="6" y="4" width="12" height="16" rx="2"/><path d="M8 4V2M10.7 4V2M13.3 4V2M16 4V2M8 22v-2M10.7 22v-2M13.3 22v-2M16 22v-2"/><path d="M12 8.5l3 3.5-3 3.5-3-3.5z"/>',
   beads: '<circle cx="12" cy="4.2" r="1.3"/><circle cx="16.5" cy="5.8" r="1.3"/><circle cx="18.2" cy="10" r="1.3"/><circle cx="16.5" cy="14.2" r="1.3"/><circle cx="7.5" cy="14.2" r="1.3"/><circle cx="5.8" cy="10" r="1.3"/><circle cx="7.5" cy="5.8" r="1.3"/><path d="M12 15.5v5M10.3 21.5h3.4"/>',
   flip: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5"/>', vib: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 8v8M20 8v8"/>',
-  chev: '<path d="M9 6l6 6-6 6"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>', chevl: '<path d="M15 6l-6 6 6 6"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   flame: '<path d="M12 22c4 0 7-3 7-7 0-3-2-5.5-3.5-7-.5 2-1.5 3-3 3 .5-3-1-6-3.5-8 0 3-1.5 5-3 6.5C4.5 11 5 13 5 15c0 4 3 7 7 7z"/>',
   star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
@@ -293,45 +293,47 @@ const MP3Q = "https://cdn.mp3quran.net/audio/";
 // чтецы: фото только со свободной лицензией (Wikimedia Commons), автор и лицензия показываются на странице чтеца
 const WM = "https://upload.wikimedia.org/wikipedia/commons/thumb/";
 const READERS = [
-  { id: "afasy", n: ["Мишари Рашид әл-Афаси", "Мишари Рашид аль-Афаси"], c: ["Кувейт", "Кувейт"], v: [["mishary-alafasy/r1", "m"]],
+  { id: "afasy", f: [50, 30, 1], n: ["Мишари Рашид әл-Афаси", "Мишари Рашид аль-Афаси"], c: ["Кувейт", "Кувейт"], v: [["mishary-alafasy/r1", "m"]],
     img: [WM + "2/24/%D0%9C%D0%B8%D1%88%D0%B0%D1%80%D0%B8_%D0%A0%D0%B0%D1%88%D0%B8%D0%B4.jpg/250px-%D0%9C%D0%B8%D1%88%D0%B0%D1%80%D0%B8_%D0%A0%D0%B0%D1%88%D0%B8%D0%B4.jpg", "quranic.ru", "Copyrighted free use", "https://commons.wikimedia.org/wiki/File:%D0%9C%D0%B8%D1%88%D0%B0%D1%80%D0%B8_%D0%A0%D0%B0%D1%88%D0%B8%D0%B4.jpg"],
     b: ["Кувейттегі Үлкен мешіттің имамы. Қазіргі ең танымал қарилардың бірі: таза, әуенді әрі асықпай оқиды.", "Имам Большой мечети Кувейта. Один из самых известных современных чтецов: чистое, мелодичное и неторопливое чтение."] },
-  { id: "minshawi", n: ["Мұхаммед Сыддық әл-Миншауи", "Мухаммад Сиддик аль-Миншави"], c: ["Мысыр, 1920–1969", "Египет, 1920–1969"], v: [["muhammad-minshawi/r3", "t"], ["muhammad-minshawi/r1", "m"], ["muhammad-minshawi/r2", "j"]],
+  { id: "minshawi", f: [50, 24, 1.15], n: ["Мұхаммед Сыддық әл-Миншауи", "Мухаммад Сиддик аль-Миншави"], c: ["Мысыр, 1920–1969", "Египет, 1920–1969"], v: [["muhammad-minshawi/r3", "t"], ["muhammad-minshawi/r1", "m"], ["muhammad-minshawi/r2", "j"]],
     img: [WM + "e/ee/Elminshwey.jpg/250px-Elminshwey.jpg", "", "Public domain", "https://commons.wikimedia.org/wiki/File:Elminshwey.jpg"],
     b: ["Оның «үйретуші мусхафы» балалармен бірге жазылған: қари оқиды, балалар қайталайды. Жаңа бастағандарға ең қолайлы қари.", "Его «обучающий мусхаф» записан вместе с детьми: чтец читает, дети повторяют. Лучший выбор для начинающих."] },
-  { id: "husary", n: ["Махмұд Халил әл-Хусари", "Махмуд Халиль аль-Хусари"], c: ["Мысыр, 1917–1980", "Египет, 1917–1980"], v: [["mahmoud-husary/r1", "m"], ["mahmoud-husary/r2", "j"]],
+  { id: "husary", f: [50, 20, 1], n: ["Махмұд Халил әл-Хусари", "Махмуд Халиль аль-Хусари"], c: ["Мысыр, 1917–1980", "Египет, 1917–1980"], v: [["mahmoud-husary/r1", "m"], ["mahmoud-husary/r2", "j"]],
     img: [WM + "7/70/Hussary.jpg/250px-Hussary.jpg", "Zubairkhan1", "Public domain", "https://commons.wikimedia.org/wiki/File:Hussary.jpg"],
     b: ["Мысыр қарилерінің басшысы болған. Құранды толық «мураттал» оқуымен алғаш жазғандардың бірі. Оқуы өте анық — тәжуидтің үлгісі.", "Был главой чтецов Египта, одним из первых записал весь Коран чтением муратталь. Очень чёткое чтение — образец таджвида."] },
-  { id: "basit", n: ["Абдулбасит Абдуссамад", "Абдул-Басит Абдус-Самад"], c: ["Мысыр, 1927–1988", "Египет, 1927–1988"], v: [["abdulbasit-abdulsamad/r3", "m"], ["abdulbasit-abdulsamad/r1", "j"]],
+  { id: "basit", f: [45, 32, 1.4], n: ["Абдулбасит Абдуссамад", "Абдул-Басит Абдус-Самад"], c: ["Мысыр, 1927–1988", "Египет, 1927–1988"], v: [["abdulbasit-abdulsamad/r3", "m"], ["abdulbasit-abdulsamad/r1", "j"]],
     img: [WM + "b/b9/Abdul_Basit_Abd_us-Samad_in_South_Africa_in_1966_%283%29_%28cropped%29.jpg/250px-Abdul_Basit_Abd_us-Samad_in_South_Africa_in_1966_%283%29_%28cropped%29.jpg", "", "Public domain", "https://commons.wikimedia.org/wiki/File:Abdul_Basit_Abd_us-Samad_in_South_Africa_in_1966_(3)_(cropped).jpg"],
     b: ["Құранның «алтын дауысы»: әуенді мужәууад оқуы мен өте ұзақ тынысымен әйгілі.", "«Золотой голос» Корана: знаменит мелодичным чтением муджаввад и необычайно долгим дыханием."] },
-  { id: "ghamdi", n: ["Сағд әл-Ғамиди", "Саад аль-Гамиди"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["saad-ghamdi/r1", "m"]],
+  { id: "ghamdi", f: [50, 36, 1], n: ["Сағд әл-Ғамиди", "Саад аль-Гамиди"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["saad-ghamdi/r1", "m"]],
     img: [WM + "4/43/Saad_al_Ghamdi.jpg/250px-Saad_al_Ghamdi.jpg", "الشيخ هيثم الدخين", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Saad_al_Ghamdi.jpg"],
     b: ["Сабырлы, анық оқу. Сүрелерді жаттау үшін жиі ұсынылады.", "Спокойное, ясное чтение. Его часто советуют для заучивания сур."] },
-  { id: "maher", n: ["Махир әл-Мұғайқли", "Махер аль-Муайкли"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["maher-muaiqly/r1", "m"]],
+  { id: "maher", f: [50, 30, 1.1], n: ["Махир әл-Мұғайқли", "Махер аль-Муайкли"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["maher-muaiqly/r1", "m"]],
     img: [WM + "c/c4/Professor_Maher_Al-Mu%27aiqly.jpg/250px-Professor_Maher_Al-Mu%27aiqly.jpg", "Real avdulmouhd", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Professor_Maher_Al-Mu%27aiqly.jpg"],
     b: ["Меккедегі Харам мешітінің имамы. Жұмсақ, таза оқу.", "Имам Запретной мечети в Мекке. Мягкое, чистое чтение."] },
-  { id: "shuraim", n: ["Сағуд әш-Шурайм", "Сауд аш-Шурайм"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["saud-shuraim/r1", "m"]],
+  { id: "shuraim", f: [45, 17, 2.6], n: ["Сағуд әш-Шурайм", "Сауд аш-Шурайм"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["saud-shuraim/r1", "m"]],
     img: ["https://upload.wikimedia.org/wikipedia/commons/8/8f/Saud_Shuraim.png", "Sazwanmisuari", "CC0", "https://commons.wikimedia.org/wiki/File:Saud_Shuraim.png"],
     b: ["Ұзақ жылдар Меккедегі Харам мешітінің имамы болды. Күшті әрі жинақы, бірден танылатын оқу.", "Долгие годы был имамом Запретной мечети в Мекке. Сильное, собранное, узнаваемое чтение."] },
-  { id: "dosari", n: ["Ясир әд-Дәусари", "Ясир ад-Даусари"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["yasser-dosari/r1", "m"]],
+  { id: "dosari", f: [42, 28, 1.6], n: ["Ясир әд-Дәусари", "Ясир ад-Даусари"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["yasser-dosari/r1", "m"]],
     img: [WM + "8/8b/Yasser_Al-Dosari_%28cropped%29.jpg/250px-Yasser_Al-Dosari_%28cropped%29.jpg", "MAL MALDIVE", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:Yasser_Al-Dosari_(cropped).jpg"],
     b: ["Меккедегі Харам мешітінің имамы. Жүрекке жететін, әсерлі оқу.", "Имам Запретной мечети в Мекке. Проникновенное, трогающее сердце чтение."] },
-  { id: "qatami", n: ["Насир әл-Қатами", "Насер аль-Катами"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["nasser-qatami/r1", "m"]],
+  { id: "qatami", f: [50, 30, 1.1], n: ["Насир әл-Қатами", "Насер аль-Катами"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["nasser-qatami/r1", "m"]],
     img: [WM + "a/aa/%D8%B5%D9%88%D8%B1%D8%A9_%D8%B4%D8%AE%D8%B5%D9%8A%D8%A9_%D9%86%D8%A7%D8%B5%D8%B1_%D8%A7%D9%84%D9%82%D8%B7%D8%A7%D9%85%D9%8A.jpg/250px-%D8%B5%D9%88%D8%B1%D8%A9_%D8%B4%D8%AE%D8%B5%D9%8A%D8%A9_%D9%86%D8%A7%D8%B5%D8%B1_%D8%A7%D9%84%D9%82%D8%B7%D8%A7%D9%85%D9%8A.jpg", "Ayman dhū alghiná", "CC BY-SA 4.0", "https://commons.wikimedia.org/wiki/File:%D8%B5%D9%88%D8%B1%D8%A9_%D8%B4%D8%AE%D8%B5%D9%8A%D8%A9_%D9%86%D8%A7%D8%B5%D8%B1_%D8%A7%D9%84%D9%82%D8%B7%D8%A7%D9%85%D9%8A.jpg"],
     b: ["Әсерлі, жүрекке жақын оқуымен танымал.", "Известен проникновенным, трогающим сердце чтением."] },
-  { id: "ajmi", n: ["Ахмад әл-Ажми", "Ахмад аль-Аджми"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["ahmad-ajmi/r1", "m"]],
+  { id: "ajmi", f: [50, 34, 1.1], n: ["Ахмад әл-Ажми", "Ахмад аль-Аджми"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["ahmad-ajmi/r1", "m"]],
     img: [WM + "e/e5/Ahmad_bin_Ali_Al-Ajmi.png/250px-Ahmad_bin_Ali_Al-Ajmi.png", "أحمد زين", "CC BY-SA 3.0", "https://commons.wikimedia.org/wiki/File:Ahmad_bin_Ali_Al-Ajmi.png"],
     b: ["Күшті әрі әуенді оқу, бүкіл әлемде танымал.", "Сильное и мелодичное чтение, популярное во всём мире."] },
-  { id: "ayyub", n: ["Мұхаммед Әйюб", "Мухаммад Айюб"], c: ["Сауд Арабиясы, 1952–2016", "Саудовская Аравия, 1952–2016"], v: [["muhammad-ayyub/r1", "m"]], img: null,
-    b: ["Көп жыл Мединедегі Пайғамбар ﷺ мешітінің имамы болды. Баяу, жайлы оқу.", "Много лет был имамом Мечети Пророка ﷺ в Медине. Неспешное, спокойное чтение."] },
+  { id: "sudais", f: [50, 28, 1.1], n: ["Абдуррахман әс-Судайс", "Абдуррахман ас-Судайс"], c: ["Сауд Арабиясы", "Саудовская Аравия"], v: [["abdulrahman-sudais/r1", "m"]],
+    img: [WM + "1/18/Abdul-Rahman_Al-Sudais_%28Cropped%2C_2011%29.jpg/250px-Abdul-Rahman_Al-Sudais_%28Cropped%2C_2011%29.jpg", "Prime Minister's Office (India)", "GODL-India", "https://commons.wikimedia.org/wiki/File:Abdul-Rahman_Al-Sudais_(Cropped,_2011).jpg"],
+    b: ["1984 жылдан бері Меккедегі Харам мешітінің имамы әрі хатибі. Жылдам, әуезді, бірден танылатын оқу.", "С 1984 года имам и хатиб Запретной мечети в Мекке. Быстрое, звонкое, сразу узнаваемое чтение."] },
 ];
 const STYLE = { m: ["Мураттал — бірқалыпты", "Муратталь — размеренное"], t: ["Үйретуші — балалармен", "Обучающее — с повторением"], j: ["Мужәууад — әуенді", "Муджаввад — мелодичное"] };
 const readerOf = rid => READERS.find(r => r.v.some(v => v[0] === rid)) || READERS[0];
 const LRECITERS = READERS.flatMap(r => r.v.map(([id, st]) => [id, r.n[0] + (r.v.length > 1 ? " — " + STYLE[st][0].split(" — ")[0].toLowerCase() : ""), r.n[1] + (r.v.length > 1 ? " — " + STYLE[st][1].split(" — ")[0].toLowerCase() : "")]));
 const recName = id => { const r = LRECITERS.find(x => x[0] === id) || LRECITERS[0]; return S.lang === "ru" ? r[2] : r[1]; };
 const initials = n => n.replace(/\b(әл|аль|аш|әш|ад|әд|ас)-/gi, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
-const readerAva = (r, cls = "") => r.img ? `<span class="rava ${cls}" data-i="${esc(initials(r.n[1]))}"><img src="${r.img[0]}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('mono');this.parentNode.textContent=this.parentNode.dataset.i"></span>` : `<span class="rava mono ${cls}">${esc(initials(r.n[1]))}</span>`;
+const faceStyle = r => { const [x, y, z] = r.f || [50, 30, 1]; return `object-position:${x}% ${y}%;transform-origin:${x}% ${y}%;transform:scale(${z})`; };
+const readerAva = (r, cls = "") => r.img ? `<span class="rava ${cls}" data-i="${esc(initials(r.n[1]))}"><img src="${r.img[0]}" alt="" loading="lazy" referrerpolicy="no-referrer" style="${faceStyle(r)}" onerror="this.parentNode.classList.add('mono');this.parentNode.textContent=this.parentNode.dataset.i"></span>` : `<span class="rava mono ${cls}">${esc(initials(r.n[1]))}</span>`;
 const fmtT = t => { if (!isFinite(t)) return "0:00"; t = Math.floor(t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0"); };
 let LP = null; // { a: Audio, bar: Element }
 function listenPlay(s, rec) {
@@ -457,7 +459,10 @@ function shell() {
   const top = h("header", { class: "top" }, brandEl(), h("a", { class: "chip", href: "#/me", id: "topstats", "aria-label": T("streak") }));
   const tabbar = h("nav", { class: "tabbar", "aria-label": T("menu") }, NAV.map(([href, k, ic]) => h("a", { href, "data-k": k, "aria-label": T(k), html: icon(ic) + `<span>${esc(T(k))}</span>` })));
   const main = h("main", { id: "view", tabindex: "-1" });
-  const foot = h("footer", { class: "site" }, h("p", {}, T("footer")), h("p", { style: "margin-top:6px" }, T("footer2")));
+  const ru = S.lang === "ru";
+  const credits = h("details", { class: "credits" }, h("summary", {}, ru ? "Фото чтецов: авторы и лицензии" : "Қарилардың суреттері: авторлары мен лицензиялары"),
+    h("ul", {}, READERS.filter(r => r.img).map(r => h("li", { html: `${esc(L({ kk: r.n[0], ru: r.n[1] }))} — ${r.img[1] ? esc(r.img[1]) + ", " : ""}<a href="${r.img[3]}" target="_blank" rel="noopener">${esc(r.img[2])}, Wikimedia Commons</a>` }))));
+  const foot = h("footer", { class: "site" }, h("p", {}, T("footer")), h("p", { style: "margin-top:6px" }, T("footer2")), credits);
   document.body.append(side, top, main, foot, tabbar, toasts);
   document.documentElement.lang = S.lang === "ru" ? "ru" : "kk";
   document.title = S.lang === "ru" ? "Iqra — учимся читать Коран с нуля" : "Iqra — Құранды нөлден оқып үйрену";
@@ -557,7 +562,7 @@ async function pageHome(v) {
     tile(lastS ? `#/sura/${lastS.n}/${S.last.a}` : "#/suras", "stand", lastS ? T("contRead") : T("suras"),
       lastS ? `${L(lastS.name)}, ${S.last.a} ${T("ayahN")}` : (ru ? "114 сур с переводом" : "114 сүре, аудармасымен")),
     tile("#/me", "flame", ru ? `${st} ${plRu(st, "день", "дня", "дней")} подряд` : `${st} күн қатарынан`, ru ? `Цель на день — ${goal} очков` : `Күндік мақсат — ${goal} ұпай`, "warm"),
-    tile("#/tasbih", "beads", ru ? "Тасбих" : "Тәсбих", ts.total ? fmtN(ts.total) : (ru ? "После намаза" : "Намаздан кейін")),
+    tile("#/tasbih", "beads", ru ? "Тасбих" : "Тәсбих", tsbTotal() ? fmtN(tsbTotal()) : (ru ? "После намаза" : "Намаздан кейін")),
     tile("#/listen", "headph", T("listen"), ru ? `${READERS.length} чтецов` : `${READERS.length} қари`)));
 
   const mods = h("div", { class: "mods" });
@@ -1383,7 +1388,6 @@ function pageReader(v, id) {
   wrap.append(h("div", { class: "crumbs", html: `<a href="#/listen">${esc(T("readers"))}</a><span>·</span><span>${esc(L({ kk: r.n[0], ru: r.n[1] }))}</span>` }),
     h("header", { class: "rd-head", html: `${readerAva(r, "lg")}<div><h1>${esc(L({ kk: r.n[0], ru: r.n[1] }))}</h1><p class="muted">${esc(L({ kk: r.c[0], ru: r.c[1] }))}</p></div>` }),
     h("p", { class: "rd-bio" }, L({ kk: r.b[0], ru: r.b[1] })));
-  if (r.img) wrap.append(h("p", { class: "muted small rd-credit", html: `${esc(ru ? "Фото" : "Сурет")}: ${r.img[1] ? esc(r.img[1]) + ", " : ""}<a href="${r.img[3]}" target="_blank" rel="noopener">${esc(r.img[2])}, Wikimedia Commons</a>` }));
   if (r.v.length > 1) {
     const seg = h("div", { class: "seg rd-seg", role: "group", "aria-label": ru ? "Стиль чтения" : "Оқу мәнері" });
     r.v.forEach(([vid, st]) => {
@@ -1416,6 +1420,7 @@ function pageReader(v, id) {
 /* ═════════════ намаз ═════════════ */
 let NZ = null;
 const loadNZ = () => NZ || (NZ = fetchJSON("data/namaz.json").catch(e => { NZ = null; throw e; }));
+const hisnURL = id => `https://www.hisnmuslim.com/audio/ar/${id}.mp3`;
 function duaCard(t, opts = {}) {
   const ru = S.lang === "ru";
   const card = h("div", { class: "dua" });
@@ -1430,13 +1435,17 @@ function duaCard(t, opts = {}) {
   } else {
     card.append(h("p", { class: "dua-ar", lang: "ar" }, t.ar), h("p", { class: "dua-tr" }, L(t.tr)), h("p", { class: "dua-m" }, L(t.m)));
   }
-  const pb = h("button", { class: "saybtn", type: "button", html: icon("sound") + `<span>${esc(t.au ? (ru ? "Слушать чтеца" : "Қаридан тыңдау") : (ru ? "Озвучить" : "Дыбыстау"))}</span>` });
-  pb.onclick = () => t.au ? playURL(ayahURL(t.au.s, t.au.a), pb) : speakAr(t.ar, pb);
-  card.append(h("div", { class: "dua-f" }, pb, t.au ? null : h("small", { class: "muted" }, ru ? "голос устройства" : "құрылғы дауысы")));
+  // живой голос: аяты — чтец (EveryAyah), дуа и зикры — запись из «Хиснуль-муслим»; синтезатор речи не используем
+  const src = t.au ? ayahURL(t.au.s, t.au.a) : t.hm ? hisnURL(t.hm) : null;
+  if (src) {
+    const pb = h("button", { class: "saybtn", type: "button", html: icon("sound") + `<span>${esc(ru ? "Слушать" : "Тыңдау")}</span>` });
+    pb.onclick = () => playURL(src, pb);
+    card.append(h("div", { class: "dua-f" }, pb));
+  }
   return card;
 }
 // позы намаза (ханафитский мазхаб): m_ — мужчины, f_ — женщины; лица не рисуем
-const POSES = {"m_qiyam": "<path d=\"M48 58 L48 90\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 58 L54 90\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M48 90 L42 91\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 90 L48 91\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M51 28 L51 56\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"51\" cy=\"15\" r=\"7.5\" fill=\"currentColor\"/><path d=\"M43.4 13.5a7.6 7.6 0 0 1 15.2 0z\" fill=\"#b88a4e\" transform=\"rotate(0 51 15)\"/><path d=\"M55 31 L55 44 L44 49\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "m_ruku": "<path d=\"M64 56 L64 90\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"10\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M64 90 L57 91\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M64 54 L34 54\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"24\" cy=\"54\" r=\"7.5\" fill=\"currentColor\"/><path d=\"M16.4 52.5a7.6 7.6 0 0 1 15.2 0z\" fill=\"#b88a4e\" transform=\"rotate(-90 24 54)\"/><path d=\"M38 58 L46 68 L60 70\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "m_sujud": "<path d=\"M68 58 L62 88\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"10\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M62 88 L80 86 L76 91\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 59 L34 78\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"14\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"23\" cy=\"83\" r=\"7.5\" fill=\"currentColor\"/><path d=\"M15.4 81.5a7.6 7.6 0 0 1 15.2 0z\" fill=\"#b88a4e\" transform=\"rotate(-125 23 83)\"/><path d=\"M36 80 L46 83 L30 91\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "m_julus": "<path d=\"M58 80 L34 86\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"11\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M34 89 L64 89\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M68 89 L70 79\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M58 40 L58 78\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"58\" cy=\"27\" r=\"7.5\" fill=\"currentColor\"/><path d=\"M50.4 25.5a7.6 7.6 0 0 1 15.2 0z\" fill=\"#b88a4e\" transform=\"rotate(0 58 27)\"/><path d=\"M54 44 L50 62 L38 80\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "f_qiyam": "<path d=\"M43 30h16l6 60H37z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linejoin=\"round\"/><g transform=\"rotate(0 51 16)\"><path d=\"M51 6a10 10 0 0 1 10 10c0 6-2 10-2 14H43c0-4-2-8-2-14A10 10 0 0 1 51 6z\" fill=\"#b88a4e\"/></g><circle cx=\"51\" cy=\"16\" r=\"6\" fill=\"#f3e3c8\"/><path d=\"M56 34 L54 41 L44 41\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "f_ruku": "<path d=\"M60 54L62 90H48L50 60z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"7\" stroke-linejoin=\"round\"/><path d=\"M60 56 L36 42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><g transform=\"rotate(-60 30 38)\"><path d=\"M30 28a10 10 0 0 1 10 10c0 6-2 10-2 14H22c0-4-2-8-2-14A10 10 0 0 1 30 28z\" fill=\"#b88a4e\"/></g><circle cx=\"30\" cy=\"38\" r=\"6\" fill=\"#f3e3c8\"/><path d=\"M40 48 L46 60 L51 68\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "f_sujud": "<path d=\"M50 92C51 78 60 66 70 66C79 66 84 78 84 92Z\" fill=\"currentColor\"/><path d=\"M64 72 L36 84\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"14\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><g transform=\"rotate(-120 25 85)\"><path d=\"M25 75a10 10 0 0 1 10 10c0 6-2 10-2 14H17c0-4-2-8-2-14A10 10 0 0 1 25 75z\" fill=\"#b88a4e\"/></g><circle cx=\"25\" cy=\"85\" r=\"6\" fill=\"#f3e3c8\"/><path d=\"M38 86 L47 91 L30 91\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", "f_julus": "<path d=\"M30 92C30 80 40 72 56 72C70 72 77 82 79 92Z\" fill=\"currentColor\"/><path d=\"M80 90 L87 90\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M56 42 L56 74\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><g transform=\"rotate(0 56 25)\"><path d=\"M56 15a10 10 0 0 1 10 10c0 6-2 10-2 14H48c0-4-2-8-2-14A10 10 0 0 1 56 15z\" fill=\"#b88a4e\"/></g><circle cx=\"56\" cy=\"25\" r=\"6\" fill=\"#f3e3c8\"/><path d=\"M52 46 L49 62 L40 77\" fill=\"none\" stroke=\"#5f9a7a\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"};
+const POSES = {"m_qiyam": "<path d=\"M43.5 52L43.5 74A9.5 9.5 0 0 0 62.5 74L62.5 52A9.5 9.5 0 0 0 43.5 52Z\" fill=\"currentColor\"/><path d=\"M43.5 74.3L44 90.3A9 9 0 0 0 62 90.3L62.5 74.3A9.5 9.5 0 1 0 43.5 74.3Z\" fill=\"currentColor\"/><path d=\"M62.5 51.3L60.5 25.3A8.5 8.5 0 0 0 43.5 26L43.5 52A9.5 9.5 0 1 0 62.5 51.3Z\" fill=\"currentColor\"/><path d=\"M54.4 23.4L53.2 16.5A3.2 3.2 0 0 0 46.8 17.4L47.6 24.4A3.4 3.4 0 1 0 54.4 23.4Z\" fill=\"currentColor\"/><path d=\"M48.3 89.5L42.5 91.1A2 2 0 0 0 43.1 95L49.2 94.6A2.6 2.6 0 1 0 48.3 89.5Z\" fill=\"currentColor\"/><ellipse cx=\"49\" cy=\"11.5\" rx=\"5.6\" ry=\"6.4\" fill=\"currentColor\" transform=\"rotate(0 49 11.5)\"/><path d=\"M43.2 9.3a5.8 5.4 0 0 1 11.6 0z\" fill=\"#b88a4e\" transform=\"rotate(0 49 11.5)\"/><path d=\"M49.4 27.1L49.9 40.1A3.1 3.1 0 0 0 56.1 40.1L56.6 27.1A3.6 3.6 0 1 0 49.4 27.1Z\" fill=\"#5f9a7a\"/><path d=\"M51.3 37.4L43.4 42.7A2.8 2.8 0 0 0 46.4 47.4L54.6 42.7A3.1 3.1 0 1 0 51.3 37.4Z\" fill=\"#5f9a7a\"/><circle cx=\"44\" cy=\"45.5\" r=\"2.9\" fill=\"#5f9a7a\"/>", "m_ruku": "<path d=\"M55 50.2L55.4 72.2A8.6 8.6 0 0 0 72.6 72.2L73 50.2A9 9 0 1 0 55 50.2Z\" fill=\"currentColor\"/><path d=\"M55.4 72.2L55.8 89.2A8.2 8.2 0 0 0 72.2 89.2L72.6 72.2A8.6 8.6 0 1 0 55.4 72.2Z\" fill=\"currentColor\"/><path d=\"M63.8 41L37.8 41.7A8.3 8.3 0 0 0 37.8 58.3L63.8 59A9 9 0 1 0 63.8 41Z\" fill=\"currentColor\"/><path d=\"M34.4 46.9L28.4 48.1A3 3 0 0 0 29.4 54L35.4 53.2A3.2 3.2 0 1 0 34.4 46.9Z\" fill=\"currentColor\"/><ellipse cx=\"24\" cy=\"52\" rx=\"5.6\" ry=\"6.4\" fill=\"currentColor\" transform=\"rotate(90 24 52)\"/><path d=\"M18.2 49.8a5.8 5.4 0 0 1 11.6 0z\" fill=\"#b88a4e\" transform=\"rotate(-90 24 52)\"/><path d=\"M62.4 89.5L55.6 91.1A2 2 0 0 0 56.1 95L63.1 94.6A2.6 2.6 0 1 0 62.4 89.5Z\" fill=\"currentColor\"/><path d=\"M37.4 54.5L46.8 64.2A3.1 3.1 0 0 0 51.4 60L42.8 49.7A3.6 3.6 0 1 0 37.4 54.5Z\" fill=\"#5f9a7a\"/><path d=\"M47 64.4L56.2 72.1A2.8 2.8 0 0 0 59.9 68L51.1 59.7A3.1 3.1 0 1 0 47 64.4Z\" fill=\"#5f9a7a\"/><circle cx=\"59\" cy=\"71\" r=\"3\" fill=\"#5f9a7a\"/>", "m_sujud": "<path d=\"M59.3 61L56.5 85.3A6.5 6.5 0 0 0 69.2 87.9L76.4 64.6A8.8 8.8 0 1 0 59.3 61Z\" fill=\"currentColor\"/><path d=\"M63.5 92.6L79.4 91.2A4.2 4.2 0 0 0 79.4 82.8L63.5 81.4A5.6 5.6 0 1 0 63.5 92.6Z\" fill=\"currentColor\"/><path d=\"M77.5 85.5L75.9 92.6A2.1 2.1 0 0 0 80 93.7L82.4 86.9A2.6 2.6 0 1 0 77.5 85.5Z\" fill=\"currentColor\"/><path d=\"M63 54.5L36.5 72.2A8.2 8.2 0 0 0 45.2 86L72.6 69.7A9 9 0 1 0 63 54.5Z\" fill=\"currentColor\"/><path d=\"M35.9 78.6L31.1 82.7A3 3 0 0 0 34.8 87.4L39.9 83.6A3.2 3.2 0 1 0 35.9 78.6Z\" fill=\"currentColor\"/><ellipse cx=\"28.5\" cy=\"86.5\" rx=\"5.6\" ry=\"6.4\" fill=\"currentColor\" transform=\"rotate(150 28.5 86.5)\"/><path d=\"M22.7 84.3a5.8 5.4 0 0 1 11.6 0z\" fill=\"#b88a4e\" transform=\"rotate(-120 28.5 86.5)\"/><path d=\"M40.2 84.1L47.5 88.2A3.1 3.1 0 0 0 50.8 83L44.1 78.1A3.6 3.6 0 1 0 40.2 84.1Z\" fill=\"#5f9a7a\"/><path d=\"M47.5 82.8L34.8 89.7A2.6 2.6 0 0 0 37.1 94.4L50.3 88.3A3.1 3.1 0 1 0 47.5 82.8Z\" fill=\"#5f9a7a\"/><path d=\"M35.6 89.6L30.6 90.5A2 2 0 0 0 31 94.5L36 94.4A2.4 2.4 0 1 0 35.6 89.6Z\" fill=\"#5f9a7a\"/>", "m_julus": "<path d=\"M58.6 71L35.6 79.8A6.6 6.6 0 0 0 38.8 92.5L63.2 89.5A9.6 9.6 0 1 0 58.6 71Z\" fill=\"currentColor\"/><path d=\"M37.9 92.8L63.9 93.2A4.2 4.2 0 0 0 64.6 84.8L38.8 81.3A5.8 5.8 0 1 0 37.9 92.8Z\" fill=\"currentColor\"/><path d=\"M65.6 86.9L68 93.7A2.1 2.1 0 0 0 72.1 92.6L70.5 85.5A2.6 2.6 0 1 0 65.6 86.9Z\" fill=\"currentColor\"/><path d=\"M71.4 78.5L67.3 52.7A8.4 8.4 0 0 0 50.6 54.6L52.5 80.7A9.5 9.5 0 1 0 71.4 78.5Z\" fill=\"currentColor\"/><path d=\"M61.3 50.4L60.1 43.5A3.1 3.1 0 0 0 53.9 44.4L54.7 51.4A3.3 3.3 0 1 0 61.3 50.4Z\" fill=\"currentColor\"/><ellipse cx=\"56\" cy=\"38\" rx=\"5.6\" ry=\"6.4\" fill=\"currentColor\" transform=\"rotate(0 56 38)\"/><path d=\"M50.2 35.8a5.8 5.4 0 0 1 11.6 0z\" fill=\"#b88a4e\" transform=\"rotate(0 56 38)\"/><path d=\"M55.4 54.6L53.9 67.6A3.1 3.1 0 0 0 60 68.6L62.5 55.7A3.6 3.6 0 1 0 55.4 54.6Z\" fill=\"#5f9a7a\"/><path d=\"M54.9 65.8L42.1 78A2.8 2.8 0 0 0 45.9 82.1L59.1 70.3A3.1 3.1 0 1 0 54.9 65.8Z\" fill=\"#5f9a7a\"/><circle cx=\"43\" cy=\"80.5\" r=\"2.9\" fill=\"#5f9a7a\"/>", "f_qiyam": "<path d=\"M45 30c2-5 14-5 16 0l5 58c-6 4-20 4-26 0z\" fill=\"currentColor\"/><path d=\"M61.5 45.3L60 26.4A8 8 0 0 0 44 27.2L44.5 46.2A8.5 8.5 0 1 0 61.5 45.3Z\" fill=\"currentColor\"/><g transform=\"rotate(0 50 15)\"><path d=\"M50 7C56 7 58.6 12 58.6 17C58.6 23 61 28 61 34L45 34C44 29 43.4 25 43.8 21C42.8 17 43.2 12 45 9.4C46.4 7.6 48 7 50 7Z\" fill=\"#a9cbb8\"/><ellipse cx=\"47.3\" cy=\"15.4\" rx=\"3.1\" ry=\"4.3\" fill=\"#f3e3c8\"/></g><path d=\"M50.4 28.7L49.9 34.7A3.1 3.1 0 0 0 56 35.8L57.5 29.9A3.6 3.6 0 1 0 50.4 28.7Z\" fill=\"#5f9a7a\"/><path d=\"M52.5 31.9L44.5 33.2A2.8 2.8 0 0 0 45.2 38.8L53.3 38.1A3.1 3.1 0 1 0 52.5 31.9Z\" fill=\"#5f9a7a\"/><circle cx=\"44\" cy=\"36\" r=\"2.9\" fill=\"#5f9a7a\"/>", "f_ruku": "<path d=\"M57 52c4-4 13-4 15 0l3 37c-6 3-17 3-21 0z\" fill=\"currentColor\"/><path d=\"M66.6 43L42.3 36A8.3 8.3 0 0 0 37 51.8L60.6 60.8A9.4 9.4 0 1 0 66.6 43Z\" fill=\"currentColor\"/><g transform=\"rotate(-62 31 42)\"><path d=\"M31 34C37 34 39.6 39 39.6 44C39.6 50 42 55 42 61L26 61C25 56 24.4 52 24.8 48C23.8 44 24.2 39 26 36.4C27.4 34.6 29 34 31 34Z\" fill=\"#a9cbb8\"/><ellipse cx=\"28.3\" cy=\"42.4\" rx=\"3.1\" ry=\"4.3\" fill=\"#f3e3c8\"/></g><path d=\"M39.3 49.4L47.7 59A3.1 3.1 0 0 0 52.5 55.2L44.9 44.9A3.6 3.6 0 1 0 39.3 49.4Z\" fill=\"#5f9a7a\"/><path d=\"M47.7 59.1L56 67.9A2.8 2.8 0 0 0 60.1 64.2L52.4 55A3.1 3.1 0 1 0 47.7 59.1Z\" fill=\"#5f9a7a\"/><circle cx=\"59\" cy=\"67\" r=\"3\" fill=\"#5f9a7a\"/>", "f_sujud": "<path d=\"M52 93c-1-12 5-23 15-24c9-1 17 8 17 24z\" fill=\"currentColor\"/><path d=\"M61.5 64.7L39.1 76.8A8.2 8.2 0 0 0 46.2 91.6L69.7 81.7A9.4 9.4 0 1 0 61.5 64.7Z\" fill=\"currentColor\"/><g transform=\"rotate(-118 32 86)\"><path d=\"M32 78C38 78 40.6 83 40.6 88C40.6 94 43 99 43 105L27 105C26 100 25.4 96 25.8 92C24.8 88 25.2 83 27 80.4C28.4 78.6 30 78 32 78Z\" fill=\"#a9cbb8\"/><ellipse cx=\"29.3\" cy=\"86.4\" rx=\"3.1\" ry=\"4.3\" fill=\"#f3e3c8\"/></g><path d=\"M42 88.9L50.3 94.5A3 3 0 0 0 53.9 89.7L46.2 83.3A3.5 3.5 0 1 0 42 88.9Z\" fill=\"#5f9a7a\"/><path d=\"M51.8 89L36.8 90.1A2.4 2.4 0 0 0 37 94.9L52 95A3 3 0 1 0 51.8 89Z\" fill=\"#5f9a7a\"/>", "f_julus": "<path d=\"M30 93c0-9 6-15 16-15h18c10 0 16 6 17 15z\" fill=\"currentColor\"/><path d=\"M79.8 93.4L86.9 93.9A1.9 1.9 0 0 0 87.4 90.1L80.5 88.7A2.4 2.4 0 1 0 79.8 93.4Z\" fill=\"currentColor\"/><path d=\"M70.3 78.8L67.1 54.9A8.2 8.2 0 0 0 50.8 56.3L51.6 80.3A9.4 9.4 0 1 0 70.3 78.8Z\" fill=\"currentColor\"/><g transform=\"rotate(0 57 44)\"><path d=\"M57 36C63 36 65.6 41 65.6 46C65.6 52 68 57 68 63L52 63C51 58 50.4 54 50.8 50C49.8 46 50.2 41 52 38.4C53.4 36.6 55 36 57 36Z\" fill=\"#a9cbb8\"/><ellipse cx=\"54.3\" cy=\"44.4\" rx=\"3.1\" ry=\"4.3\" fill=\"#f3e3c8\"/></g><path d=\"M55.6 56.3L53 68.3A3.1 3.1 0 0 0 59 69.8L62.4 58A3.5 3.5 0 1 0 55.6 56.3Z\" fill=\"#5f9a7a\"/><path d=\"M54 66.7L42.2 76.9A2.8 2.8 0 0 0 45.8 81.2L57.9 71.4A3.1 3.1 0 1 0 54 66.7Z\" fill=\"#5f9a7a\"/><circle cx=\"43\" cy=\"79.5\" r=\"2.9\" fill=\"#5f9a7a\"/>"};
 const POSE_NAMES = { qiyam: ["Қиям", "Стояние"], ruku: ["Рукуғ", "Поклон"], sujud: ["Сәжде", "Суджуд"], julus: ["Отырыс", "Сидение"] };
 const POSE_OF = ["qiyam", "qiyam", "qiyam", "qiyam", "qiyam", "qiyam", "ruku", "qiyam", "sujud", "qiyam", "julus", "julus"];
 const poseSVG = k => `<svg class="pose" viewBox="6 4 88 92" aria-hidden="true">${POSES[(S.nzg === "f" ? "f" : "m") + "_" + k]}</svg>`;
@@ -1481,7 +1490,7 @@ async function pageNamaz(v, sub) {
   const ts = S.tsb || {};
   v.append(shelf(ru ? "После намаза" : "Намаздан кейін"),
     h("div", { class: "nz-after" },
-      h("a", { class: "glass", href: "#/tasbih", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(ru ? "Тасбих" : "Тәсбих")}</b><small class="num">${esc(ts.total ? fmtN(ts.total) : "33 · 33 · 33")}</small></span>` }),
+      h("a", { class: "glass", href: "#/tasbih", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(ru ? "Тасбих" : "Тәсбих")}</b><small class="num">${esc(tsbTotal() ? fmtN(tsbTotal()) : "33 · 33 · 33")}</small></span>` }),
       h("a", { class: "glass", href: "#/namaz/after", html: `<span class="t-ic ar" lang="ar">ٱللَّهُ</span><span><b>${esc(ru ? "Аят аль-Курси" : "Аятул-Күрси")}</b><small>${esc(ru ? "и азкары" : "және зікірлер")}</small></span>` })),
     h("a", { class: "nz-row", href: "#/namaz/witr", html: `<b>${esc(ru ? "Витр и дуа «Кунут»" : "Үтір және «Құнут» дұғасы")}</b>${icon("chev")}` }),
     h("div", { class: "box tip nz-note" }, mdEl(d.intro)));
@@ -1535,7 +1544,7 @@ function nzWitr(v, d) {
     h("div", { class: "stack" }, h("div", { class: "box tip" }, mdEl(d.witr)), duaCard(d.texts.qunut)));
 }
 
-/* ───── тасбих: карточка-зикр переворачивается, счёт сохраняется ───── */
+/* ───── тасбих: зикры листаются, у каждого свой счёт (сегодня и за всё время), карточка переворачивается ───── */
 const TS_FACT = {
   subhan: { kk: ["«Субханаллаһ» мен «Әлхамдулиллаһ» аспан мен жердің арасын толтырады", "Пайғамбар ﷺ осы екі қысқа сөздің сауабы соншалықты үлкен екенін айтқан.", "Хадис, Муслим, 223"],
     ru: ["«Субханаллах» и «Альхамдулиллях» наполняют пространство между небесами и землёй", "Пророк ﷺ сказал, что награда за эти два коротких слова настолько велика.", "Хадис, Муслим, 223"] },
@@ -1545,41 +1554,113 @@ const TS_FACT = {
     ru: ["Четыре самых любимых Аллахом слова", "«Субханаллах, Альхамдулиллях, Ля иляха илляллах, Аллаху акбар». Неважно, с какого из них начать.", "Хадис, Муслим, 2137"] },
   tahlil: { kk: ["Күнәлар теңіз көбігіндей болса да кешіріледі", "Әр намаздан кейін 33 тәсбих, 33 тахмид, 33 тәкбір айтып, жүзін осы тәһлилмен толықтырған адамға осылай уәде етілген.", "Хадис, Муслим, 597"],
     ru: ["Грехи простятся, даже если их как морской пены", "Так обещано тому, кто после каждого намаза скажет 33 раза тасбих, 33 — тахмид, 33 — такбир и завершит сотню этим тахлилем.", "Хадис, Муслим, 597"] },
+  istighfar: { kk: ["Пайғамбар ﷺ күніне жетпіс реттен көп кешірім сұрайтын", "«Аллаһқа ант етемін, мен күніне жетпіс реттен көп Аллаһтан кешірім сұрап, Оған тәубе етемін», — деген.", "Хадис, Бұхари, 6307"],
+    ru: ["Пророк ﷺ просил прощения больше семидесяти раз в день", "Он сказал: «Клянусь Аллахом, я прошу у Аллаха прощения и каюсь перед Ним больше семидесяти раз в день».", "Хадис, аль-Бухари, 6307"] },
+  bihamdihi: { kk: ["Күніне жүз рет — күнәлар кешіріледі", "Кім күніне жүз рет «Субханаллаһи уа бихамдиһи» десе, күнәлары теңіз көбігіндей болса да өшіріледі.", "Хадис, Бұхари, 6405; Муслим, 2691"],
+    ru: ["Сто раз в день — и грехи стёрты", "Кто скажет «Субханаллахи ва бихамдихи» сто раз в день, с того снимутся грехи, даже если их как морской пены.", "Хадис, аль-Бухари, 6405; Муслим, 2691"] },
+  azim: { kk: ["Тілге жеңіл, таразыда ауыр екі сөз", "Пайғамбар ﷺ: «Тілге жеңіл, таразыда ауыр, Рахманға сүйікті екі сөз бар», — деп, осы зікірді айтқан.", "Хадис, Бұхари, 6406; Муслим, 2694"],
+    ru: ["Два слова: лёгкие для языка, тяжёлые на Весах", "Пророк ﷺ сказал: «Есть два слова, лёгкие для языка, тяжёлые на Весах и любимые Милостивым», — и назвал этот зикр.", "Хадис, аль-Бухари, 6406; Муслим, 2694"] },
+  hawqala: { kk: ["Жәннат қазыналарының бірі", "Пайғамбар ﷺ «Лә хауля уа лә қуууата илла билләһ» сөзін жәннат қазыналарының бірі деп атаған.", "Хадис, Бұхари, 4205; Муслим, 2704"],
+    ru: ["Одно из сокровищ Рая", "Пророк ﷺ назвал слова «Ля хауля ва ля куввата илля билла» одним из сокровищ Рая.", "Хадис, аль-Бухари, 4205; Муслим, 2704"] },
+  salli: { kk: ["Бір салауатқа — он рақым", "Кім Пайғамбарға ﷺ бір рет салауат айтса, Аллаһ оған он рет игілік береді.", "Хадис, Муслим, 408"],
+    ru: ["За один салават — десять благословений", "Кто благословит Пророка ﷺ один раз, того Аллах благословит десять раз.", "Хадис, Муслим, 408"] },
+  tawhid: { kk: ["Зікірдің ең абзалы", "Пайғамбар ﷺ: «Зікірдің ең абзалы — Лә иләһә илләллаһ», — деген.", "Хадис, Тирмизи, 3383"],
+    ru: ["Лучший из зикров", "Пророк ﷺ сказал: «Лучший зикр — „Ля иляха илляллах“».", "Хадис, ат-Тирмизи, 3383"] },
 };
-const TS_SEQ = [["subhan", 33], ["hamd", 33], ["akbar", 33], ["tahlil", 1]];
+// [ключ, цель на день]; первые четыре — тасбих после намаза (33 + 33 + 33 + 1)
+const ZK = [["subhan", 33], ["hamd", 33], ["akbar", 33], ["tahlil", 1], ["istighfar", 100], ["bihamdihi", 100], ["azim", 33], ["hawqala", 33], ["salli", 33], ["tawhid", 33]];
+const TS_AFTER = ["subhan", "hamd", "akbar"];
+function tsState() {
+  const t = S.tsb = Object.assign({ k: 0, day: "", d: {}, t: {}, vib: true }, S.tsb);
+  delete t.i; delete t.c; delete t.total; // старый формат
+  if (!t.d || typeof t.d !== "object") t.d = {}; if (!t.t || typeof t.t !== "object") t.t = {};
+  if (t.day !== today()) { t.day = today(); t.d = {}; }
+  if (!(t.k >= 0 && t.k < ZK.length)) t.k = 0;
+  return t;
+}
+const tsbTotal = () => { const t = S.tsb && S.tsb.t; return t && typeof t === "object" ? Object.values(t).reduce((a, b) => a + (+b || 0), 0) : 0; };
+// вибрация: Android — Vibration API; iPhone (iOS 18+) — тактильный отклик переключателя
+let HAPT = null;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const canHaptic = () => typeof navigator.vibrate === "function" || isIOS();
+function haptic(times = 1) {
+  if (typeof navigator.vibrate === "function") { navigator.vibrate(times > 1 ? [200, 100, 200] : 220); return; }
+  if (!isIOS()) return;
+  if (!HAPT || !HAPT.isConnected) {
+    HAPT = h("label", { "aria-hidden": "true", style: "position:fixed;left:-99px;top:0;width:1px;height:1px;overflow:hidden;opacity:0" });
+    const i = document.createElement("input"); i.type = "checkbox"; i.setAttribute("switch", ""); i.tabIndex = -1; HAPT.append(i); document.body.append(HAPT);
+  }
+  HAPT.click();
+  for (let j = 1; j < times; j++) setTimeout(() => HAPT.click(), j * 160);
+}
 async function pageTasbih(v) {
   const d = await loadNZ();
   const ru = S.lang === "ru";
-  const st = S.tsb = Object.assign({ i: 0, c: 0, total: 0 }, S.tsb);
-  if (!(st.i >= 0 && st.i < TS_SEQ.length)) { st.i = 0; st.c = 0; }
-  const canVib = typeof navigator.vibrate === "function";
-  v.append(backHead("#/namaz", ru ? "Тасбих" : "Тәсбих", null,
-    canVib ? h("span", { class: "pill vib", html: icon("vib") + esc(ru ? "Вибрация каждые 33" : "Әр 33-те діріл") }) : null));
+  const st = tsState(); save();
+  const vibBtn = canHaptic() ? h("button", { class: "pill vib", type: "button", "aria-pressed": String(st.vib !== false) }) : null;
+  const drawVib = () => { if (vibBtn) { vibBtn.setAttribute("aria-pressed", String(st.vib !== false)); vibBtn.innerHTML = icon("vib") + esc(st.vib !== false ? (ru ? "Вибрация каждые 33" : "Әр 33-те діріл") : (ru ? "Вибрация выкл." : "Діріл өшірулі")); } };
+  if (vibBtn) vibBtn.onclick = () => { st.vib = st.vib === false; save(); drawVib(); if (st.vib) haptic(); };
+  drawVib();
+  v.append(backHead("#/namaz", ru ? "Тасбих" : "Тәсбих", null, vibBtn));
+
+  const prev = h("button", { class: "tn-b", type: "button", "aria-label": ru ? "Предыдущий зикр" : "Алдыңғы зікір", html: icon("chevl") });
+  const next = h("button", { class: "tn-b", type: "button", "aria-label": ru ? "Следующий зикр" : "Келесі зікір", html: icon("chev") });
+  const ttl = h("div", { class: "tn-t", "aria-live": "polite" });
+  const dots = h("div", { class: "ts-dots", "aria-hidden": "true" });
   const front = h("span", { class: "ts-face ts-front" }), back = h("span", { class: "ts-face ts-back" });
   const card = h("button", { class: "ts-card", type: "button" }, h("span", { class: "ts-inner" }, front, back));
+  const goalEl = h("div", { class: "ts-goal", role: "status", "aria-live": "polite" });
   const btn = h("button", { class: "ts-count", type: "button" });
-  v.append(h("div", { class: "ts-wrap" }, card, btn));
+  v.append(h("div", { class: "ts-wrap" }, h("div", { class: "ts-nav" }, prev, ttl, next), dots, h("div", { class: "ts-stage" }, card, goalEl), btn));
+
   const draw = () => {
-    const [k] = TS_SEQ[st.i], tx = d.texts[k], f = TS_FACT[k][ru ? "ru" : "kk"];
-    front.innerHTML = `<span class="ts-stages" aria-label="${st.i + 1} / 4">${TS_SEQ.map((_, j) => `<i class="${j < st.i ? "on" : j === st.i ? "cur" : ""}${j === 3 ? " sm" : ""}"></i>`).join("")}<small>${st.i + 1} ${ru ? "из" : "/"} 4</small></span>` +
-      `<span class="ts-ar${tx.ar.length > 30 ? " long" : ""}" lang="ar">${esc(tx.ar)}</span><span class="ts-tl">${esc(L(tx.tr))}</span><span class="ts-m">${esc(L(tx.m))}</span>` +
+    const [k, goal] = ZK[st.k], tx = d.texts[k], f = TS_FACT[k][ru ? "ru" : "kk"];
+    const n = st.d[k] || 0;
+    ttl.innerHTML = `<b>${esc(L(tx.t))}</b><small>${st.k + 1} ${ru ? "из" : "/"} ${ZK.length} · ${ru ? "цель" : "мақсат"} ${goal}</small>`;
+    dots.innerHTML = ZK.map(([key, g], j) => `<i class="${j === st.k ? "cur" : ""}${(st.d[key] || 0) >= g ? " ok" : ""}"></i>`).join("");
+    front.classList.toggle("long", tx.ar.length > 60);
+    front.innerHTML = `<span class="ts-ar${tx.ar.length > 30 ? " long" : ""}" lang="ar">${esc(tx.ar)}</span><span class="ts-tl">${esc(L(tx.tr))}</span><span class="ts-m">${esc(L(tx.m))}</span>` +
       `<span class="ts-hint">${icon("flip")}${esc(ru ? "Нажмите — узнаете об этом зикре" : "Басыңыз — осы зікір туралы біліңіз")}</span>`;
-    back.innerHTML = `<span class="ts-know">${icon("bulb")}${esc(ru ? "Знаете ли вы" : "Білесіз бе")}</span><b class="ts-q">«${esc(f[0])}»</b><span class="ts-d">${esc(f[1])}</span><span class="pill">${esc(f[2])}</span>` +
+    back.innerHTML = `<span class="ts-know">${icon("bulb")}${esc(ru ? "Знаете ли вы" : "Білесіз бе")}</span><b class="ts-q">${esc(f[0])}</b><span class="ts-d">${esc(f[1])}</span><span class="pill">${esc(f[2])}</span>` +
       `<span class="ts-hint">${icon("flip")}${esc(ru ? "Нажмите, чтобы вернуться" : "Қайту үшін басыңыз")}</span>`;
-    card.setAttribute("aria-label", (card.classList.contains("flipped") ? f[0] : L(tx.m)) + ". " + (ru ? "Нажмите, чтобы перевернуть карточку" : "Карточканы аудару үшін басыңыз"));
-    btn.innerHTML = `<b class="num">${st.c}</b><small class="num" aria-label="${ru ? "Всего" : "Барлығы"}">${fmtN(st.total)}</small>`;
-    btn.setAttribute("aria-label", `${ru ? "Посчитать" : "Санау"}: ${st.c}`);
+    card.setAttribute("aria-label", (card.classList.contains("flipped") ? f[0] : L(tx.m)) + ". " + (ru ? "Нажмите, чтобы перевернуть карточку. Листайте влево и вправо, чтобы сменить зикр." : "Карточканы аудару үшін басыңыз. Зікірді ауыстыру үшін солға-оңға сырғытыңыз."));
+    btn.innerHTML = `<b class="num">${n}</b><small class="num" aria-label="${ru ? "Всего за всё время" : "Барлығы"}">${fmtN(st.t[k] || 0)}</small>`;
+    btn.setAttribute("aria-label", `${ru ? "Посчитать" : "Санау"}: ${n}`);
   };
-  card.onclick = () => { card.classList.toggle("flipped"); draw(); };
+  const go = dir => {
+    st.k = (st.k + dir + ZK.length) % ZK.length; save();
+    card.classList.remove("flipped");
+    card.classList.remove("in-l", "in-r"); void card.offsetWidth; card.classList.add(dir > 0 ? "in-r" : "in-l");
+    draw();
+  };
+  prev.onclick = () => go(-1); next.onclick = () => go(1);
+  // свайп по карточке — смена зикра, нажатие — переворот
+  let sx = 0, sy = 0, swiped = false;
+  card.addEventListener("pointerdown", e => { sx = e.clientX; sy = e.clientY; swiped = false; });
+  card.addEventListener("pointerup", e => { const dx = e.clientX - sx, dy = e.clientY - sy; if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) { swiped = true; go(dx < 0 ? 1 : -1); } });
+  card.onclick = () => { if (swiped) { swiped = false; return; } card.classList.toggle("flipped"); draw(); };
+  const onKey = e => { if (document.body.dataset.page !== "tasbih") return document.removeEventListener("keydown", onKey); if (e.key === "ArrowLeft") go(-1); else if (e.key === "ArrowRight") go(1); };
+  document.addEventListener("keydown", onKey);
+
+  let goalT = 0;
+  const showGoal = () => {
+    goalEl.innerHTML = `<span class="g-ic">${icon("check")}</span><b>${esc(ru ? "Дневная цель достигнута" : "Күндік мақсат орындалды")}</b>` +
+      `<p>${esc(ru ? "По 33 раза «Субханаллах», «Альхамдулиллях» и «Аллаху акбар». Да примет Аллах!" : "«Субханаллаһ», «Әлхамдулиллаһ» және «Аллаһу әкбар» — 33 реттен. Аллаһ қабыл етсін!")}</p>`;
+    goalEl.classList.add("show"); clearTimeout(goalT);
+    goalT = setTimeout(() => goalEl.classList.remove("show"), 4000);
+  };
+  goalEl.onclick = () => goalEl.classList.remove("show");
   btn.onclick = () => {
-    st.c++; st.total++;
-    if (st.c >= TS_SEQ[st.i][1]) {
-      if (TS_SEQ[st.i][1] === 33 && canVib) navigator.vibrate(250);
-      st.i++; st.c = 0; card.classList.remove("flipped");
-      if (st.i >= TS_SEQ.length) { st.i = 0; toast(ru ? "Тасбих завершён. Да примет Аллах!" : "Тәсбих аяқталды. Аллаһ қабыл етсін!", "✓"); }
-    }
+    const [k, goal] = ZK[st.k];
+    const n = st.d[k] = (st.d[k] || 0) + 1; st.t[k] = (st.t[k] || 0) + 1;
+    const after = TS_AFTER.every(x => (st.d[x] || 0) >= 33) && st.goal !== today();
+    if (after) st.goal = today();
+    if (st.vib !== false && (n % 33 === 0 || n === goal)) haptic(after ? 2 : 1);
     save(); draw();
     btn.classList.remove("tap"); void btn.offsetWidth; btn.classList.add("tap");
+    if (after) showGoal();
+    // тасбих после намаза: после 33 — сам переходит к следующему зикру
+    else if (n === goal && st.k < 3) setTimeout(() => { if (document.body.dataset.page === "tasbih" && ZK[st.k][0] === k) go(1); }, 450);
   };
   draw();
 }
@@ -1845,7 +1926,7 @@ function mergeState(a, b) { // объединяем прогресс двух у
   m.lessons = union(a.lessons, b.lessons); m.ex = union(a.ex, b.ex); m.badges = union(a.badges, b.badges);
   m.hifz = {}; for (const k of new Set([...Object.keys(a.hifz || {}), ...Object.keys(b.hifz || {})])) m.hifz[k] = union((a.hifz || {})[k], (b.hifz || {})[k]);
   m.tr = { n: Math.max(a.tr?.n || 0, b.tr?.n || 0), ok: Math.max(a.tr?.ok || 0, b.tr?.ok || 0) };
-  m.tsb = ((a.tsb && a.tsb.total) || 0) >= ((b.tsb && b.tsb.total) || 0) ? a.tsb : b.tsb;
+  { const sum = x => x && x.t ? Object.values(x.t).reduce((p, q) => p + (+q || 0), 0) : 0; m.tsb = sum(a.tsb) >= sum(b.tsb) ? a.tsb : b.tsb; }
   m.at = Math.max(a.at || 0, b.at || 0);
   return m;
 }
