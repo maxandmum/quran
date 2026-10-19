@@ -70,7 +70,7 @@ const UI = {
   hzHint: ["Жасырылған сөзді басып, тексеріңіз. Аятты есте сақтағанда «Жаттадым» белгісін қойыңыз.",
     "Нажмите на скрытое слово, чтобы проверить себя. Отметьте «Выучил(а)», когда помните аят."],
   audioErr: ["Аудио жүктелмеді. Интернетті тексеріңіз.", "Аудио не загрузилось. Проверьте интернет."],
-  tapWord: ["Сөзді басып, жеке тыңдауға болады", "Нажмите на слово, чтобы услышать его отдельно"], tapWordWbw: ["Сөзді басыңыз — оны естисіз және аудармасын көресіз", "Нажмите на слово — услышите его и увидите перевод"],
+  tapWord: ["Сөзді басып, жеке тыңдауға болады", "Нажмите на слово, чтобы услышать его отдельно"], tapWordWbw: ["Сөзді басыңыз — оны естисіз және аудармасын көресіз", "Нажмите на слово — услышите его и увидите перевод"], tapWordNo: ["Сөзді басып, жеке тыңдауға болады. Сөздердің аудармасы әзірге Фатихада және 93–114-сүрелерде бар.", "Нажмите на слово, чтобы услышать его. Перевод отдельных слов пока есть в «Аль-Фатихе» и сурах 93–114."],
   trainers: ["Тренажёрлар", "Тренажёры"], startTr: ["Бастау", "Начать"], again: ["Тағы бір рет", "Ещё раз"],
   question: ["Сұрақ", "Вопрос"], result: ["Нәтиже", "Результат"], correct: ["дұрыс", "верно"],
   backTr: ["Тренажёрлерге", "К тренажёрам"], plusXp: ["ұпай", "очков"],
@@ -187,7 +187,7 @@ const I = {
   beads: '<circle cx="12" cy="4.2" r="1.3"/><circle cx="16.5" cy="5.8" r="1.3"/><circle cx="18.2" cy="10" r="1.3"/><circle cx="16.5" cy="14.2" r="1.3"/><circle cx="7.5" cy="14.2" r="1.3"/><circle cx="5.8" cy="10" r="1.3"/><circle cx="7.5" cy="5.8" r="1.3"/><path d="M12 15.5v5M10.3 21.5h3.4"/>',
   flip: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5"/>', vib: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 8v8M20 8v8"/>',
   chev: '<path d="M9 6l6 6-6 6"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
-  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   flame: '<path d="M12 22c4 0 7-3 7-7 0-3-2-5.5-3.5-7-.5 2-1.5 3-3 3 .5-3-1-6-3.5-8 0 3-1.5 5-3 6.5C4.5 11 5 13 5 15c0 4 3 7 7 7z"/>',
   star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
@@ -241,12 +241,21 @@ function loadTl(n) {
 const moduleOf = n => COURSE.modules.find(m => n >= m.from && n <= m.to);
 
 /* ═════════════ аудио ═════════════ */
+// чтецы для чтения по аятам (EveryAyah): все 11 чтецов раздела «Чтецы» + 2 обучающих записи
 const RECITERS = [
-  ["Husary_Muallim_128kbps", ["Хусари — үйретуші", "Хусари — обучающее чтение"]],
-  ["Minshawy_Teacher_128kbps", ["Миншауи — үйретуші", "Миншави — обучающее чтение"]],
-  ["Husary_128kbps", ["Хусари", "Хусари"]],
-  ["Alafasy_128kbps", ["Мишари Әл-Афаси", "Мишари Аль-Афаси"]],
-  ["Minshawy_Murattal_128kbps", ["Миншауи", "Миншави"]],
+  ["Husary_Muallim_128kbps", ["Хусари — үйретуші, баяу", "Хусари — обучающее, медленно"], "learn"],
+  ["Minshawy_Teacher_128kbps", ["Миншауи — балалармен қайталау", "Миншави — с повтором за детьми"], "learn"],
+  ["Alafasy_128kbps", ["Мишари әл-Афаси", "Мишари аль-Афаси"]],
+  ["Husary_128kbps", ["Махмұд Халил әл-Хусари", "Махмуд Халиль аль-Хусари"]],
+  ["Minshawy_Murattal_128kbps", ["Мұхаммед Сыддық әл-Миншауи", "Мухаммад Сиддик аль-Миншави"]],
+  ["Abdul_Basit_Murattal_192kbps", ["Абдулбасит Абдуссамад", "Абдул-Басит Абдус-Самад"]],
+  ["Ghamadi_40kbps", ["Сағд әл-Ғамиди", "Саад аль-Гамиди"]],
+  ["MaherAlMuaiqly128kbps", ["Махир әл-Мұғайқли", "Махер аль-Муайкли"]],
+  ["Saood_ash-Shuraym_128kbps", ["Сағуд әш-Шурайм", "Сауд аш-Шурайм"]],
+  ["Yasser_Ad-Dussary_128kbps", ["Ясир әд-Дәусари", "Ясир ад-Даусари"]],
+  ["Nasser_Alqatami_128kbps", ["Насир әл-Қатами", "Насер аль-Катами"]],
+  ["Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net", ["Ахмад әл-Ажми", "Ахмад аль-Аджми"]],
+  ["Abdurrahmaan_As-Sudais_192kbps", ["Абдуррахман әс-Судайс", "Абдуррахман ас-Судайс"]],
 ];
 const pad3 = n => String(n).padStart(3, "0");
 const ayahURL = (s, a, rec = S.reciter) => `https://everyayah.com/data/${rec}/${pad3(s)}${pad3(a)}.mp3`;
@@ -1290,7 +1299,10 @@ async function pageSura(v, n, hifz, goto) {
   // плеер по аятам
   let playing = false, idx = 0, rep = 1, rate = 1, hzLevel = 0;
   const playBtn = h("button", { class: "play", html: icon("play"), title: T("playAll") });
-  const recSel = h("select", { "aria-label": T("reciter") }, RECITERS.map(([id, nm]) => h("option", { value: id, selected: id === S.reciter ? "" : null }, L({ kk: nm[0], ru: nm[1] }))));
+  const recOpt = ([id, nm]) => h("option", { value: id, selected: id === S.reciter ? "" : null }, L({ kk: nm[0], ru: nm[1] }));
+  const recSel = h("select", { "aria-label": T("reciter") },
+    h("optgroup", { label: S.lang === "ru" ? "Для обучения" : "Үйрену үшін" }, RECITERS.filter(r => r[2] === "learn").map(recOpt)),
+    h("optgroup", { label: S.lang === "ru" ? "Чтецы" : "Қарилар" }, RECITERS.filter(r => !r[2]).map(recOpt)));
   recSel.onchange = () => { S.reciter = recSel.value; save(); };
   const repSel = h("select", { "aria-label": T("repeat") }, [1, 3, 5, 10].map(k => h("option", { value: k }, `${T("repeat")} ×${k}`)));
   repSel.onchange = () => rep = +repSel.value;
@@ -1311,7 +1323,7 @@ async function pageSura(v, n, hifz, goto) {
     ["hz0", "hz1", "hz2", "hz3"].forEach((k, i) => { const b = h("button", { class: "tog", "aria-pressed": String(i === 0) }, T(k)); b.onclick = () => { hzLevel = i; $$("button", lv).forEach((x, j) => x.setAttribute("aria-pressed", String(j === i))); draw(); }; lv.append(b); });
     wrap.append(lv, h("p", { class: "muted small", style: "margin-top:8px" }, T("hzHint")));
   } else {
-    wrap.append(h("p", { class: "muted small", style: "margin-top:10px" }, T(WBW_SURAS.has(n) && WBW_D ? "tapWordWbw" : "tapWord")));
+    wrap.append(h("p", { class: "muted small", style: "margin-top:10px" }, T(WBW_SURAS.has(n) && WBW_D ? "tapWordWbw" : "tapWordNo")));
   }
   if (n !== 1 && n !== 9) wrap.append(h("div", { class: "bism", lang: "ar" }, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"));
   const list = h("div", { class: "ayahs" + (S.view.color || hifz ? "" : " nocolor") + (S.view.tr && !hifz ? "" : " notr") + (S.view.tl && !hifz ? "" : " notl") });
@@ -1328,10 +1340,11 @@ async function pageSura(v, n, hifz, goto) {
       const right = h("span", { class: "row" });
       if (hifz) {
         const st = S.hifz[n] || (S.hifz[n] = {});
-        const mb = h("button", { class: "mem", "aria-pressed": String(!!st[a.n]), html: icon("check") + esc(T("memorized")) });
+        const mb = h("button", { class: "mem", "aria-pressed": String(!!st[a.n]), disabled: st[a.n] ? "" : null, html: icon("check") + esc(T("memorized")) });
         mb.onclick = () => {
-          const on = !st[a.n]; if (on) { st[a.n] = today(); addXP(10, mb); } else delete st[a.n];
-          mb.setAttribute("aria-pressed", String(on)); save();
+          if (st[a.n]) return; // отметку «Выучил» не снимаем — она сбрасывается только сбросом прогресса
+          const on = true; st[a.n] = today(); addXP(10, mb); mb.disabled = true;
+          mb.setAttribute("aria-pressed", "true"); save();
           if (on && suraMemorized(n)) { addXP(50, mb); toast((S.lang === "ru" ? "Сура выучена: " : "Сүре жатталды: ") + L(s.name), "✓"); }
           checkBadges();
         };
@@ -1749,11 +1762,29 @@ async function nzAzkar(v) {
 async function nzDuas(v) {
   const ru = S.lang === "ru";
   const d = await loadAZ();
-  v.append(backHead("#/namaz", ru ? "Дуа на каждый день" : "Күнделікті дұғалар", ru ? "Короткие мольбы на разные случаи" : "Әр жағдайға арналған қысқа дұғалар"));
-  const nav = h("nav", { class: "duas-nav" }, d.daily.map((g, i) => { const a = h("a", { href: "#" }, L(g.g)); a.onclick = e => { e.preventDefault(); document.getElementById("dg" + i).scrollIntoView({ behavior: "smooth", block: "start" }); }; return a; }));
-  v.append(nav);
-  d.daily.forEach((g, i) => { v.append(h("h2", { class: "duas-h", id: "dg" + i }, L(g.g))); const w = h("div", { class: "stack" }); g.items.forEach(t => w.append(duaCard(t))); v.append(w); });
-  v.append(h("p", { class: "muted small", style: "margin-top:16px" }, L(d.intro)));
+  let gi = Math.min(Math.max(0, S.duaG || 0), d.daily.length - 1);
+  v.append(backHead("#/namaz", ru ? "Дуа на каждый день" : "Күнделікті дұғалар", ru ? "Выберите раздел или листайте" : "Бөлімді таңдаңыз не сырғытыңыз"));
+  const nav = h("nav", { class: "duas-nav", role: "tablist" });
+  const pane = h("div", { class: "duas-pane", role: "tabpanel" });
+  const dots = h("div", { class: "ts-dots duas-dots", "aria-hidden": "true" });
+  const tabs = d.daily.map((g, i) => { const b = h("button", { type: "button", role: "tab" }, L(g.g)); b.onclick = () => go(i - gi); nav.append(b); return b; });
+  const draw = dir => {
+    stopAudio();
+    tabs.forEach((b, i) => { b.setAttribute("aria-selected", String(i === gi)); if (i === gi) b.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" }); });
+    dots.innerHTML = d.daily.map((_, i) => `<i class="${i === gi ? "cur" : ""}"></i>`).join("");
+    pane.innerHTML = ""; pane.classList.remove("in-l", "in-r"); void pane.offsetWidth; if (dir) pane.classList.add(dir > 0 ? "in-r" : "in-l");
+    const g = d.daily[gi];
+    pane.append(h("h2", { class: "duas-h" }, L(g.g), h("small", {}, ` · ${gi + 1} / ${d.daily.length}`)));
+    const w = h("div", { class: "stack" }); g.items.forEach(t => w.append(duaCard(t))); pane.append(w);
+  };
+  const go = dir => { const ni = Math.min(d.daily.length - 1, Math.max(0, gi + dir)); if (ni === gi) return; gi = ni; S.duaG = gi; save(); draw(dir); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  // свайп: влево — следующий раздел, вправо — предыдущий
+  let sx = 0, sy = 0, st = 0;
+  pane.addEventListener("touchstart", e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, { passive: true });
+  pane.addEventListener("touchend", e => { const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - st < 800) go(dx < 0 ? 1 : -1); }, { passive: true });
+  v.append(nav, dots, pane, h("p", { class: "muted small", style: "margin-top:16px" }, L(d.intro)));
+  draw(0);
 }
 
 /* ═════════════ время намазов и кибла ═════════════
@@ -1767,9 +1798,9 @@ const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 // расчёт по солнцу (алгоритм PrayTimes, упрощённый): возвращает часы в локальном времени устройства
-function calcTimes(date, lat, lng) {
+function calcTimes(date, lat, lng, tzh) {
   const rad = Math.PI / 180, deg = 180 / Math.PI;
-  const tz = -date.getTimezoneOffset() / 60;
+  const tz = tzh != null ? tzh : -date.getTimezoneOffset() / 60;
   const y = date.getFullYear(), m = date.getMonth() + 1, dd = date.getDate();
   const A = Math.floor((14 - m) / 12), Y = y + 4800 - A, M = m + 12 * A - 3;
   const jd = dd + Math.floor((153 * M + 2) / 5) + 365 * Y + Math.floor(Y / 4) - Math.floor(Y / 100) + Math.floor(Y / 400) - 32045 - 0.5 - lng / 360;
@@ -1783,13 +1814,22 @@ function calcTimes(date, lat, lng) {
     const v = Math.acos((-Math.sin(angle * rad) - Math.sin(s.dec * rad) * Math.sin(lat * rad)) / (Math.cos(s.dec * rad) * Math.cos(lat * rad))) * deg / 15;
     return n + (ccw ? -v : v); };
   const asrT = (f, t) => { const s = sun(t); const ang = -Math.atan(1 / (f + Math.tan(Math.abs(lat - s.dec) * rad))) * deg; return hourAngle(ang, t); };
+  const sr = hourAngle(0.833, 6 / 24, true), ss = hourAngle(0.833, 18 / 24);
+  let fj = hourAngle(18, 5 / 24, true), is = hourAngle(17, 18 / 24);
+  // высокие широты (Москва, Казань, север России): летом сумерки не кончаются — берём долю ночи по углу
+  const night = 24 - (ss - sr);
+  if (!isFinite(fj) || sr - fj > night * 18 / 60) fj = sr - night * 18 / 60;
+  if (!isFinite(is) || is - ss > night * 17 / 60) is = ss + night * 17 / 60;
   const adj = h => h + tz - lng / 15;
-  const r = { fajr: adj(hourAngle(18, 5 / 24, true)), sunrise: adj(hourAngle(0.833, 6 / 24, true)), dhuhr: adj(noon(12 / 24)) + 2 / 60,
-    asr: adj(asrT(2, 13 / 24)), maghrib: adj(hourAngle(0.833, 18 / 24)) + 3 / 60, isha: adj(hourAngle(17, 18 / 24)) };
+  const r = { fajr: adj(fj), sunrise: adj(sr), dhuhr: adj(noon(12 / 24)) + 2 / 60, asr: adj(asrT(2, 13 / 24)), maghrib: adj(ss) + 3 / 60, isha: adj(is) };
   const out = {};
   for (const k of PT_KEYS) { const v = r[k]; if (!isFinite(v)) { out[k] = "—"; continue; } const mm = Math.round(fix(v) * 60); out[k] = String(Math.floor(mm / 60) % 24).padStart(2, "0") + ":" + String(mm % 60).padStart(2, "0"); }
   return out;
 }
+// смещение часового пояса города (IANA) в часах на дату
+const tzOff = (tzName, d = new Date()) => { try { const p = new Intl.DateTimeFormat("en-US", { timeZone: tzName, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric" }).formatToParts(d).reduce((o, x) => (o[x.type] = +x.value, o), {});
+  return (Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute) - Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes())) / 3.6e6; } catch (e) { return -d.getTimezoneOffset() / 60; } };
+const cityOff = (city, d) => city.src === "dumk" ? +(city.tz || 5) : city.tzName ? tzOff(city.tzName, d) : -d.getTimezoneOffset() / 60;
 async function dumkYear(city, year) {
   const key = `iqra.pt.${city.id}.${year}`;
   const c = lsGet(key); if (c && c.length) return c;
@@ -1803,11 +1843,11 @@ async function timesFor(city, date) {
     const rows = await dumkYear(city, date.getFullYear()); const r = rows.find(x => x[0] === ymd(date));
     if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; }
   }
-  return calcTimes(date, +city.lat, +city.lng);
+  return calcTimes(date, +city.lat, +city.lng, cityOff(city, date));
 }
 const tMin = s => { const m = /^(\d+):(\d+)/.exec(s || ""); return m ? +m[1] * 60 + +m[2] : null; };
 // сейчас по часовому поясу города (у ДУМК — UTC+5), чтобы сравнивать с его расписанием
-const cityNow = city => { const d = new Date(); if (city.src !== "dumk") return d; const tz = +(city.tz || 5); return new Date(d.getTime() + (d.getTimezoneOffset() + tz * 60) * 6e4); };
+const cityNow = city => { const d = new Date(); return new Date(d.getTime() + (d.getTimezoneOffset() + cityOff(city, d) * 60) * 6e4); };
 async function nextPrayer(city) {
   const now = cityNow(city), nm = now.getHours() * 60 + now.getMinutes();
   const t = await timesFor(city, now);
@@ -1826,7 +1866,8 @@ async function cityByCoords(lat, lng) {
     try { const j = await fetchJSON(`${PT_API}/cities/?lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}`); const c = j.results && j.results[0];
       if (c) return { id: c.id, title: c.title, lat: c.lat, lng: c.lng, tz: c.timezone, src: "dumk" }; } catch (e) {}
   }
-  return { id: "geo", title: S.lang === "ru" ? "Моё местоположение" : "Менің орным", lat: lat.toFixed(4), lng: lng.toFixed(4), src: "calc" };
+  let tzName = null; try { tzName = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+  return { id: "geo", title: S.lang === "ru" ? "Моё местоположение" : "Менің орным", lat: lat.toFixed(4), lng: lng.toFixed(4), src: "calc", tzName };
 }
 const locate = () => new Promise((res, rej) => { if (!navigator.geolocation) return rej(new Error("geo")); navigator.geolocation.getCurrentPosition(p => res(p.coords), rej, { timeout: 15000, maximumAge: 6e5 }); });
 // карточка «следующий намаз» для «Сегодня» и «Намаза»
@@ -1839,44 +1880,78 @@ function nextPrayerCard(cls = "") {
     .catch(() => { a.querySelector(".np-t b").textContent = ru ? "Нет связи с расписанием" : "Кестеге қосылу мүмкін болмады"; });
   return a;
 }
+// окно выбора места: Казахстан — справочник ДУМК, Россия, Турция и весь мир — поиск Open-Meteo, время считается на устройстве
+const PT_CC = [["kz", ["Қазақстан", "Казахстан"]], ["ru", ["Ресей", "Россия"]], ["tr", ["Түркия", "Турция"]], ["all", ["Бүкіл әлем", "Весь мир"]]];
+function cityPicker(onPick) {
+  const ru = S.lang === "ru";
+  let cc = S.ptc || "kz";
+  const inp = h("input", { type: "search", autocomplete: "off", "aria-label": ru ? "Поиск места" : "Орынды іздеу" });
+  const res = h("div", { class: "pt-res" });
+  const seg = h("div", { class: "seg pt-cc", role: "group" });
+  const setPh = () => { inp.placeholder = cc === "kz" ? (ru ? "Город или село Казахстана" : "Қазақстандағы қала не ауыл") : cc === "ru" ? (ru ? "Город России, например Казань" : "Ресей қаласы, мысалы Қазан") : cc === "tr" ? (ru ? "Город Турции, например Стамбул" : "Түркия қаласы, мысалы Ыстамбұл") : (ru ? "Любой город мира" : "Әлемнің кез келген қаласы"); };
+  PT_CC.forEach(([k, nm]) => { const b = h("button", { type: "button", "aria-pressed": String(k === cc) }, L({ kk: nm[0], ru: nm[1] }));
+    b.onclick = () => { cc = k; S.ptc = k; save(); seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); setPh(); res.innerHTML = ""; if (inp.value.trim().length > 1) inp.oninput(); inp.focus(); }; seg.append(b); });
+  setPh();
+  const choose = c => { S.city = c; save(); close(); onPick(); };
+  let tmr = 0;
+  inp.oninput = () => { clearTimeout(tmr); const q = inp.value.trim(); if (q.length < 2) { res.innerHTML = ""; return; }
+    tmr = setTimeout(async () => {
+      try {
+        res.innerHTML = "";
+        if (cc === "kz") {
+          const j = await fetchJSON(`${PT_API}/cities/?search=${encodeURIComponent(q)}`);
+          (j.results || []).slice(0, 10).forEach(c => { const b = h("button", { type: "button", html: `<b>${esc(c.title)}</b><small>${esc([c.district, c.region].filter(Boolean).join(", "))}</small>` });
+            b.onclick = () => choose({ id: c.id, title: c.title, lat: c.lat, lng: c.lng, tz: c.timezone, src: "dumk" }); res.append(b); });
+          if (!(j.results || []).length) res.innerHTML = `<p class="muted small">${esc(ru ? "Ничего не найдено. Попробуйте по-казахски, например «Алматы» или «Шымкент»." : "Ештеңе табылмады.")}</p>`;
+        } else {
+          const j = await fetchJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=${ru ? "ru" : "kk"}${cc === "all" ? "" : "&countryCode=" + cc.toUpperCase()}`);
+          (j.results || []).forEach(c => { const b = h("button", { type: "button", html: `<b>${esc(c.name)}</b><small>${esc([c.admin2, c.admin1, cc === "all" ? c.country : null].filter(Boolean).join(", "))}</small>` });
+            b.onclick = () => choose({ id: "om" + c.id, title: c.name, sub: c.admin1 || "", lat: (+c.latitude).toFixed(4), lng: (+c.longitude).toFixed(4), tzName: c.timezone, cc: c.country_code, src: "calc" }); res.append(b); });
+          if (!(j.results || []).length) res.innerHTML = `<p class="muted small">${esc(ru ? "Ничего не найдено. Попробуйте другое написание." : "Ештеңе табылмады. Басқаша жазып көріңіз.")}</p>`;
+        }
+      } catch (e) { res.innerHTML = `<p class="muted small">${esc(ru ? "Нет связи с сервером. Проверьте интернет." : "Серверге қосылу мүмкін болмады.")}</p>`; }
+    }, 300); };
+  const geoB = h("button", { class: "btn ghost", type: "button", html: icon("pin") + esc(ru ? "Определить автоматически" : "Автоматты анықтау") });
+  geoB.onclick = async () => { geoB.disabled = true; try { const c = await locate(); choose(await cityByCoords(c.latitude, c.longitude)); }
+    catch (e) { toast(ru ? "Не удалось определить местоположение" : "Орынды анықтау мүмкін болмады"); geoB.disabled = false; } };
+  const x = h("button", { class: "iconbtn sh-x", type: "button", "aria-label": ru ? "Закрыть" : "Жабу", html: icon("x") });
+  const sheet = h("div", { class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": ru ? "Выбор места" : "Орынды таңдау" },
+    h("div", { class: "sh-h" }, h("h2", {}, ru ? "Где вы находитесь?" : "Қай жердесіз?"), x), seg,
+    h("label", { class: "sbox", html: icon("search") }, inp), res, geoB);
+  const bg = h("div", { class: "modal-bg sheet-bg" }, sheet);
+  const onKey = e => { if (e.key === "Escape") close(); };
+  function close() { bg.remove(); document.removeEventListener("keydown", onKey); }
+  x.onclick = close; bg.onclick = e => { if (e.target === bg) close(); };
+  document.addEventListener("keydown", onKey);
+  document.body.append(bg); setTimeout(() => inp.focus(), 50);
+}
 async function nzTimes(v) {
   const ru = S.lang === "ru";
   v.append(backHead("#/namaz", ru ? "Время намазов" : "Намаз уақыттары", ru ? "И направление киблы" : "Және құбыла бағыты"));
   const box = h("div", { class: "pt-wrap" });
   v.append(box);
-  const pick = h("section", { class: "card pt-pick" });
   const draw = async () => {
     box.innerHTML = "";
-    // выбор города
-    const inp = h("input", { type: "search", placeholder: ru ? "Город или село Казахстана" : "Қазақстандағы қала не ауыл", "aria-label": ru ? "Поиск города" : "Қаланы іздеу", autocomplete: "off" });
-    const res = h("div", { class: "pt-res" });
-    const geoB = h("button", { class: "btn ghost", type: "button", html: icon("pin") + esc(ru ? "Определить автоматически" : "Автоматты анықтау") });
-    let tmr = 0;
-    inp.oninput = () => { clearTimeout(tmr); const q = inp.value.trim(); if (q.length < 2) { res.innerHTML = ""; return; }
-      tmr = setTimeout(async () => { try { const j = await fetchJSON(`${PT_API}/cities/?search=${encodeURIComponent(q)}`);
-        res.innerHTML = ""; (j.results || []).slice(0, 8).forEach(c => { const b = h("button", { type: "button", html: `<b>${esc(c.title)}</b><small>${esc([c.district, c.region].filter(Boolean).join(", "))}</small>` });
-          b.onclick = () => { S.city = { id: c.id, title: c.title, lat: c.lat, lng: c.lng, tz: c.timezone, src: "dumk" }; save(); draw(); }; res.append(b); });
-        if (!(j.results || []).length) res.innerHTML = `<p class="muted small">${esc(ru ? "Ничего не найдено. Попробуйте по-казахски, например «Алматы»." : "Ештеңе табылмады.")}</p>`;
-      } catch (e) { res.innerHTML = `<p class="muted small">${esc(ru ? "Нет связи с сервером ДУМК." : "ҚМДБ серверіне қосылу мүмкін болмады.")}</p>`; } }, 300); };
-    geoB.onclick = async () => { geoB.disabled = true; try { const c = await locate(); S.city = await cityByCoords(c.latitude, c.longitude); save(); draw(); }
-      catch (e) { toast(ru ? "Не удалось определить местоположение" : "Орынды анықтау мүмкін болмады"); geoB.disabled = false; } };
-    pick.innerHTML = "";
-    pick.append(h("h2", {}, S.city ? (ru ? "Сменить город" : "Қаланы ауыстыру") : (ru ? "Ваш город" : "Қалаңыз")), h("label", { class: "sbox", html: icon("search") }, inp), res, geoB);
-    if (!S.city) { box.append(pick); return; }
-    // расписание на сегодня
+    if (!S.city) {
+      box.append(h("section", { class: "card stack pt-empty" }, h("h2", {}, ru ? "Ваш город" : "Қалаңыз"),
+        h("p", { class: "muted" }, ru ? "Казахстан — по официальному расписанию ДУМК. Россия, Турция и другие страны — расчёт по солнцу." : "Қазақстан — ҚМДБ ресми кестесімен. Ресей, Түркия және басқа елдер — күн бойынша есеп."),
+        h("button", { class: "btn", type: "button", onclick: () => cityPicker(draw), html: icon("pin") + esc(ru ? "Выбрать город" : "Қаланы таңдау") })));
+      return;
+    }
     const c = S.city, now = cityNow(c);
-    let t; try { t = await timesFor(c, now); } catch (e) { box.append(h("div", { class: "box warn" }, ru ? "Не удалось загрузить расписание. Проверьте интернет." : "Кестені жүктеу мүмкін болмады."), pick); return; }
+    let t; try { t = await timesFor(c, now); } catch (e) { box.append(h("div", { class: "box warn" }, ru ? "Не удалось загрузить расписание. Проверьте интернет." : "Кестені жүктеу мүмкін болмады."), h("button", { class: "btn ghost", onclick: () => cityPicker(draw) }, ru ? "Сменить город" : "Қаланы ауыстыру")); return; }
     const n = await nextPrayer(c).catch(() => null);
     const hijri = (() => { try { return new Intl.DateTimeFormat((ru ? "ru" : "kk") + "-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(now); } catch (e) { return ""; } })();
     const dateS = new Intl.DateTimeFormat(ru ? "ru-RU" : "kk-KZ", { weekday: "long", day: "numeric", month: "long" }).format(now);
+    const foreignTz = c.src === "calc" && c.tzName && Math.abs(cityOff(c, new Date()) + new Date().getTimezoneOffset() / 60) > 0.01;
     const card = h("section", { class: "pt-card" },
-      h("div", { class: "pt-h" }, h("div", {}, h("b", {}, c.title), h("small", {}, dateS + (hijri ? " · " + hijri : ""))),
-        h("button", { class: "pill", type: "button", onclick: () => { pick.hidden = !pick.hidden; } }, ru ? "Сменить" : "Ауыстыру")),
+      h("div", { class: "pt-h" }, h("div", {}, h("b", {}, c.title + (c.sub ? ", " + c.sub : "")), h("small", {}, dateS + (hijri ? " · " + hijri : ""))),
+        h("button", { class: "pill", type: "button", onclick: () => cityPicker(draw) }, ru ? "Сменить" : "Ауыстыру")),
       h("ol", { class: "pt-list" }, PT_KEYS.map(k => h("li", { class: (n && n.today && n.k === k ? "next" : "") + (k === "sunrise" ? " sun" : ""), html: `<span>${esc(ptName(k))}</span><b class="num">${esc(t[k])}</b>${n && n.today && n.k === k ? `<small>${esc(fmtLeft(n.left))}</small>` : ""}` }))),
-      h("p", { class: "muted small pt-src" }, c.src === "dumk" ? (ru ? "Официальное расписание ДУМК (muftyat.kz)." : "ҚМДБ ресми кестесі (muftyat.kz).")
-        : (ru ? "Расчёт на устройстве: фаджр 18°, иша 17°, аср по ханафитскому мазхабу. Уточняйте у местной мечети." : "Құрылғыда есептелді: таң 18°, құптан 17°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз.")));
-    pick.hidden = true;
-    box.append(card, pick, qiblaCard(+c.lat, +c.lng), remindCard("prayer"));
+      h("p", { class: "muted small pt-src" }, (c.src === "dumk" ? (ru ? "Официальное расписание ДУМК (muftyat.kz)." : "ҚМДБ ресми кестесі (muftyat.kz).")
+        : (ru ? "Расчёт по солнцу: фаджр 18°, иша 17°, аср по ханафитскому мазхабу. Уточняйте у местной мечети." : "Күн бойынша есеп: таң 18°, құптан 17°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз."))
+        + (foreignTz ? (ru ? " Время указано местное для этого города." : " Уақыт осы қаланың жергілікті уақытымен.") : "")));
+    box.append(card, qiblaCard(+c.lat, +c.lng), remindCard("prayer"));
   };
   draw();
 }
@@ -1905,8 +1980,7 @@ async function prayerICS(city, days = 30) {
     const t = await timesFor(city, d);
     for (const k of ["fajr", "dhuhr", "asr", "maghrib", "isha"]) {
       const m = /^(\d+):(\d+)/.exec(t[k] || ""); if (!m) continue;
-      const start = city.src === "dumk" ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), +m[1], +m[2]) - (+(city.tz || 5)) * 3600e3)
-        : new Date(d.getFullYear(), d.getMonth(), d.getDate(), +m[1], +m[2]);
+      const start = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), +m[1], +m[2]) - cityOff(city, new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12))) * 3600e3);
       ev.push({ uid: `${ymd(d)}-${k}-${city.id}`, utc: true, start, title: `${ru ? "Намаз" : "Намаз"}: ${ptName(k)} ${t[k]}`, desc: city.title, dur: 15 });
     }
   }

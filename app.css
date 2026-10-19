@@ -1140,8 +1140,13 @@ body[data-page="tasbih"] main{overflow-x:clip}
 .dua.done{box-shadow:inset 0 0 0 1.5px var(--accent)}
 .azk-pr{display:grid;gap:6px;margin:4px 0 14px;max-width:420px}
 .duas-nav{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;margin-bottom:6px;scrollbar-width:none}
-.duas-nav a{flex:none;padding:8px 14px;border-radius:999px;background:var(--surface);color:var(--ink);text-decoration:none;font-weight:600;font-size:14px}
-.duas-h{margin:20px 0 10px;font-size:20px;scroll-margin-top:80px}
+.duas-nav button{flex:none;padding:9px 15px;border-radius:999px;border:none;background:var(--surface);color:var(--ink);font-weight:600;font-size:14px;cursor:pointer}
+.duas-nav button[aria-selected="true"]{background:var(--primary);color:var(--primary-ink)}
+.duas-dots{margin:2px 0 6px}
+.duas-pane{touch-action:pan-y}
+.duas-pane.in-r{animation:tsInR .28s ease-out}.duas-pane.in-l{animation:tsInL .28s ease-out}
+.duas-h small{font-size:14px;color:var(--muted);font-weight:500}
+.duas-h{margin:8px 0 10px;font-size:20px}
 /* пословный перевод */
 .wbw-tip{position:absolute;z-index:65;display:grid;justify-items:center;gap:2px;min-width:120px;max-width:260px;padding:10px 14px;border-radius:16px;
   background:var(--hero);color:var(--hero-ink);box-shadow:0 12px 30px rgba(0,0,0,.2);text-align:center;animation:fade .15s ease-out}
@@ -1181,3 +1186,17 @@ body[data-page="tasbih"] main{overflow-x:clip}
 
 .rem input[type=time]{height:42px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;padding:0 10px}
 .rem .btn{justify-self:start}
+.ay .mem[disabled]{cursor:default;opacity:1}
+
+/* окно выбора места (снизу на телефоне, по центру на компьютере) */
+.sheet-bg{place-items:end center;padding:0}
+.sheet{width:100%;max-width:560px;max-height:86vh;overflow:auto;background:var(--surface);border-radius:26px 26px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:12px;animation:shUp .22s ease-out}
+@keyframes shUp{from{transform:translateY(40px);opacity:.4}}
+@media (min-width:821px){.sheet-bg{place-items:center;padding:16px}.sheet{border-radius:26px}}
+.sh-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sh-h h2{font-size:21px}
+.pt-cc{flex-wrap:wrap}
+.sheet .sbox{display:flex;align-items:center;gap:8px;padding:0 14px;height:48px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line)}
+.sheet .sbox svg{width:18px;height:18px;color:var(--muted)}
+.sheet input{flex:1;border:none;background:none;font:inherit;color:var(--ink);outline:none;min-width:0}
+.sheet .btn{justify-self:start}
