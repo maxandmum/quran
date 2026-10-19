@@ -1178,3 +1178,6 @@ body[data-page="tasbih"] main{overflow-x:clip}
   .cert{position:fixed;left:50%;top:40px;transform:translateX(-50%);width:640px;max-width:none;box-shadow:inset 0 0 0 6px #fbf8f0,inset 0 0 0 7px #e2cfa5}
   body{background:#fff!important}
 }
+
+.rem input[type=time]{height:42px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;padding:0 10px}
+.rem .btn{justify-self:start}

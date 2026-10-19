@@ -187,7 +187,7 @@ const I = {
   beads: '<circle cx="12" cy="4.2" r="1.3"/><circle cx="16.5" cy="5.8" r="1.3"/><circle cx="18.2" cy="10" r="1.3"/><circle cx="16.5" cy="14.2" r="1.3"/><circle cx="7.5" cy="14.2" r="1.3"/><circle cx="5.8" cy="10" r="1.3"/><circle cx="7.5" cy="5.8" r="1.3"/><path d="M12 15.5v5M10.3 21.5h3.4"/>',
   flip: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5"/>', vib: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 8v8M20 8v8"/>',
   chev: '<path d="M9 6l6 6-6 6"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
-  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   flame: '<path d="M12 22c4 0 7-3 7-7 0-3-2-5.5-3.5-7-.5 2-1.5 3-3 3 .5-3-1-6-3.5-8 0 3-1.5 5-3 6.5C4.5 11 5 13 5 15c0 4 3 7 7 7z"/>',
   star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
@@ -1876,10 +1876,63 @@ async function nzTimes(v) {
       h("p", { class: "muted small pt-src" }, c.src === "dumk" ? (ru ? "Официальное расписание ДУМК (muftyat.kz)." : "ҚМДБ ресми кестесі (muftyat.kz).")
         : (ru ? "Расчёт на устройстве: фаджр 18°, иша 17°, аср по ханафитскому мазхабу. Уточняйте у местной мечети." : "Құрылғыда есептелді: таң 18°, құптан 17°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз.")));
     pick.hidden = true;
-    box.append(card, pick, qiblaCard(+c.lat, +c.lng));
+    box.append(card, pick, qiblaCard(+c.lat, +c.lng), remindCard("prayer"));
   };
   draw();
 }
+/* ───── напоминания без сервера: файл календаря (.ics) — телефон сам напомнит в нужное время ───── */
+const icsEsc = s => String(s).replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+const icsUTC = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+const icsLocal = (y, m, d, hh, mm) => `${y}${String(m).padStart(2, "0")}${String(d).padStart(2, "0")}T${String(hh).padStart(2, "0")}${String(mm).padStart(2, "0")}00`;
+function icsDownload(fname, events) {
+  const L2 = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Iqra//Quran//RU", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  const stamp = icsUTC(new Date());
+  for (const e of events) {
+    L2.push("BEGIN:VEVENT", `UID:${e.uid}@iqra`, `DTSTAMP:${stamp}`, e.utc ? `DTSTART:${icsUTC(e.start)}` : `DTSTART:${e.local}`, `DURATION:PT${e.dur || 10}M`,
+      `SUMMARY:${icsEsc(e.title)}`, `DESCRIPTION:${icsEsc(e.desc || "")}`, "URL:https://maxandmum.github.io/quran/");
+    if (e.rrule) L2.push(`RRULE:${e.rrule}`);
+    L2.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${icsEsc(e.title)}`, `TRIGGER:-PT${e.before || 0}M`, "END:VALARM", "END:VEVENT");
+  }
+  L2.push("END:VCALENDAR");
+  const blob = new Blob([L2.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+  const a = h("a", { href: URL.createObjectURL(blob), download: fname }); document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+async function prayerICS(city, days = 30) {
+  const ru = S.lang === "ru", ev = [], base = cityNow(city);
+  for (let i = 0; i < days; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    const t = await timesFor(city, d);
+    for (const k of ["fajr", "dhuhr", "asr", "maghrib", "isha"]) {
+      const m = /^(\d+):(\d+)/.exec(t[k] || ""); if (!m) continue;
+      const start = city.src === "dumk" ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), +m[1], +m[2]) - (+(city.tz || 5)) * 3600e3)
+        : new Date(d.getFullYear(), d.getMonth(), d.getDate(), +m[1], +m[2]);
+      ev.push({ uid: `${ymd(d)}-${k}-${city.id}`, utc: true, start, title: `${ru ? "Намаз" : "Намаз"}: ${ptName(k)} ${t[k]}`, desc: city.title, dur: 15 });
+    }
+  }
+  icsDownload("iqra-namaz.ics", ev);
+}
+function lessonICS(hhmm) {
+  const ru = S.lang === "ru", [hh, mm] = hhmm.split(":").map(Number), d = new Date(); d.setDate(d.getDate() + (d.getHours() * 60 + d.getMinutes() >= hh * 60 + mm ? 1 : 0));
+  icsDownload("iqra-urok.ics", [{ uid: "daily-lesson", local: icsLocal(d.getFullYear(), d.getMonth() + 1, d.getDate(), hh, mm), rrule: "FREQ=DAILY",
+    title: ru ? "Iqra: урок чтения Корана" : "Iqra: Құран оқу сабағы", desc: ru ? "10 минут в день — и серия не прервётся." : "Күніне 10 минут — сериясы үзілмейді.", dur: 15 }]);
+}
+function remindCard(kind) {
+  const ru = S.lang === "ru";
+  const how = h("p", { class: "muted small" }, ru ? "Скачается файл календаря. На iPhone нажмите «Добавить все», на Android откройте файл в Google Календаре. Напоминания сработают, даже если сайт закрыт." : "Күнтізбе файлы жүктеледі. iPhone-да «Барлығын қосу» басыңыз, Android-та файлды Google Күнтізбесінде ашыңыз. Сайт жабық болса да еске салады.");
+  if (kind === "prayer") {
+    const b = h("button", { class: "btn", type: "button", html: icon("bell") + esc(ru ? "Добавить намазы в календарь — 30 дней" : "Намаздарды күнтізбеге қосу — 30 күн") });
+    b.onclick = async () => { b.disabled = true; try { await prayerICS(S.city); } catch (e) { toast(ru ? "Не удалось составить расписание" : "Кесте құру мүмкін болмады"); } b.disabled = false; };
+    return h("section", { class: "card stack rem" }, h("h2", {}, ru ? "Напоминания о намазе" : "Намаз туралы еске салу"), b, how, h("p", { class: "muted small" }, ru ? "Через месяц скачайте заново — расписание меняется." : "Бір айдан кейін қайта жүктеңіз — кесте өзгереді."));
+  }
+  const t = h("input", { type: "time", value: S.remT || "20:00", "aria-label": ru ? "Время напоминания" : "Еске салу уақыты" });
+  t.onchange = () => { S.remT = t.value; save(); };
+  const b = h("button", { class: "btn", type: "button", html: icon("bell") + esc(ru ? "Добавить в календарь" : "Күнтізбеге қосу") });
+  b.onclick = () => lessonICS(t.value || "20:00");
+  return h("section", { class: "card stack rem" }, h("h2", {}, ru ? "Напоминание об уроке" : "Сабақ туралы еске салу"),
+    h("div", { class: "setrow" }, h("span", {}, ru ? "Каждый день в" : "Күн сайын сағат"), t), b, how);
+}
+
 function qiblaCard(lat, lng) {
   const ru = S.lang === "ru";
   const q = qiblaDeg(lat, lng);
@@ -2188,6 +2241,7 @@ function pageMe(v) {
   }
   const goalSeg = h("div", { class: "seg" }, [[15, "goals"], [30, "goalm"], [60, "goalh"]].map(([g, k]) => h("button", { "aria-pressed": String(S.goal === g), onclick: () => { S.goal = g; save(); route(); } }, `${T(k)} · ${g}`)));
   wrap.append(h("section", { class: "card stack" }, h("h2", {}, T("week")), wk, h("h3", {}, T("dailyGoal")), goalSeg));
+  wrap.append(remindCard("lesson"));
   // настройки
   const themeSeg = h("div", { class: "seg" }, [["light", "light"], ["dark", "dark"], ["system", "system"]].map(([th, k]) => h("button", { "aria-pressed": String((S.theme || "light") === th), onclick: () => { S.theme = th; save(); applyTheme(); shell(); route(); } }, T(k))));
   const langSeg = h("div", { class: "seg" }, [["kk", "Қазақша"], ["ru", "Русский"]].map(([l, t]) => h("button", { "aria-pressed": String(S.lang === l), onclick: () => setLang(l) }, t)));
