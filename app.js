@@ -17,7 +17,9 @@ const save = () => { S.at = Date.now(); try { localStorage.setItem(KEY, JSON.str
 /* ═════════════ язык и тема ═════════════ */
 if (!S.lang) S.lang = /^ru/i.test(navigator.language || "") ? "ru" : "kk";
 const L = o => o == null ? "" : (typeof o === "string" ? o : (o[S.lang] ?? o.kk ?? ""));
+const applyArz = () => document.documentElement.style.setProperty("--arz", String(S.arz || 1));
 const applyTheme = () => {
+  applyArz();
   if (S.theme) document.documentElement.dataset.theme = S.theme; else delete document.documentElement.dataset.theme;
   const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#e8efe9";
 };
@@ -70,7 +72,7 @@ const UI = {
   hzHint: ["Жасырылған сөзді басып, тексеріңіз. Аятты есте сақтағанда «Жаттадым» белгісін қойыңыз.",
     "Нажмите на скрытое слово, чтобы проверить себя. Отметьте «Выучил(а)», когда помните аят."],
   audioErr: ["Аудио жүктелмеді. Интернетті тексеріңіз.", "Аудио не загрузилось. Проверьте интернет."],
-  tapWord: ["Сөзді басып, жеке тыңдауға болады", "Нажмите на слово, чтобы услышать его отдельно"], tapWordWbw: ["Сөзді басыңыз — оны естисіз және аудармасын көресіз", "Нажмите на слово — услышите его и увидите перевод"], tapWordNo: ["Сөзді басып, жеке тыңдауға болады. Сөздердің аудармасы әзірге Фатихада және 93–114-сүрелерде бар.", "Нажмите на слово, чтобы услышать его. Перевод отдельных слов пока есть в «Аль-Фатихе» и сурах 93–114."],
+  tapWord: ["Сөзді басып, жеке тыңдауға болады", "Нажмите на слово, чтобы услышать его отдельно"], bmAdd: ["Бетбелгі", "Закладка"], bmOn: ["Бетбелгіге қосылды", "Аят добавлен в закладки"], bmOff: ["Бетбелгіден алынды", "Закладка убрана"], tapWordWbw: ["Сөзді басыңыз — оны естисіз және аудармасын көресіз", "Нажмите на слово — услышите его и увидите перевод"], tapWordNo: ["Сөзді басып, жеке тыңдауға болады. Сөздердің аудармасы әзірге Фатихада және 93–114-сүрелерде бар.", "Нажмите на слово, чтобы услышать его. Перевод отдельных слов пока есть в «Аль-Фатихе» и сурах 93–114."],
   trainers: ["Тренажёрлар", "Тренажёры"], startTr: ["Бастау", "Начать"], again: ["Тағы бір рет", "Ещё раз"],
   question: ["Сұрақ", "Вопрос"], result: ["Нәтиже", "Результат"], correct: ["дұрыс", "верно"],
   backTr: ["Тренажёрлерге", "К тренажёрам"], plusXp: ["ұпай", "очков"],
@@ -187,7 +189,7 @@ const I = {
   beads: '<circle cx="12" cy="4.2" r="1.3"/><circle cx="16.5" cy="5.8" r="1.3"/><circle cx="18.2" cy="10" r="1.3"/><circle cx="16.5" cy="14.2" r="1.3"/><circle cx="7.5" cy="14.2" r="1.3"/><circle cx="5.8" cy="10" r="1.3"/><circle cx="7.5" cy="5.8" r="1.3"/><path d="M12 15.5v5M10.3 21.5h3.4"/>',
   flip: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5"/>', vib: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 8v8M20 8v8"/>',
   chev: '<path d="M9 6l6 6-6 6"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
-  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', bookmark: '<path d="M6 3.5h12v17l-6-4.2-6 4.2z"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   flame: '<path d="M12 22c4 0 7-3 7-7 0-3-2-5.5-3.5-7-.5 2-1.5 3-3 3 .5-3-1-6-3.5-8 0 3-1.5 5-3 6.5C4.5 11 5 13 5 15c0 4 3 7 7 7z"/>',
   star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
@@ -495,7 +497,7 @@ function toggleTheme() { S.theme = isDark() ? "light" : "dark"; save(); applyThe
 function markNav(k) { $$("[data-k]").forEach(a => { if (a.dataset.k === k) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }); }
 const subTabs = (items, cur) => h("nav", { class: "subtabs" }, items.map(([href, label, k]) => h("a", { href, "aria-current": k === cur ? "page" : null }, label)));
 const learnTabs = cur => subTabs([["#/course", T("course"), "course"], ["#/practice", T("practice"), "practice"], ["#/ref", T("ref"), "ref"]], cur);
-const quranTabs = cur => subTabs([["#/suras", T("surasT"), "suras"], ["#/listen", T("readers"), "listen"]], cur);
+const quranTabs = cur => subTabs([["#/suras", T("surasT"), "suras"], ["#/listen", T("readers"), "listen"], ["#/bookmarks", S.lang === "ru" ? "Закладки" : "Бетбелгілер", "bm"]], cur);
 const pageHead = (title, sub, extra) => h("header", { class: "phead" }, h("h1", {}, title), sub ? h("p", { class: "muted" }, sub) : null, extra || null);
 const backHead = (href, title, sub, extra) => h("header", { class: "bhead" }, h("a", { class: "iconbtn back", href, "aria-label": T("prev"), html: icon("back") }),
   h("div", { class: "bh-t" }, h("h1", {}, title), sub ? h("p", { class: "muted small" }, sub) : null), extra || null);
@@ -523,6 +525,7 @@ async function route() {
     else if (p0 === "reader") { markNav("suras"); pageReader(view, p1); }
     else if (p0 === "namaz") { markNav("namaz"); await pageNamaz(view, p1); }
     else if (p0 === "tasbih") { markNav("namaz"); await pageTasbih(view); }
+    else if (p0 === "bookmarks") { markNav("suras"); await pageBookmarks(view); }
     else if (p0 === "exam") { markNav("learn"); pageExam(view, +p1); }
     else if (p0 === "practice") { markNav("learn"); p1 ? pageTrainer(view, p1) : pagePractice(view); }
     else if (p0 === "me") { markNav("me"); pageMe(view); }
@@ -1349,6 +1352,11 @@ async function pageSura(v, n, hifz, goto) {
           checkBadges();
         };
         right.append(mb);
+      } else {
+        const key = `${n}:${a.n}`, bm = S.bm || (S.bm = {});
+        const bb = h("button", { class: "iconbtn bmk", type: "button", "aria-pressed": String(!!bm[key]), "aria-label": T("bmAdd"), html: icon("bookmark") });
+        bb.onclick = () => { if (bm[key]) delete bm[key]; else bm[key] = Date.now(); bb.setAttribute("aria-pressed", String(!!bm[key])); save(); toast(bm[key] ? T("bmOn") : T("bmOff")); };
+        right.append(bb);
       }
       right.append(pb);
       const meta = h("div", { class: "meta" }, h("span", { class: "tr" }, L(a.tr)), h("span", { class: "rl" }), right);
@@ -1829,7 +1837,7 @@ function calcTimes(date, lat, lng, tzh) {
 // смещение часового пояса города (IANA) в часах на дату
 const tzOff = (tzName, d = new Date()) => { try { const p = new Intl.DateTimeFormat("en-US", { timeZone: tzName, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric" }).formatToParts(d).reduce((o, x) => (o[x.type] = +x.value, o), {});
   return (Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute) - Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes())) / 3.6e6; } catch (e) { return -d.getTimezoneOffset() / 60; } };
-const cityOff = (city, d) => city.src === "dumk" ? +(city.tz || 5) : city.tzName ? tzOff(city.tzName, d) : -d.getTimezoneOffset() / 60;
+const cityOff = (city, d) => city.src === "dumk" ? +(city.tz || 5) : city.src === "dy" ? +(city.tz || 3) : city.tzName ? tzOff(city.tzName, d) : -d.getTimezoneOffset() / 60;
 async function dumkYear(city, year) {
   const key = `iqra.pt.${city.id}.${year}`;
   const c = lsGet(key); if (c && c.length) return c;
@@ -1838,7 +1846,22 @@ async function dumkYear(city, year) {
   lsSet(key, rows); return rows;
 }
 // время на дату: {fajr..isha} строками «чч:мм» (в часовом поясе города)
+// Турция: официальное расписание Diyanet (через открытое зеркало ezanvakti.emushaf.net), около 30 дней вперёд
+const DY_API = "https://ezanvakti.emushaf.net";
+async function dyRows(city, need) {
+  const key = `iqra.dy.${city.id}`;
+  let c = lsGet(key);
+  if (!c || !c.some(r => r[0] === need)) {
+    const j = await fetchJSON(`${DY_API}/vakitler/${city.id}`);
+    c = (j || []).map(x => [String(x.MiladiTarihKisaIso8601 || x.MiladiTarihKisa).split(".").reverse().join("-"), x.Imsak, x.Gunes, x.Ogle, x.Ikindi, x.Aksam, x.Yatsi]);
+    lsSet(key, c);
+  }
+  return c;
+}
 async function timesFor(city, date) {
+  if (city.src === "dy") {
+    try { const rows = await dyRows(city, ymd(date)); const r = rows.find(x => x[0] === ymd(date)); if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; } } catch (e) {}
+  }
   if (city.src === "dumk") {
     const rows = await dumkYear(city, date.getFullYear()); const r = rows.find(x => x[0] === ymd(date));
     if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; }
@@ -1888,7 +1911,7 @@ function cityPicker(onPick) {
   const inp = h("input", { type: "search", autocomplete: "off", "aria-label": ru ? "Поиск места" : "Орынды іздеу" });
   const res = h("div", { class: "pt-res" });
   const seg = h("div", { class: "seg pt-cc", role: "group" });
-  const setPh = () => { inp.placeholder = cc === "kz" ? (ru ? "Город или село Казахстана" : "Қазақстандағы қала не ауыл") : cc === "ru" ? (ru ? "Город России, например Казань" : "Ресей қаласы, мысалы Қазан") : cc === "tr" ? (ru ? "Город Турции, например Стамбул" : "Түркия қаласы, мысалы Ыстамбұл") : (ru ? "Любой город мира" : "Әлемнің кез келген қаласы"); };
+  const setPh = () => { inp.placeholder = cc === "kz" ? (ru ? "Город или село Казахстана" : "Қазақстандағы қала не ауыл") : cc === "ru" ? (ru ? "Город России, например Казань" : "Ресей қаласы, мысалы Қазан") : cc === "tr" ? (ru ? "Провинция Турции, например Стамбул" : "Түркия провинциясы, мысалы Istanbul") : (ru ? "Любой город мира" : "Әлемнің кез келген қаласы"); };
   PT_CC.forEach(([k, nm]) => { const b = h("button", { type: "button", "aria-pressed": String(k === cc) }, L({ kk: nm[0], ru: nm[1] }));
     b.onclick = () => { cc = k; S.ptc = k; save(); seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); setPh(); res.innerHTML = ""; if (inp.value.trim().length > 1) inp.oninput(); inp.focus(); }; seg.append(b); });
   setPh();
@@ -1903,6 +1926,8 @@ function cityPicker(onPick) {
           (j.results || []).slice(0, 10).forEach(c => { const b = h("button", { type: "button", html: `<b>${esc(c.title)}</b><small>${esc([c.district, c.region].filter(Boolean).join(", "))}</small>` });
             b.onclick = () => choose({ id: c.id, title: c.title, lat: c.lat, lng: c.lng, tz: c.timezone, src: "dumk" }); res.append(b); });
           if (!(j.results || []).length) res.innerHTML = `<p class="muted small">${esc(ru ? "Ничего не найдено. Попробуйте по-казахски, например «Алматы» или «Шымкент»." : "Ештеңе табылмады.")}</p>`;
+        } else if (cc === "tr") {
+          return trList(q);
         } else {
           const j = await fetchJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=${ru ? "ru" : "kk"}${cc === "all" ? "" : "&countryCode=" + cc.toUpperCase()}`);
           (j.results || []).forEach(c => { const b = h("button", { type: "button", html: `<b>${esc(c.name)}</b><small>${esc([c.admin2, c.admin1, cc === "all" ? c.country : null].filter(Boolean).join(", "))}</small>` });
@@ -1911,6 +1936,38 @@ function cityPicker(onPick) {
         }
       } catch (e) { res.innerHTML = `<p class="muted small">${esc(ru ? "Нет связи с сервером. Проверьте интернет." : "Серверге қосылу мүмкін болмады.")}</p>`; }
     }, 300); };
+  // Турция: 81 провинция (Diyanet), затем район; координаты для киблы — из Open-Meteo
+  const trNorm = x => String(x).toLocaleLowerCase("tr").replace(/[ıi̇]/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const TR_RU = { "стамбул": "istanbul", "истанбул": "istanbul", "анкара": "ankara", "измир": "izmir", "анталья": "antalya", "анталия": "antalya", "бурса": "bursa", "конья": "konya", "адана": "adana", "газиантеп": "gaziantep",
+    "кайсери": "kayseri", "трабзон": "trabzon", "самсун": "samsun", "эскишехир": "eskisehir", "мерсин": "mersin", "диярбакыр": "diyarbakir", "коджаэли": "kocaeli", "измит": "kocaeli", "сакарья": "sakarya", "ризе": "rize", "алания": "antalya", "бодрум": "mugla", "мугла": "mugla", "денизли": "denizli", "эрзурум": "erzurum", "шанлыурфа": "sanliurfa", "ван": "van", "мардин": "mardin", "хатай": "hatay", "малатья": "malatya" };
+  async function trList(q) {
+    let prov = lsGet("iqra.dy.prov");
+    if (!prov) { prov = (await fetchJSON(`${DY_API}/sehirler/2`)).map(x => [x.SehirID, x.SehirAdi]); lsSet("iqra.dy.prov", prov); }
+    const nq = TR_RU[q.toLowerCase()] || trNorm(q);
+    const list = prov.filter(([, n]) => trNorm(n).includes(nq)).slice(0, 12);
+    res.innerHTML = "";
+    if (!list.length) { res.innerHTML = `<p class="muted small">${esc(ru ? "Введите провинцию латиницей или по-русски, например Istanbul, Анкара." : "Провинцияны латынша жазыңыз, мысалы Istanbul.")}</p>`; return; }
+    list.forEach(([pid, pn]) => { const b = h("button", { type: "button", html: `<b>${esc(pn)}</b><small>${esc(ru ? "Провинция — выберите район" : "Провинция — ауданды таңдаңыз")}</small>` });
+      b.onclick = async () => {
+        res.innerHTML = `<p class="muted small">…</p>`;
+        try {
+          const ds = await fetchJSON(`${DY_API}/ilceler/${pid}`);
+          res.innerHTML = "";
+          const sorted = ds.sort((a, b2) => (trNorm(b2.IlceAdi) === trNorm(pn)) - (trNorm(a.IlceAdi) === trNorm(pn)) || a.IlceAdi.localeCompare(b2.IlceAdi, "tr"));
+          sorted.forEach(x => { const db = h("button", { type: "button", html: `<b>${esc(x.IlceAdi)}</b><small>${esc(pn)}</small>` });
+            db.onclick = async () => {
+              let lat = null, lng = null;
+              try { const g = await fetchJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(x.IlceAdiEn || x.IlceAdi)}&count=10&countryCode=TR`);
+                const hit = (g.results || []).find(r => trNorm(r.admin1 || "").includes(trNorm(pn)) || trNorm(pn).includes(trNorm(r.admin1 || ""))) || (g.results || [])[0];
+                if (hit) { lat = (+hit.latitude).toFixed(4); lng = (+hit.longitude).toFixed(4); } } catch (e) {}
+              const tc = w => String(w).toLocaleLowerCase("tr").replace(/(^|[\s-])(\S)/g, (m, a, b) => a + b.toLocaleUpperCase("tr"));
+              choose({ id: x.IlceID, title: tc(x.IlceAdi), sub: trNorm(x.IlceAdi) === trNorm(pn) ? "" : tc(pn), lat, lng, tz: 3, src: "dy" });
+            };
+            res.append(db); });
+        } catch (e) { res.innerHTML = `<p class="muted small">${esc(ru ? "Нет связи с сервером расписания." : "Кесте серверіне қосылу мүмкін болмады.")}</p>`; }
+      };
+      res.append(b); });
+  }
   const geoB = h("button", { class: "btn ghost", type: "button", html: icon("pin") + esc(ru ? "Определить автоматически" : "Автоматты анықтау") });
   geoB.onclick = async () => { geoB.disabled = true; try { const c = await locate(); choose(await cityByCoords(c.latitude, c.longitude)); }
     catch (e) { toast(ru ? "Не удалось определить местоположение" : "Орынды анықтау мүмкін болмады"); geoB.disabled = false; } };
@@ -1949,9 +2006,10 @@ async function nzTimes(v) {
         h("button", { class: "pill", type: "button", onclick: () => cityPicker(draw) }, ru ? "Сменить" : "Ауыстыру")),
       h("ol", { class: "pt-list" }, PT_KEYS.map(k => h("li", { class: (n && n.today && n.k === k ? "next" : "") + (k === "sunrise" ? " sun" : ""), html: `<span>${esc(ptName(k))}</span><b class="num">${esc(t[k])}</b>${n && n.today && n.k === k ? `<small>${esc(fmtLeft(n.left))}</small>` : ""}` }))),
       h("p", { class: "muted small pt-src" }, (c.src === "dumk" ? (ru ? "Официальное расписание ДУМК (muftyat.kz)." : "ҚМДБ ресми кестесі (muftyat.kz).")
+        : c.src === "dy" ? (ru ? "Официальное расписание Diyanet (Турция). Фаджр — время имсака." : "Diyanet ресми кестесі (Түркия). Таң — имсак уақыты.")
         : (ru ? "Расчёт по солнцу: фаджр 18°, иша 17°, аср по ханафитскому мазхабу. Уточняйте у местной мечети." : "Күн бойынша есеп: таң 18°, құптан 17°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз."))
         + (foreignTz ? (ru ? " Время указано местное для этого города." : " Уақыт осы қаланың жергілікті уақытымен.") : "")));
-    box.append(card, qiblaCard(+c.lat, +c.lng), remindCard("prayer"));
+    box.append(...[card, c.lat != null ? qiblaCard(+c.lat, +c.lng) : null, remindCard("prayer")].filter(Boolean));
   };
   draw();
 }
@@ -2198,6 +2256,26 @@ function pageTrainer(v, id) {
   v.append(wrap);
 }
 
+
+/* ═════════════ закладки на аятах ═════════════ */
+async function pageBookmarks(v) {
+  const ru = S.lang === "ru";
+  v.append(pageHead(T("suras"), ru ? "Аяты, которые вы отметили закладкой" : "Бетбелгі қойылған аяттар", quranTabs("bm")));
+  const keys = Object.entries(S.bm || {}).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+  if (!keys.length) { v.append(h("div", { class: "card stack" }, h("p", {}, ru ? "Пока пусто. Откройте суру и нажмите на значок закладки у аята." : "Әзірге бос. Сүрені ашып, аяттағы бетбелгі белгісін басыңыз."), h("a", { class: "btn", href: "#/suras" }, T("surasT")))); return; }
+  const list = h("div", { class: "stack" }); v.append(list);
+  for (const k of keys) {
+    const [sn, an] = k.split(":").map(Number), su = suraBy(sn);
+    const row = h("div", { class: "bm-row" });
+    const a = h("a", { class: "bm-a", href: `#/sura/${sn}/${an}` }, h("small", {}, `${L(su.name)}, ${an}`), h("p", { class: "ar", lang: "ar" }, "…"), h("p", { class: "bm-tl muted" }, ""));
+    const del = h("button", { class: "iconbtn", type: "button", "aria-label": ru ? "Убрать закладку" : "Бетбелгіні алу", html: icon("x") });
+    del.onclick = () => { delete S.bm[k]; save(); row.remove(); if (!Object.keys(S.bm).length) route(); };
+    row.append(a, del); list.append(row);
+    loadSura(sn).then(d => { const ay = d.ayat[an - 1]; a.querySelector(".ar").textContent = ay.sp.map(x => x[0]).join(""); }).catch(() => {});
+    loadTl(sn).then(t => { const x = t[an - 1] || ""; a.querySelector(".bm-tl").textContent = x.length > 160 ? x.slice(0, 160) + "…" : x; }).catch(() => {});
+  }
+}
+
 /* ═════════════ экзамен после модуля: 20 вопросов, зачёт от 16, сертификат ═════════════ */
 const EXAM_MIX = { 1: { letters: 7, lookalike: 5, forms: 5, listen: 3 }, 2: { harakat: 8, build: 4, listen: 5, letters: 3 },
   3: { tajweed: 10, madd: 6, harakat: 4 }, 4: { listen: 8, tajweed: 6, madd: 3, build: 3 } };
@@ -2283,6 +2361,15 @@ function pageExam(v, m) {
 /* ═════════════ профиль ═════════════ */
 const BADGE_IC = { first: "learn", m1: "ab", m2: "stand", m3: "rule", m4: "star", s3: "flame", s7: "flame", s30: "flame", t100: "target", perfect: "check", fatiha: "stand", hifz5: "star" };
 const badgeIcon = id => BADGE_IC[id] === "ab" ? '<span class="ar" lang="ar">أ ب</span>' : icon(BADGE_IC[id] || "star");
+function arzRow() {
+  const ru = S.lang === "ru";
+  const out = h("span", { class: "num arz-v" }, Math.round((S.arz || 1) * 100) + "%");
+  const r = h("input", { type: "range", min: "0.8", max: "1.6", step: "0.1", value: String(S.arz || 1), "aria-label": ru ? "Размер арабского текста" : "Араб мәтінінің өлшемі" });
+  r.oninput = () => { S.arz = +r.value; applyArz(); out.textContent = Math.round(S.arz * 100) + "%"; };
+  r.onchange = () => save();
+  return h("div", { class: "arz" }, h("div", { class: "setrow" }, h("span", {}, ru ? "Размер арабского текста" : "Араб мәтінінің өлшемі"), out), r,
+    h("p", { class: "ar arz-demo", lang: "ar" }, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"));
+}
 function pageMe(v) {
   const ru = S.lang === "ru";
   const lv = levelOf(S.xp), [lo, hi] = levelBounds(lv);
@@ -2325,6 +2412,7 @@ function pageMe(v) {
   wrap.append(h("section", { class: "card stack" }, h("h2", {}, T("settings")),
     h("div", { class: "setrow" }, h("span", {}, T("language")), langSeg),
     h("div", { class: "setrow" }, h("span", {}, T("theme")), themeSeg),
+    arzRow(),
     h("p", { class: "muted small" }, AUTH.user ? T("synced") : T("savedHere")),
     h("div", {}, h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = false }, T("resetAll"))), confirmBox));
   v.append(wrap);

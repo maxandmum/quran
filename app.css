@@ -1200,3 +1200,18 @@ body[data-page="tasbih"] main{overflow-x:clip}
 .sheet .sbox svg{width:18px;height:18px;color:var(--muted)}
 .sheet input{flex:1;border:none;background:none;font:inherit;color:var(--ink);outline:none;min-width:0}
 .sheet .btn{justify-self:start}
+
+/* размер арабского текста (настройка в профиле) */
+:root{--arz:1}
+[lang="ar"]:not([lang="ar"] [lang="ar"]){zoom:var(--arz)}
+.arz{display:grid;gap:6px}
+.arz input[type=range]{width:100%;accent-color:var(--primary)}
+.arz-demo{font-size:26px;text-align:center;color:var(--primary)}
+/* закладки */
+.iconbtn.bmk[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--primary-ink)}
+.iconbtn.bmk[aria-pressed="true"] svg{fill:currentColor}
+.bm-row{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:20px;background:var(--surface)}
+.bm-a{flex:1;min-width:0;text-decoration:none;color:var(--ink);display:grid;gap:4px}
+.bm-a small{font-weight:700;color:var(--primary)}
+.bm-a .ar{font-size:24px;line-height:1.9;text-align:right}
+.bm-tl{font-size:14px}
