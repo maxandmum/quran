@@ -29,7 +29,7 @@ function cyrTr(str) {
   }
   return out.replace(/(^|[\s'-]|[aeıiouâîû])u(?=[aeiâî])/g, "$1v");
 }
-const TRL = o => S.lang === "tr" && o && typeof o === "object" && o.ru ? cyrTr(o.ru) : L(o);
+const TRL = o => S.lang === "tr" && o && typeof o === "object" && (o.tr || o.ru) ? (o.tr || cyrTr(o.ru)) : L(o);
 // чистая транскрипция для чтения (Коран, зикры, дуа): без точек под/над буквами и макронов — таджвид остаётся только в арабском тексте
 const TLC = o => { let x = TRL(o); if (!x) return ""; if (S.lang !== "tr") x = x.replace(/h/g, "х").replace(/H/g, "Х");
   return x.normalize("NFD").replace(S.lang === "tr" ? /[\u0307\u0323\u0331]/g : /[\u0304\u0307\u0323\u0331]/g, "").replace(/[ʿʾ]/g, "").normalize("NFC"); };
@@ -670,6 +670,7 @@ async function pageHome(v) {
     tile("#/zikr", "beads", LX("Зикр", "Зікір", "Zikir"), tsbTotal() ? fmtN(tsbTotal()) : (LX("Тасбих и азкары", "Тәсбих және зікірлер", "Tesbih ve ezkâr"))),
     nextPrayerTile()));
 
+  { const r = ramadanRow(); if (r) v.append(r); }
   // курс — компактной сеткой 2×2; повторение — если есть что повторить
   if (rvDue().length) v.append(rvCard());
   else if (!started && !S.placeFrom) v.append(h("a", { class: "rv-card pl-card", href: "#/placement", html: `<span class="rv-ic">${icon("bulb")}</span><span><b>${esc(LX("Уже немного читаете?", "Аздап оқи аласыз ба?", "Biraz okuyabiliyor musunuz?"))}</b><small>${esc(LX("Входной тест подскажет, с какого модуля начать", "Кіріс тест қай модульден бастауды айтады", "Seviye testi hangi modülden başlayacağınızı söyler"))}</small></span>${icon("chev")}` }));
@@ -1575,11 +1576,11 @@ function duaCard(t, opts = {}) {
   card.append(head);
   if (t.quran) {
     const su = suraBy(t.quran.s), ay = SURA_D[t.quran.s] && SURA_D[t.quran.s].ayat[t.quran.a - 1];
-    if (ay) { const at = ayahLine(su, ay); at.classList.add("dua-ar"); card.append(at, h("p", { class: "dua-tr" }, TLC(ay.tr))); }
+    if (ay) { const at = ayahLine(su, ay); at.classList.add("dua-ar"); card.append(at, h("p", { class: "dua-tr" }, TLC(t.tl || ay.tr))); }
     const m = h("p", { class: "dua-m" }, "…"); card.append(m);
     loadTl(t.quran.s).then(a => { m.textContent = a[t.quran.a - 1]; }).catch(() => { m.textContent = T("tlErr"); });
   } else {
-    card.append(h("p", { class: "dua-ar", lang: "ar" }, t.ar), h("p", { class: "dua-tr" }, TLC(t.tr)), h("p", { class: "dua-m" }, L(t.m)));
+    card.append(h("p", { class: "dua-ar", lang: "ar" }, t.ar), h("p", { class: "dua-tr" }, TLC(t.tl || t.tr)), h("p", { class: "dua-m" }, L(t.m)));
   }
   if (t.note) card.append(h("p", { class: "dua-note", html: icon("bulb") + esc(L(t.note)) }));
   if (t.src) card.append(h("p", { class: "dua-src" }, L(t.src)));
@@ -1626,7 +1627,7 @@ async function pageNamaz(v, sub) {
   if (sub === "ramadan") return nzRamadan(v);
   if (sub) return notFound(v);
   v.append(pageHead(T("namaz"), LX("Ханафитский мазхаб · шаг за шагом", "Ханафи мазһабы · қадам-қадаммен", "Hanefi mezhebi · adım adım")), nextPrayerCard());
-  { const R = ramadanDays(); if (R.length && (R[0][0] - new Date()) / 864e5 < 45) v.append(ramadanRow()); }
+  { const r = ramadanRow(); if (r) v.append(r); }
   const poses = h("span", { class: "nz-poses" });
   const drawP = () => { poses.innerHTML = ["qiyam", "ruku", "sujud", "julus"].map(k => `<span class="nz-pose"><span class="pz">${poseSVG(k)}</span><small>${esc(L({ kk: POSE_NAMES[k][0], ru: POSE_NAMES[k][1], tr: POSE_NAMES[k][2] }))}</small></span>`).join(""); };
   drawP();
@@ -1643,15 +1644,14 @@ async function pageNamaz(v, sub) {
     h("div", { class: "nz-rlist" }, [[L(d.texts.sana.t), firstW(d.texts.sana.ar)], [LX("Аль-Фатиха", "Әл-Фатиха", "Fâtiha"), "ٱلْحَمْدُ"], [L(d.texts.tashahhud.t), firstW(d.texts.tashahhud.ar)]].map(([t, ar], i) =>
       h("a", { href: "#/namaz/read", html: `<i>${i + 1}</i><b>${esc(t)}</b><span class="ar" lang="ar">${esc(ar)}</span>` }))));
 
-  const ts = S.tsb || {};
+  // после намаза — Аят аль-Курси и витр; счётчик зикров живёт в одном месте — в разделе «Зикр»
   v.append(shelf(LX("После намаза", "Намаздан кейін", "Namazdan sonra")),
     h("div", { class: "nz-after" },
-      h("a", { class: "glass", href: "#/zikr/c/subhan", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(LX("Тасбих", "Тәсбих", "Tesbih"))}</b><small class="num">${esc(tsbTotal() ? fmtN(tsbTotal()) : "33 · 33 · 33")}</small></span>` }),
-      h("a", { class: "glass", href: "#/namaz/after", html: `<span class="t-ic ar" lang="ar">ٱللَّهُ</span><span><b>${esc(LX("Аят аль-Курси", "Аятул-Күрси", "Âyetü'l-Kürsî"))}</b><small>${esc(LX("и азкары", "және зікірлер", "ve zikirler"))}</small></span>` })),
-    h("a", { class: "nz-row", href: "#/namaz/witr", html: `<b>${esc(LX("Витр и дуа «Кунут»", "Үтір және «Құнут» дұғасы", "Vitir ve Kunut duası"))}</b>${icon("chev")}` }));
+      h("a", { class: "glass", href: "#/namaz/after", html: `<span class="t-ic ar" lang="ar">ٱللَّهُ</span><span><b>${esc(LX("Аят аль-Курси", "Аятул-Күрси", "Âyetü'l-Kürsî"))}</b><small>${esc(LX("истигфар и дуа", "истиғфар мен дұға", "istiğfar ve dua"))}</small></span>` }),
+      h("a", { class: "glass", href: "#/namaz/witr", html: `<span class="t-ic solid">${icon("moon")}</span><span><b>${esc(LX("Витр", "Үтір", "Vitir"))}</b><small>${esc(LX("и дуа «Кунут»", "және «Құнут» дұғасы", "ve Kunut duası"))}</small></span>` })));
   v.append(shelf(LX("Зикр и дуа", "Зікір мен дұға", "Zikir ve dua")),
     h("div", { class: "nz-after" },
-      h("a", { class: "glass", href: "#/zikr", html: `<span class="t-ic solid">${icon("sun")}</span><span><b>${esc(LX("Зикр", "Зікір", "Zikir"))}</b><small>${esc(azkSub())}</small></span>` }),
+      h("a", { class: "glass", href: "#/zikr", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(LX("Зикр", "Зікір", "Zikir"))}</b><small class="num">${esc(tsbTotal() ? fmtN(tsbTotal()) : LX("тасбих и азкары", "тәсбих пен зікірлер", "tesbih ve ezkâr"))}</small></span>` }),
       h("a", { class: "glass", href: "#/namaz/duas", html: `<span class="t-ic solid">${icon("learn")}</span><span><b>${esc(LX("Дуа на каждый день", "Күнделікті дұғалар", "Her gün için dualar"))}</b><small>${esc(LX("Сон, дом, еда, мечеть", "Ұйқы, үй, тамақ, мешіт", "Uyku, ev, yemek, cami"))}</small></span>` })),
     h("div", { class: "box tip nz-note" }, mdEl(d.intro)));
 }
@@ -1748,7 +1748,7 @@ function nzAfter(v, d) {
   v.append(backHead("#/namaz", LX("После намаза", "Намаздан кейін", "Namazdan sonra"), LX("Истигфар, дуа и Аят аль-Курси", "Истиғфар, дұға және Аятул-Күрси", "İstiğfar, dua ve Âyetü'l-Kürsî")));
   const wrap = h("div", { class: "stack" });
   d.after.filter(k => !["subhan", "hamd", "akbar", "tahlil"].includes(k)).forEach(k => wrap.append(duaCard(d.texts[k])));
-  wrap.append(h("a", { class: "glass", href: "#/zikr/c/subhan", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(LX("Тасбих: 33 · 33 · 33 и тахлиль", "Тәсбих: 33 · 33 · 33 және тәһлил", "Tesbih: 33 · 33 · 33 ve tehlil"))}</b><small>${esc(LX("Счётчик с карточками", "Карточкалы санағыш", "Kartlı sayaç"))}</small></span>` }));
+  wrap.append(h("a", { class: "glass", href: "#/zikr/c/subhan", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(LX("Зикр после намаза: 33 · 33 · 33", "Намаздан кейінгі зікір: 33 · 33 · 33", "Namaz sonrası zikir: 33 · 33 · 33"))}</b><small>${esc(LX("Открыть счётчик", "Санағышты ашу", "Sayacı aç"))}</small></span>` }));
   v.append(wrap);
 }
 function nzWitr(v, d) {
@@ -1796,6 +1796,18 @@ const ZK_TX = {
     m: { kk: "Аллаһ пәк және Оған мадақ — жаратылыстарының санындай, Өзі разы болғанындай, Аршының салмағындай, сөздерінің сиясындай.", ru: "Пречист Аллах и хвала Ему — столько раз, сколько Его творений, сколько угодно Ему, сколько весит Его Трон и сколько чернил нужно для Его слов.", tr: "Allah'ı, yarattıklarının sayısınca, rızası kadar, Arşının ağırlığınca ve kelimelerinin mürekkebi kadar hamd ile tesbih ederim." },
     t: { kk: "Төрт салмақты сөз", ru: "Четыре весомые фразы", tr: "Dört ağır söz" } },
 };
+// аккуратная транскрипция зикров — привычное написание, без значков над буквами
+const ZK_TL = {
+  subhan: ["Субханаллаһ", "Субханаллах", "Sübhânallah"], hamd: ["Әлхамдулиллаһ", "Альхамдулиллях", "Elhamdülillah"], akbar: ["Аллаһу әкбар", "Аллаху акбар", "Allâhü ekber"],
+  tahlil: ["Лә иләһә илләллаһу уахдаһу лә шәрикә ләһ, ләһул-мулку уә ләһул-хамду уә һуә ғалә кулли шәйин қадир", "Ля иляха илляллаху вахдаху ля шарика лях, ляхуль-мульку ва ляхуль-хамду ва хува аля кулли шайин кадир", "Lâ ilâhe illallâhü vahdehû lâ şerîke leh, lehü'l-mülkü ve lehü'l-hamdü ve hüve alâ külli şey'in kadîr"],
+  istighfar: ["Астағфируллаһ", "Астагфируллах", "Estağfirullah"], bihamdihi: ["Субханаллаһи уә бихамдиһи", "Субханаллахи ва бихамдихи", "Sübhânallâhi ve bihamdihî"],
+  azim: ["Субханаллаһи уә бихамдиһи, субханаллаһил-ғазим", "Субханаллахи ва бихамдихи, субханаллахиль-азым", "Sübhânallâhi ve bihamdihî, sübhânallâhi'l-azîm"],
+  hawqala: ["Лә хаулә уә лә қууәтә иллә билләһ", "Ля хауля ва ля куввата илля билля", "Lâ havle ve lâ kuvvete illâ billâh"],
+  salli: ["Аллаһумма салли ғалә Мухаммад", "Аллахумма салли аля Мухаммад", "Allâhümme salli alâ Muhammed"], tawhid: ["Лә иләһә илләллаһ", "Ля иляха илляллах", "Lâ ilâhe illallah"],
+  hasbunallah: ["Хасбуналлаһу уә ниғмәл-уәкил", "Хасбуналлаху ва ни'маль-вакиль", "Hasbünallâhü ve ni'me'l-vekîl"],
+  juwayriya: ["Субханаллаһи уә бихамдиһи ғадада халқиһи, уә рида нафсиһи, уә зината ғаршиһи, уә мидада кәлиматиһ", "Субханаллахи ва бихамдихи адада халкихи, ва рида нафсихи, ва зината аршихи, ва мидада калиматихи", "Sübhânallâhi ve bihamdihî adede halkıhî, ve rıdâ nefsihî, ve zinete arşihî, ve midâde kelimâtih"],
+};
+const zkTl = z => { const t = ZK_TL[z[1]]; return t ? L({ kk: t[0], ru: t[1], tr: t[2] }) : ""; };
 // [id, текст из данных намаза, цель на день]; первые четыре — тасбих после намаза (33 + 33 + 33 + 1)
 const ZK = [["subhan", "subhan", 33], ["hamd", "hamd", 33], ["akbar", "akbar", 33], ["tahlil", "tahlil", 1], ["istighfar", "istighfar", 100], ["bihamdihi", "bihamdihi", 100],
   ["tahlil100", "tahlil", 100], ["azim", "azim", 33], ["hawqala", "hawqala", 33], ["salli", "salli", 33], ["tawhid", "tawhid", 33], ["hasbunallah", "hasbunallah", 33], ["juwayriya", "juwayriya", 3]];
@@ -1835,7 +1847,7 @@ function haptic(times = 1) {
   for (let j = 1; j < times; j++) setTimeout(() => HAPT.click(), j * 160);
 }
 
-const ZK_TABS = [["", ["Барлық зікір", "Все зикры", "Tüm zikirler"]], ["fav", ["Таңдаулы", "Избранное", "Favoriler"]], ["morning", ["Таңғы", "Утренние", "Sabah"]], ["evening", ["Кешкі", "Вечерние", "Akşam"]]];
+const ZK_TABS = [["", ["Барлық зікір", "Все зикры", "Tüm zikirler"]], ["fav", ["Таңдаулы", "Избранное", "Favoriler"]], ["morning", ["Таңғы зікірлер", "Утренние азкары", "Sabah ezkârı"]], ["evening", ["Кешкі зікірлер", "Вечерние азкары", "Akşam ezkârı"]]];
 async function pageZikr(v, sub, id) {
   if (sub === "c") return zkCounter(v, id);
   const tab = ZK_TABS.some(([k]) => k === (sub || "")) ? (sub || "") : "";
@@ -1893,7 +1905,7 @@ async function zkCounter(v, id) {
   const faces = () => {
     const z = list[k], tx = zkText(d, z), f = ZF[z[0]] || ZF[z[1]];
     front.classList.toggle("long", tx.ar.length > 60);
-    front.innerHTML = `<span class="ts-ar${tx.ar.length > 30 ? " long" : ""}" lang="ar">${esc(tx.ar)}</span><span class="ts-tl">${esc(TLC(tx.tr))}</span><span class="ts-m">${esc(L(tx.m))}</span>` +
+    front.innerHTML = `<span class="ts-ar${tx.ar.length > 30 ? " long" : ""}" lang="ar">${esc(tx.ar)}</span><span class="ts-tl">${esc(zkTl(z) || TLC(tx.tr))}</span><span class="ts-m">${esc(L(tx.m))}</span>` +
       `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите — хадис об этом зикре", "Басыңыз — осы зікір туралы хадис", "Dokunun — bu zikir hakkında hadis"))}</span>`;
     back.innerHTML = f ? `<span class="ts-d">${esc(LX(`Передаётся со слов ${f[1]}, да будет доволен им Аллах, что Посланник Аллаха ﷺ сказал:`, `${f[0]} (Аллаһ оған разы болсын) жеткізеді: Аллаһтың Елшісі ﷺ былай деген:`, `${f[2]}'den (r.a.) rivayet edildiğine göre Resûlullah ﷺ şöyle buyurdu:`))}</span>` +
       `<span class="ts-q">${esc(f[3][lang])}</span><span class="pill ts-src">${esc(f[4][lang])}</span>` +
@@ -2236,9 +2248,16 @@ function ramadanDays() { // дни ближайшего (или текущего
 }
 function ramadanRow() {
   const R = ramadanDays(); if (!R.length) return null;
-  const left = Math.round((R[0][0] - new Date()) / 864e5), on = left <= 0;
+  const now = new Date(), left = Math.ceil((R[0][0] - now) / 864e5), on = left <= 0;
   const fmt = new Intl.DateTimeFormat(S.lang === "kk" ? "ru" : S.lang, { day: "numeric", month: "long" });
-  return h("a", { class: "nz-row ram-row", href: "#/namaz/ramadan", html: `<span class="ram-ic">☾</span><b>${esc(LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"))}<small>${esc(on ? LX("Идёт Рамадан", "Рамазан айы жүріп жатыр", "Ramazan devam ediyor") : `${fmt.format(R[0][0])} · ${LX(`через ${left} дн.`, `${left} күннен кейін`, `${left} gün sonra`)}`)}</small></b>${icon("chev")}` });
+  const day = on ? R.findIndex(([d]) => ymd(d) === ymd(now)) + 1 : 0;
+  const sub = on ? LX(`Идёт Рамадан · день ${day} из ${R.length}`, `Рамазан айы · ${R.length} күннің ${day}-і`, `Ramazan · ${day}. gün / ${R.length}`)
+    : LX(`Начнётся ${fmt.format(R[0][0])} · через ${left} ${plRu(left, "день", "дня", "дней")}`, `${fmt.format(R[0][0])} басталады · ${left} күннен кейін`, `${fmt.format(R[0][0])} başlıyor · ${left} gün sonra`);
+  const el = h("a", { class: "ram-card" + (on ? " on" : ""), href: "#/namaz/ramadan", html:
+    `<span class="ram-moon">${icon("moon")}</span><span class="ram-t"><b>${esc(LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"))} ${R[0][1].y}</b><small>${esc(sub)}</small><small class="ram-it"></small></span>${icon("chev")}` });
+  // во время Рамадана — сразу время сухура и ифтара на сегодня
+  if (on && S.city) timesFor(S.city, now).then(t => { const x = $(".ram-it", el); if (x) x.textContent = LX(`Сухур до ${t.fajr} · ифтар в ${t.maghrib}`, `Сәресі ${t.fajr} дейін · ауызашар ${t.maghrib}`, `İmsak ${t.fajr} · iftar ${t.maghrib}`); }).catch(() => {});
+  return el;
 }
 async function nzRamadan(v) {
   v.append(backHead("#/namaz/times", LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"), LX("Сухур и ифтар по дням", "Сәресі мен ауызашар күн сайын", "Gün gün sahur ve iftar")));

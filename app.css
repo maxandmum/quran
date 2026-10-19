@@ -1517,3 +1517,17 @@ details>summary>svg{transition:transform .25s cubic-bezier(.2,.7,.2,1)}
 .pl-res2 .pl-mod b{font-size:16px}
 .pl-res2 .row{justify-content:flex-start!important}
 .rk tfoot td.rk-all span{color:var(--primary-ink)!important;font-weight:800}
+
+/* Рамадан — заметная карточка на главной и в разделе «Намаз» */
+.ram-card{display:flex;align-items:center;gap:14px;margin:12px 0 4px;padding:14px 16px;border-radius:22px;text-decoration:none;color:var(--ink);
+  background:linear-gradient(120deg,var(--gold-soft),color-mix(in srgb,var(--gold-soft) 40%,var(--surface)));border:1px solid color-mix(in srgb,var(--gold) 30%,transparent)}
+.ram-card.on{background:linear-gradient(120deg,#163d30,#0f5a47);color:#f1efe6;border:0}
+.ram-moon{flex:none;width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:var(--surface);color:var(--warm-ink)}
+.ram-card.on .ram-moon{background:rgba(255,255,255,.12);color:#e2b877}
+.ram-moon svg{width:24px;height:24px}
+.ram-t{flex:1;min-width:0;display:grid;gap:2px}
+.ram-t b{font-size:16px}
+.ram-t small{font-size:13px;color:var(--muted)}
+.ram-card.on .ram-t small{color:#b9d0c5}
+.ram-t .ram-it:empty{display:none}
+.ram-card>svg{width:18px;height:18px;flex:none;opacity:.6}
