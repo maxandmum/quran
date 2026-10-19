@@ -1148,3 +1148,33 @@ body[data-page="tasbih"] main{overflow-x:clip}
 .wbw-tip .ar{font-size:24px;line-height:1.7;color:#f1d29e}
 .wbw-tip b{font-size:15.5px;line-height:1.3}
 .wbw-tip small{font-size:12.5px;color:var(--hero-mut)}
+
+/* ───── экзамен и сертификат ───── */
+.exam-row{display:flex;align-items:center;gap:12px;margin:10px 0 0;padding:14px 16px;border-radius:20px;border:1.5px dashed var(--line);text-decoration:none;color:var(--ink);background:var(--surface)}
+.exam-row>svg{width:18px;height:18px;color:var(--muted)}
+.exam-row.passed{border-style:solid;border-color:var(--accent)}
+.ex-ic{width:40px;height:40px;flex:none;border-radius:30%;background:var(--warm);color:var(--warm-ink);display:grid;place-items:center}
+.exam-row.passed .ex-ic{background:var(--primary-soft);color:var(--primary)}
+.ex-ic svg{width:20px;height:20px}
+.ex-t{flex:1;min-width:0;display:grid}
+.ex-t small{color:var(--muted);font-size:13px}
+.c-input{display:grid;gap:4px;margin-bottom:12px;max-width:420px}
+.c-input input{height:46px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;padding:0 14px}
+.cert{position:relative;max-width:620px;padding:36px 28px 26px;border-radius:24px;background:#fbf8f0;color:#1b2a22;text-align:center;display:grid;justify-items:center;gap:10px;
+  border:2px solid #c4914e;box-shadow:inset 0 0 0 6px #fbf8f0,inset 0 0 0 7px #e2cfa5,var(--shadow)}
+.cert .c-mark{width:64px;height:64px}
+.cert .c-mark svg{width:100%;height:100%}
+.cert .c-mark svg [stroke]{stroke:#0f5a47}
+.cert .c-kicker{letter-spacing:.24em;text-transform:uppercase;font-weight:700;color:#8a5a2b;font-size:12.5px}
+.cert .c-name{font-family:var(--serif);font-size:34px;line-height:1.15;color:#0f5a47;border-bottom:1px solid #e2cfa5;padding:0 18px 8px;min-width:60%}
+.cert p{max-width:440px;color:#3d4a43}
+.cert .c-mod{font-size:19px}
+.cert .c-row{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;font-size:14px;color:#56695e;margin-top:6px}
+.cert .c-foot{display:flex;gap:12px;align-items:baseline;margin-top:10px;font-size:12.5px;color:#56695e}
+.cert .wm{font-family:"Sora",var(--ui);font-weight:600;font-size:18px;color:#0f5a47}.cert .wm i{font-style:normal;color:#c4914e}
+@media print{
+  body *{visibility:hidden!important}
+  .cert,.cert *{visibility:visible!important}
+  .cert{position:fixed;left:50%;top:40px;transform:translateX(-50%);width:640px;max-width:none;box-shadow:inset 0 0 0 6px #fbf8f0,inset 0 0 0 7px #e2cfa5}
+  body{background:#fff!important}
+}

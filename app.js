@@ -187,7 +187,7 @@ const I = {
   beads: '<circle cx="12" cy="4.2" r="1.3"/><circle cx="16.5" cy="5.8" r="1.3"/><circle cx="18.2" cy="10" r="1.3"/><circle cx="16.5" cy="14.2" r="1.3"/><circle cx="7.5" cy="14.2" r="1.3"/><circle cx="5.8" cy="10" r="1.3"/><circle cx="7.5" cy="5.8" r="1.3"/><path d="M12 15.5v5M10.3 21.5h3.4"/>',
   flip: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5"/>', vib: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 8v8M20 8v8"/>',
   chev: '<path d="M9 6l6 6-6 6"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
-  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   flame: '<path d="M12 22c4 0 7-3 7-7 0-3-2-5.5-3.5-7-.5 2-1.5 3-3 3 .5-3-1-6-3.5-8 0 3-1.5 5-3 6.5C4.5 11 5 13 5 15c0 4 3 7 7 7z"/>',
   star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
@@ -514,6 +514,7 @@ async function route() {
     else if (p0 === "reader") { markNav("suras"); pageReader(view, p1); }
     else if (p0 === "namaz") { markNav("namaz"); await pageNamaz(view, p1); }
     else if (p0 === "tasbih") { markNav("namaz"); await pageTasbih(view); }
+    else if (p0 === "exam") { markNav("learn"); pageExam(view, +p1); }
     else if (p0 === "practice") { markNav("learn"); p1 ? pageTrainer(view, p1) : pagePractice(view); }
     else if (p0 === "me") { markNav("me"); pageMe(view); }
     else notFound(view);
@@ -609,7 +610,7 @@ function pageCourse(v) {
       ul.append(h("li", { class: locked ? "locked" : null }, h("a", { href: les.ready ? `#/lesson/${n}` : null, "aria-disabled": les.ready ? null : "true",
         html: `${rosette(n, cls)}<div class="lt"><b>${mdInline(les.title)}</b>${sub ? `<span>${esc(sub)}</span>` : ""}</div>${locked ? `<span class="lk" title="${esc(S.lang === "ru" ? "Сначала завершите предыдущие уроки" : "Алдымен алдыңғы сабақтарды аяқтаңыз")}">${icon("lock")}</span>` : ""}` })));
     }
-    sec.append(ul);
+    sec.append(ul, examRow(M));
     v.append(sec);
   }
   const target = location.hash.split("#")[2];
@@ -2068,6 +2069,88 @@ function pageTrainer(v, id) {
   };
   run();
   v.append(wrap);
+}
+
+/* ═════════════ экзамен после модуля: 20 вопросов, зачёт от 16, сертификат ═════════════ */
+const EXAM_MIX = { 1: { letters: 7, lookalike: 5, forms: 5, listen: 3 }, 2: { harakat: 8, build: 4, listen: 5, letters: 3 },
+  3: { tajweed: 10, madd: 6, harakat: 4 }, 4: { listen: 8, tajweed: 6, madd: 3, build: 3 } };
+const EXAM_N = 20, EXAM_PASS = 16;
+const modDoneN = M => { let d = 0; for (let i = M.from; i <= M.to; i++) if (isDone(i)) d++; return d; };
+function examRow(M) {
+  const ru = S.lang === "ru", e = (S.exams || {})[M.id], tot = M.to - M.from + 1, d = modDoneN(M);
+  const sub = e && e.passed ? (ru ? `Сдан: ${e.best} из ${EXAM_N}` : `Тапсырылды: ${EXAM_N}-нан ${e.best}`)
+    : e ? (ru ? `Лучший результат: ${e.best} из ${EXAM_N}` : `Ең жақсы нәтиже: ${EXAM_N}-нан ${e.best}`)
+    : d < tot ? (ru ? `Лучше после всех уроков модуля (${d} из ${tot})` : `Модульдің барлық сабағынан кейін (${tot}-нан ${d})`) : (ru ? "Все уроки пройдены — можно сдавать" : "Барлық сабақ өтілді — тапсыруға болады");
+  return h("a", { class: "exam-row" + (e && e.passed ? " passed" : ""), href: `#/exam/${M.id}`, html: `<span class="ex-ic">${icon(e && e.passed ? "check" : "star")}</span><span class="ex-t"><b>${esc(ru ? "Экзамен модуля" : "Модуль емтиханы")}</b><small>${esc(sub)}</small></span>${icon("chev")}` });
+}
+function pageExam(v, m) {
+  const ru = S.lang === "ru";
+  const M = COURSE.modules.find(x => x.id === m);
+  if (!M) return notFound(v);
+  S.exams = S.exams || {};
+  const box = h("div", { class: "read exam" });
+  v.append(backHead(`#/course#m${M.id}`, ru ? `Экзамен: модуль ${M.id}` : `Емтихан: ${M.id}-модуль`, L(M.title)), box);
+  const intro = () => {
+    box.innerHTML = "";
+    const e = S.exams[m], tot = M.to - M.from + 1, d = modDoneN(M);
+    box.append(h("section", { class: "card stack" },
+      h("p", {}, ru ? `${EXAM_N} вопросов по материалу модуля. Чтобы сдать, нужно ответить верно хотя бы на ${EXAM_PASS}. После сдачи вы получите сертификат.` : `Модуль бойынша ${EXAM_N} сұрақ. Тапсыру үшін кемінде ${EXAM_PASS} сұраққа дұрыс жауап беру керек. Тапсырған соң сертификат аласыз.`),
+      d < tot ? h("div", { class: "box warn" }, ru ? `Пройдено уроков модуля: ${d} из ${tot}. Сдавать можно и сейчас, но лучше сначала закончить уроки.` : `Модуль сабақтары: ${tot}-нан ${d} өтілді. Қазір де тапсыруға болады, бірақ алдымен сабақтарды аяқтаған жөн.`) : null,
+      e ? h("p", { class: "muted small" }, (ru ? "Лучший результат: " : "Ең жақсы нәтиже: ") + `${e.best} / ${EXAM_N}` + (e.passed ? (ru ? " — сдан" : " — тапсырылды") : "")) : null,
+      h("div", { class: "row" }, h("button", { class: "btn", onclick: run, html: icon("play") + esc(ru ? "Начать экзамен" : "Емтиханды бастау") }),
+        e && e.passed ? h("button", { class: "btn ghost", onclick: () => cert(e) }, ru ? "Мой сертификат" : "Сертификатым") : null)));
+  };
+  const run = () => {
+    const mix = EXAM_MIX[m] || EXAM_MIX[1];
+    const qs = shuffle(Object.entries(mix).flatMap(([id, k]) => Array.from({ length: k }, () => TRAINERS.find(t => t.id === id))).filter(Boolean)).slice(0, EXAM_N);
+    let i = 0, ok = 0;
+    const step = () => {
+      box.innerHTML = "";
+      if (i >= qs.length) return finish(ok);
+      const q = qs[i].make();
+      box.append(h("div", { class: "tprog", style: "display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted);margin-bottom:6px" }, h("span", {}, `${T("question")} ${i + 1} / ${qs.length}`), h("span", { class: "num" }, `✓ ${ok}`)),
+        h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${i / qs.length * 100}%` })));
+      const el = exEl(q, "tr", null, { noTag: true, single: true, onDone: good => { if (good) ok++; i++; setTimeout(step, good ? 450 : 1400); } });
+      if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
+      if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); el.querySelector(".q").after(lb); setTimeout(() => playURL(wordURL(q.listen), lb), 250); }
+      box.append(el);
+    };
+    step();
+  };
+  const finish = ok => {
+    const prev = S.exams[m] || { best: 0 };
+    const passed = ok >= EXAM_PASS;
+    const e = S.exams[m] = { best: Math.max(prev.best || 0, ok), passed: prev.passed || passed, at: passed && !prev.passed ? today() : (prev.at || (passed ? today() : null)), score: passed ? Math.max(prev.score || 0, ok) : prev.score };
+    if (passed && !prev.passed) addXP(20);
+    save();
+    box.innerHTML = "";
+    box.append(h("div", { class: "panel result" }, h("div", { class: "big" }, `${ok} / ${EXAM_N}`),
+      h("p", {}, passed ? (ru ? "Экзамен сдан! Машаллах." : "Емтихан тапсырылды! Машаллаһ.") : (ru ? `Пока не сдан: нужно ${EXAM_PASS}. Повторите уроки и попробуйте снова.` : `Әзірге тапсырылмады: ${EXAM_PASS} керек. Сабақтарды қайталап, қайта көріңіз.`)),
+      h("div", { class: "row", style: "justify-content:center" },
+        passed ? h("button", { class: "btn", onclick: () => cert(e) }, ru ? "Получить сертификат" : "Сертификат алу") : h("button", { class: "btn", onclick: run }, T("again")),
+        h("a", { class: "btn ghost", href: `#/course#m${M.id}` }, ru ? "К курсу" : "Курсқа"))));
+  };
+  const cert = e => {
+    box.innerHTML = "";
+    const nm = h("input", { type: "text", value: S.certName || (AUTH.user && AUTH.user.displayName) || "", placeholder: ru ? "Ваше имя для сертификата" : "Сертификаттағы атыңыз", "aria-label": ru ? "Имя" : "Аты", maxlength: "60" });
+    const nameEl = h("div", { class: "c-name" });
+    const upd = () => { S.certName = nm.value.trim(); save(); nameEl.textContent = S.certName || (ru ? "Имя Фамилия" : "Аты-жөні"); };
+    nm.oninput = upd;
+    const date = new Intl.DateTimeFormat(ru ? "ru-RU" : "kk-KZ", { day: "numeric", month: "long", year: "numeric" }).format(e.at ? new Date(e.at) : new Date());
+    const card = h("section", { class: "cert" },
+      h("div", { class: "c-mark", html: MARK }),
+      h("small", { class: "c-kicker" }, ru ? "Сертификат" : "Сертификат"),
+      nameEl,
+      h("p", {}, ru ? `успешно сдал(а) экзамен по модулю ${M.id} курса чтения Корана` : `Құран оқу курсының ${M.id}-модулі бойынша емтиханды сәтті тапсырды`),
+      h("b", { class: "c-mod" }, `«${L(M.title)}»`),
+      h("div", { class: "c-row" }, h("span", {}, (ru ? "Результат: " : "Нәтиже: ") + `${e.score || e.best} / ${EXAM_N}`), h("span", {}, date)),
+      h("div", { class: "c-foot", html: `<span class="wm">iqra<i>.</i></span><span>maxandmum.github.io/quran</span>` }));
+    upd();
+    box.append(h("label", { class: "c-input" }, h("span", { class: "muted small" }, ru ? "Имя на сертификате" : "Сертификаттағы аты"), nm), card,
+      h("div", { class: "row", style: "margin-top:14px" }, h("button", { class: "btn", onclick: () => window.print(), html: icon("download") + esc(ru ? "Распечатать или сохранить PDF" : "Басып шығару не PDF сақтау") }),
+        h("a", { class: "btn ghost", href: `#/course#m${M.id}` }, ru ? "К курсу" : "Курсқа")));
+  };
+  intro();
 }
 
 /* ═════════════ профиль ═════════════ */
