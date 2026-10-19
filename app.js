@@ -70,7 +70,7 @@ const UI = {
   hzHint: ["Жасырылған сөзді басып, тексеріңіз. Аятты есте сақтағанда «Жаттадым» белгісін қойыңыз.",
     "Нажмите на скрытое слово, чтобы проверить себя. Отметьте «Выучил(а)», когда помните аят."],
   audioErr: ["Аудио жүктелмеді. Интернетті тексеріңіз.", "Аудио не загрузилось. Проверьте интернет."],
-  tapWord: ["Сөзді басып, жеке тыңдауға болады", "Нажмите на слово, чтобы услышать его отдельно"],
+  tapWord: ["Сөзді басып, жеке тыңдауға болады", "Нажмите на слово, чтобы услышать его отдельно"], tapWordWbw: ["Сөзді басыңыз — оны естисіз және аудармасын көресіз", "Нажмите на слово — услышите его и увидите перевод"],
   trainers: ["Тренажёрлар", "Тренажёры"], startTr: ["Бастау", "Начать"], again: ["Тағы бір рет", "Ещё раз"],
   question: ["Сұрақ", "Вопрос"], result: ["Нәтиже", "Результат"], correct: ["дұрыс", "верно"],
   backTr: ["Тренажёрлерге", "К тренажёрам"], plusXp: ["ұпай", "очков"],
@@ -1175,6 +1175,23 @@ function ayahWordsHTML(sp) {
   }
   return words.filter(w => w.length);
 }
+// пословный перевод (рус/каз) — для «Аль-Фатихи» и сур 93–114
+const WBW_SURAS = new Set([1, ...Array.from({ length: 22 }, (_, i) => 93 + i)]);
+let WBW = null;
+const loadWBW = () => WBW || (WBW = fetchJSON("data/wbw.json").catch(e => { WBW = null; throw e; }));
+let WBW_D = null;
+function showGloss(sp, s, a, i, arText) {
+  document.querySelectorAll(".wbw-tip").forEach(x => x.remove());
+  const g = WBW_D && WBW_D[s] && WBW_D[s][a - 1] && WBW_D[s][a - 1][i];
+  if (!g) return;
+  const tip = h("div", { class: "wbw-tip", role: "status" }, h("span", { class: "ar", lang: "ar" }, arText), h("b", {}, S.lang === "ru" ? g[0] : g[1]), h("small", {}, S.lang === "ru" ? g[1] : g[0]));
+  document.body.append(tip);
+  const r = sp.getBoundingClientRect(), w = tip.offsetWidth;
+  tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+  tip.style.top = (r.bottom + window.scrollY + 6) + "px";
+  const off = e => { if (!tip.contains(e.target) && e.target !== sp && !sp.contains(e.target)) { tip.remove(); document.removeEventListener("pointerdown", off, true); } };
+  setTimeout(() => document.addEventListener("pointerdown", off, true), 0);
+}
 function ayahLine(sura, ay, mode = 0, peek) {
   const at = h("div", { class: "at", lang: "ar" });
   const ws = ayahWordsHTML(ay.sp);
@@ -1188,6 +1205,7 @@ function ayahLine(sura, ay, mode = 0, peek) {
       if (sp.classList.contains("hidew")) { sp.classList.add("peek"); }
       if (sp.classList.contains("firstl")) { sp.classList.remove("firstl"); sp.innerHTML = html; }
       playURL(wordURL(`${sura.n}:${ay.n}:${i + 1}`), sp);
+      if (mode === 0 && WBW_D && WBW_D[sura.n]) showGloss(sp, sura.n, ay.n, i, w.map(x => x[0]).join(""));
     };
     at.append(sp, " ");
   });
@@ -1253,6 +1271,7 @@ function suraEmbed(n) {
 async function pageSura(v, n, hifz, goto) {
   const s = suraBy(n);
   if (!s) return notFound(v);
+  if (WBW_SURAS.has(n)) { try { WBW_D = await loadWBW(); } catch (e) {} }
   const loading = h("div", { class: "loading" }, "…"); v.append(loading);
   let d;
   try { d = await loadSura(n); } catch (e) { loading.textContent = T("audioErr"); return; }
@@ -1291,7 +1310,7 @@ async function pageSura(v, n, hifz, goto) {
     ["hz0", "hz1", "hz2", "hz3"].forEach((k, i) => { const b = h("button", { class: "tog", "aria-pressed": String(i === 0) }, T(k)); b.onclick = () => { hzLevel = i; $$("button", lv).forEach((x, j) => x.setAttribute("aria-pressed", String(j === i))); draw(); }; lv.append(b); });
     wrap.append(lv, h("p", { class: "muted small", style: "margin-top:8px" }, T("hzHint")));
   } else {
-    wrap.append(h("p", { class: "muted small", style: "margin-top:10px" }, T("tapWord")));
+    wrap.append(h("p", { class: "muted small", style: "margin-top:10px" }, T(WBW_SURAS.has(n) && WBW_D ? "tapWordWbw" : "tapWord")));
   }
   if (n !== 1 && n !== 9) wrap.append(h("div", { class: "bism", lang: "ar" }, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"));
   const list = h("div", { class: "ayahs" + (S.view.color || hifz ? "" : " nocolor") + (S.view.tr && !hifz ? "" : " notr") + (S.view.tl && !hifz ? "" : " notl") });
