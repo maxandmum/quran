@@ -30,6 +30,9 @@ function cyrTr(str) {
   return out.replace(/(^|[\s'-]|[aeıiouâîû])u(?=[aeiâî])/g, "$1v");
 }
 const TRL = o => S.lang === "tr" && o && typeof o === "object" && o.ru ? cyrTr(o.ru) : L(o);
+// чистая транскрипция для чтения (Коран, зикры, дуа): без точек под/над буквами и макронов — таджвид остаётся только в арабском тексте
+const TLC = o => { let x = TRL(o); if (!x) return ""; if (S.lang !== "tr") x = x.replace(/h/g, "х").replace(/H/g, "Х");
+  return x.normalize("NFD").replace(S.lang === "tr" ? /[\u0307\u0323\u0331]/g : /[\u0304\u0307\u0323\u0331]/g, "").replace(/[ʿʾ]/g, "").normalize("NFC"); };
 const LX = (r, k, t) => S.lang === "ru" ? r : S.lang === "tr" ? t : k;
 const L = o => o == null ? "" : (typeof o === "string" ? o : (o[S.lang] ?? (S.lang === "tr" ? o.ru : undefined) ?? o.kk ?? ""));
 const applyArz = () => document.documentElement.style.setProperty("--arz", String(S.arz || 1));
@@ -554,15 +557,38 @@ const backHead = (href, title, sub, extra) => h("header", { class: "bhead" }, h(
   h("div", { class: "bh-t" }, h("h1", {}, title), sub ? h("p", { class: "muted small" }, sub) : null), extra || null);
 const fmtN = n => Number(n || 0).toLocaleString(LX("ru-RU", "kk-KZ", "tr-TR"));
 
+/* ───── всплывающее напоминание о правиле таджвида ───── */
+let RTIP = null;
+async function ruleTip(k, at) {
+  if (RTIP) { const same = RTIP.k === k; RTIP.el.remove(); RTIP = null; if (same) return; }
+  const c = CORE.rules[k]; let r = null; try { r = (await loadTJ()).rules[k]; } catch (e) {}
+  const el = h("div", { class: "rtip", role: "dialog", style: `--rc:${RC(k)}` },
+    h("div", { class: "rtip-h" }, h("i"), h("b", {}, L(c.name)), h("button", { class: "rtip-x", type: "button", "aria-label": LX("Закрыть", "Жабу", "Kapat"), html: icon("x"), onclick: () => close() })),
+    h("p", {}, L(c.short)), r && r.simple ? mdEl(r.simple, "md rtip-d") : null,
+    r && r.letters ? h("div", { class: "rtip-l", lang: "ar" }, r.letters.split(" ").map(x => h("span", {}, x))) : null,
+    h("a", { href: `#/ref/rule/${k}` }, LX("Правило подробно →", "Ереже толығырақ →", "Kural ayrıntılı →")));
+  document.body.append(el);
+  const b = at.getBoundingClientRect(), W = document.documentElement.clientWidth, w = Math.min(320, W - 24);
+  el.style.width = w + "px"; el.style.left = Math.max(12, Math.min(W - w - 12, b.left + b.width / 2 - w / 2)) + "px";
+  const below = b.bottom + 8 + el.offsetHeight < innerHeight - 90;
+  el.style.top = (below ? b.bottom + 8 : Math.max(8, b.top - 8 - el.offsetHeight)) + window.scrollY + "px";
+  requestAnimationFrame(() => el.classList.add("in"));
+  const close = () => { el.remove(); RTIP = null; document.removeEventListener("pointerdown", out, true); };
+  const out = e => { if (!el.contains(e.target) && e.target !== at) close(); };
+  setTimeout(() => document.addEventListener("pointerdown", out, true), 0);
+  RTIP = { k, el };
+}
 /* ═════════════ маршрутизация ═════════════ */
 async function route() {
   if (ASK_DISMISS) ASK_DISMISS();
+  if (RTIP) { RTIP.el.remove(); RTIP = null; }
   stopAudio(); onListenChange = null;
   if ("speechSynthesis" in window) speechSynthesis.cancel();
   const view = $("#view");
-  const parts = (location.hash.replace(/^#\/?/, "") || "").split("/").map(decodeURIComponent);
+  const parts = (location.hash.replace(/^#\/?/, "").split("#")[0].split("?")[0] || "").split("/").map(decodeURIComponent); // «#/course#m1» → course
   const [p0, p1, p2] = parts;
   view.innerHTML = "";
+  view.classList.remove("vin"); void view.offsetWidth; view.classList.add("vin");
   document.body.dataset.page = p0 || "home";
   window.scrollTo(0, 0);
   try {
@@ -575,7 +601,8 @@ async function route() {
     else if (p0 === "listen") { markNav("suras"); pageReaders(view); }
     else if (p0 === "reader") { markNav("suras"); pageReader(view, p1); }
     else if (p0 === "namaz") { markNav("namaz"); await pageNamaz(view, p1); }
-    else if (p0 === "tasbih") { markNav("namaz"); await pageTasbih(view); }
+    else if (p0 === "tasbih") { location.replace("#/zikr"); return; }
+    else if (p0 === "zikr") { markNav("namaz"); await pageZikr(view, p1, p2); }
     else if (p0 === "bookmarks") { markNav("suras"); await pageBookmarks(view); }
     else if (p0 === "exam") { markNav("learn"); pageExam(view, +p1); }
     else if (p0 === "review") { markNav("learn"); await pageReview(view); }
@@ -606,9 +633,9 @@ function ayahOfDay() {
   const box = h("section", { class: "aod", "aria-label": LX("Аят дня", "Күн аяты", "Günün ayeti") });
   const play = h("button", { class: "aod-play", type: "button", "aria-label": T("play"), html: icon("play") });
   play.onclick = () => playURL(ayahURL(as, aa), box);
-  box.append(h("div", { class: "aod-h", html: `${icon("star")}<b>${esc(LX("Аят дня", "Күн аяты", "Günün ayeti"))}</b><a href="#/sura/${as}/${aa}">${esc(L(su.name))}, ${aa}</a>` }, play));
+  box.append(h("div", { class: "aod-h", html: `${icon("star")}<b>${esc(LX("Аят дня", "Күн аяты", "Günün ayeti"))}</b>` }, play));
   const arEl = h("div", { class: "aod-ar", lang: "ar" }, "…"), tlEl = h("p", { class: "aod-tl" });
-  box.append(arEl, tlEl);
+  box.append(arEl, tlEl, h("a", { class: "aod-src", href: `#/sura/${as}/${aa}` }, `${LX("Сура", "Сүре", "Sure")} ${L(su.name)} · ${LX("аят", "аят", "ayet")} ${aa}`));
   loadSura(as).then(d => { const a = d.ayat[aa - 1]; arEl.innerHTML = esc(a.sp.map(x => x[0]).join("")) + " " + ayahMark(aa); }).catch(() => { arEl.textContent = ""; });
   loadTl(as).then(t => { tlEl.textContent = t[aa - 1] || ""; }).catch(() => {});
   return box;
@@ -640,7 +667,7 @@ async function pageHome(v) {
     tile(lastS ? `#/sura/${lastS.n}/${S.last.a}` : "#/suras", "stand", lastS ? T("contRead") : T("suras"),
       lastS ? `${L(lastS.name)}, ${S.last.a} ${T("ayahN")}` : (LX("114 сур с переводом", "114 сүре, аудармасымен", "114 sure, mealiyle"))),
     tile("#/me", "flame", LX(`${st} ${plRu(st, "день", "дня", "дней")} подряд`, `${st} күн қатарынан`, `${st} gün üst üste`), LX(`Цель на день — ${goal} очков`, `Күндік мақсат — ${goal} ұпай`, `Günlük hedef — ${goal} puan`), "warm"),
-    tile("#/tasbih", "beads", LX("Тасбих", "Тәсбих", "Tesbih"), tsbTotal() ? fmtN(tsbTotal()) : (LX("После намаза", "Намаздан кейін", "Namazdan sonra"))),
+    tile("#/zikr", "beads", LX("Зикр", "Зікір", "Zikir"), tsbTotal() ? fmtN(tsbTotal()) : (LX("Тасбих и азкары", "Тәсбих және зікірлер", "Tesbih ve ezkâr"))),
     nextPrayerTile()));
 
   // курс — компактной сеткой 2×2; повторение — если есть что повторить
@@ -1423,9 +1450,11 @@ async function pageSura(v, n, hifz, goto) {
         right.append(bb);
       }
       right.append(pb);
-      const meta = h("div", { class: "meta" }, h("span", { class: "tr" }, TRL(a.tr)), h("span", { class: "rl" }), right);
-      $(".rl", meta).innerHTML = hifz ? "" : a.r.map(r => `<span style="color:${RC(r)}">${esc(L(CORE.rules[r].name))}</span>`).join("");
+      const meta = h("div", { class: "meta" }, h("span", { class: "tr" }, TLC(a.tr)), right);
+      // правила таджвида в аяте — отдельные метки; по нажатию — напоминание о правиле
+      if (!hifz && a.r.length) card.append(h("div", { class: "rl" }, [...new Set(a.r)].map(r => h("button", { type: "button", class: "rl-b", style: `--rc:${RC(r)}`, onclick: e => ruleTip(r, e.currentTarget) }, L(CORE.rules[r].name)))));
       card.append(meta);
+      card.prepend(h("span", { class: "ay-no num", "aria-label": `${LX("Аят", "Аят", "Ayet")} ${a.n}` }, a.n));
       if (!hifz) card.append(h("p", { class: "tl" }, tlData ? tlData[i] || "" : ""));
       cards.push(card); list.append(card);
     });
@@ -1546,11 +1575,11 @@ function duaCard(t, opts = {}) {
   card.append(head);
   if (t.quran) {
     const su = suraBy(t.quran.s), ay = SURA_D[t.quran.s] && SURA_D[t.quran.s].ayat[t.quran.a - 1];
-    if (ay) { const at = ayahLine(su, ay); at.classList.add("dua-ar"); card.append(at, h("p", { class: "dua-tr" }, TRL(ay.tr))); }
+    if (ay) { const at = ayahLine(su, ay); at.classList.add("dua-ar"); card.append(at, h("p", { class: "dua-tr" }, TLC(ay.tr))); }
     const m = h("p", { class: "dua-m" }, "…"); card.append(m);
     loadTl(t.quran.s).then(a => { m.textContent = a[t.quran.a - 1]; }).catch(() => { m.textContent = T("tlErr"); });
   } else {
-    card.append(h("p", { class: "dua-ar", lang: "ar" }, t.ar), h("p", { class: "dua-tr" }, TRL(t.tr)), h("p", { class: "dua-m" }, L(t.m)));
+    card.append(h("p", { class: "dua-ar", lang: "ar" }, t.ar), h("p", { class: "dua-tr" }, TLC(t.tr)), h("p", { class: "dua-m" }, L(t.m)));
   }
   if (t.note) card.append(h("p", { class: "dua-note", html: icon("bulb") + esc(L(t.note)) }));
   if (t.src) card.append(h("p", { class: "dua-src" }, L(t.src)));
@@ -1592,7 +1621,7 @@ async function pageNamaz(v, sub) {
   if (sub === "after") { await loadSura(2); return nzAfter(v, d); }
   if (sub === "witr") return nzWitr(v, d);
   if (sub === "times") return nzTimes(v);
-  if (sub === "azkar") return nzAzkar(v);
+  if (sub === "azkar") { location.replace("#/zikr/morning"); return; }
   if (sub === "duas") return nzDuas(v);
   if (sub === "ramadan") return nzRamadan(v);
   if (sub) return notFound(v);
@@ -1617,12 +1646,12 @@ async function pageNamaz(v, sub) {
   const ts = S.tsb || {};
   v.append(shelf(LX("После намаза", "Намаздан кейін", "Namazdan sonra")),
     h("div", { class: "nz-after" },
-      h("a", { class: "glass", href: "#/tasbih", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(LX("Тасбих", "Тәсбих", "Tesbih"))}</b><small class="num">${esc(tsbTotal() ? fmtN(tsbTotal()) : "33 · 33 · 33")}</small></span>` }),
+      h("a", { class: "glass", href: "#/zikr/c/subhan", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(LX("Тасбих", "Тәсбих", "Tesbih"))}</b><small class="num">${esc(tsbTotal() ? fmtN(tsbTotal()) : "33 · 33 · 33")}</small></span>` }),
       h("a", { class: "glass", href: "#/namaz/after", html: `<span class="t-ic ar" lang="ar">ٱللَّهُ</span><span><b>${esc(LX("Аят аль-Курси", "Аятул-Күрси", "Âyetü'l-Kürsî"))}</b><small>${esc(LX("и азкары", "және зікірлер", "ve zikirler"))}</small></span>` })),
     h("a", { class: "nz-row", href: "#/namaz/witr", html: `<b>${esc(LX("Витр и дуа «Кунут»", "Үтір және «Құнут» дұғасы", "Vitir ve Kunut duası"))}</b>${icon("chev")}` }));
-  v.append(shelf(LX("Азкары и дуа", "Зікірлер мен дұғалар", "Zikirler ve dualar")),
+  v.append(shelf(LX("Зикр и дуа", "Зікір мен дұға", "Zikir ve dua")),
     h("div", { class: "nz-after" },
-      h("a", { class: "glass", href: "#/namaz/azkar", html: `<span class="t-ic solid">${icon("sun")}</span><span><b>${esc(LX("Утро и вечер", "Таң мен кеш", "Sabah ve akşam"))}</b><small>${esc(azkSub())}</small></span>` }),
+      h("a", { class: "glass", href: "#/zikr", html: `<span class="t-ic solid">${icon("sun")}</span><span><b>${esc(LX("Зикр", "Зікір", "Zikir"))}</b><small>${esc(azkSub())}</small></span>` }),
       h("a", { class: "glass", href: "#/namaz/duas", html: `<span class="t-ic solid">${icon("learn")}</span><span><b>${esc(LX("Дуа на каждый день", "Күнделікті дұғалар", "Her gün için dualar"))}</b><small>${esc(LX("Сон, дом, еда, мечеть", "Ұйқы, үй, тамақ, мешіт", "Uyku, ev, yemek, cami"))}</small></span>` })),
     h("div", { class: "box tip nz-note" }, mdEl(d.intro)));
 }
@@ -1642,7 +1671,7 @@ function nzHow(v, d) {
     ol.append(li);
   });
   const c = carousel([...ol.children], ol, "nzStep", LX("Шаг", "Қадам", "Adım"));
-  v.append(c.nav, ol, c.foot);
+  v.append(c.nav, h("div", { class: "slide-clip" }, ol), c.foot);
 }
 /* карусель «по одному»: стрелки, точки, свайп, кнопки внизу; позиция помнится в рамках вкладки */
 function carousel(lis, box, key, word, mark) {
@@ -1657,8 +1686,10 @@ function carousel(lis, box, key, word, mark) {
   const fn = h("button", { class: "btn", onclick: () => go(at + 1, 1) }, LX("Дальше →", "Келесі →", "İleri →"));
   const foot = h("div", { class: "st-foot" }, fb, fn);
   const paint = () => [...dots.children].forEach((b, k) => b.className = [k === at ? "on" : k < at ? "past" : "", mark && mark(k) ? "ok" : ""].join(" ").trim());
-  const go = (i, scroll) => { at = Math.max(0, Math.min(N - 1, i)); try { sessionStorage.setItem(key, at); } catch (e) {}
-    lis.forEach((li, k) => li.hidden = k !== at); paint();
+  const go = (i, scroll) => { const was = at; at = Math.max(0, Math.min(N - 1, i)); try { sessionStorage.setItem(key, at); } catch (e) {}
+    lis.forEach((li, k) => { li.hidden = k !== at; li.classList.remove("in-l", "in-r"); });
+    if (scroll && was !== at) { void lis[at].offsetWidth; lis[at].classList.add(at > was ? "in-r" : "in-l"); }
+    paint();
     lbl.textContent = `${at + 1} / ${N}`; prev.disabled = fb.disabled = at === 0; next.disabled = fn.disabled = at === N - 1;
     if (scroll && nav.getBoundingClientRect().top < 0) nav.scrollIntoView({ block: "start" }); };
   prev.onclick = () => go(at - 1, 1); next.onclick = () => go(at + 1, 1);
@@ -1717,7 +1748,7 @@ function nzAfter(v, d) {
   v.append(backHead("#/namaz", LX("После намаза", "Намаздан кейін", "Namazdan sonra"), LX("Истигфар, дуа и Аят аль-Курси", "Истиғфар, дұға және Аятул-Күрси", "İstiğfar, dua ve Âyetü'l-Kürsî")));
   const wrap = h("div", { class: "stack" });
   d.after.filter(k => !["subhan", "hamd", "akbar", "tahlil"].includes(k)).forEach(k => wrap.append(duaCard(d.texts[k])));
-  wrap.append(h("a", { class: "glass", href: "#/tasbih", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(LX("Тасбих: 33 · 33 · 33 и тахлиль", "Тәсбих: 33 · 33 · 33 және тәһлил", "Tesbih: 33 · 33 · 33 ve tehlil"))}</b><small>${esc(LX("Счётчик с карточками", "Карточкалы санағыш", "Kartlı sayaç"))}</small></span>` }));
+  wrap.append(h("a", { class: "glass", href: "#/zikr/c/subhan", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(LX("Тасбих: 33 · 33 · 33 и тахлиль", "Тәсбих: 33 · 33 · 33 және тәһлил", "Tesbih: 33 · 33 · 33 ve tehlil"))}</b><small>${esc(LX("Счётчик с карточками", "Карточкалы санағыш", "Kartlı sayaç"))}</small></span>` }));
   v.append(wrap);
 }
 function nzWitr(v, d) {
@@ -1726,42 +1757,51 @@ function nzWitr(v, d) {
     h("div", { class: "stack" }, h("div", { class: "box tip" }, mdEl(d.witr)), duaCard(d.texts.qunut)));
 }
 
-/* ───── тасбих: зикры листаются, у каждого свой счёт (сегодня и за всё время), карточка переворачивается ───── */
-const TS_FACT = {
-  subhan: { kk: ["«Субханаллаһ» мен «Әлхамдулиллаһ» аспан мен жердің арасын толтырады", "Пайғамбар ﷺ осы екі қысқа сөздің сауабы соншалықты үлкен екенін айтқан.", "Хадис, Муслим, 223"],
-    ru: ["«Субханаллах» и «Альхамдулиллях» наполняют пространство между небесами и землёй", "Пророк ﷺ сказал, что награда за эти два коротких слова настолько велика.", "Хадис, Муслим, 223"],
-    tr: ["«Sübhânallah» ve «Elhamdülillah» gökler ile yerin arasını doldurur", "Peygamber ﷺ bu iki kısa sözün sevabının bu kadar büyük olduğunu söyledi.", "Hadis, Müslim, 223"] },
-  hamd: { kk: ["«Әлхамдулиллаһ» таразыны толтырады", "Пайғамбар ﷺ осы бір қысқа сөз Қиямет күні таразы табағын толтыратындай салмақты екенін айтқан.", "Хадис, Муслим, 223"],
-    ru: ["«Альхамдулиллях» наполняет Весы", "Пророк ﷺ сказал, что одно это короткое слово так весомо, что заполняет чашу Весов в Судный день.", "Хадис, Муслим, 223"],
-    tr: ["«Elhamdülillah» mizanı doldurur", "Peygamber ﷺ bu tek kısa sözün kıyamet günü mizanın kefesini dolduracak kadar ağır olduğunu söyledi.", "Hadis, Müslim, 223"] },
-  akbar: { kk: ["Аллаһқа ең сүйікті төрт сөз", "«Субханаллаһ, Әлхамдулиллаһ, Лә иләһә илләллаһ, Аллаһу әкбар». Қайсысынан бастасаң да, бәрібір.", "Хадис, Муслим, 2137"],
-    ru: ["Четыре самых любимых Аллахом слова", "«Субханаллах, Альхамдулиллях, Ля иляха илляллах, Аллаху акбар». Неважно, с какого из них начать.", "Хадис, Муслим, 2137"],
-    tr: ["Allah'a en sevimli dört söz", "«Sübhânallah, Elhamdülillah, Lâ ilâhe illallah, Allâhu ekber». Hangisiyle başladığın fark etmez.", "Hadis, Müslim, 2137"] },
-  tahlil: { kk: ["Күнәлар теңіз көбігіндей болса да кешіріледі", "Әр намаздан кейін 33 тәсбих, 33 тахмид, 33 тәкбір айтып, жүзін осы тәһлилмен толықтырған адамға осылай уәде етілген.", "Хадис, Муслим, 597"],
-    ru: ["Грехи простятся, даже если их как морской пены", "Так обещано тому, кто после каждого намаза скажет 33 раза тасбих, 33 — тахмид, 33 — такбир и завершит сотню этим тахлилем.", "Хадис, Муслим, 597"],
-    tr: ["Deniz köpüğü kadar olsa da günahlar bağışlanır", "Her namazdan sonra 33 tesbih, 33 tahmid, 33 tekbir söyleyip yüzü bu tehlille tamamlayana böyle vaat edildi.", "Hadis, Müslim, 597"] },
-  istighfar: { kk: ["Пайғамбар ﷺ күніне жетпіс реттен көп кешірім сұрайтын", "«Аллаһқа ант етемін, мен күніне жетпіс реттен көп Аллаһтан кешірім сұрап, Оған тәубе етемін», — деген.", "Хадис, Бұхари, 6307"],
-    ru: ["Пророк ﷺ просил прощения больше семидесяти раз в день", "Он сказал: «Клянусь Аллахом, я прошу у Аллаха прощения и каюсь перед Ним больше семидесяти раз в день».", "Хадис, аль-Бухари, 6307"],
-    tr: ["Peygamber ﷺ günde yetmişten fazla istiğfar ederdi", "«Allah'a yemin ederim ki ben günde yetmişten fazla Allah'tan bağışlanma diler ve O'na tövbe ederim» buyurdu.", "Hadis, Buhârî, 6307"] },
-  bihamdihi: { kk: ["Күніне жүз рет — күнәлар кешіріледі", "Кім күніне жүз рет «Субханаллаһи уа бихамдиһи» десе, күнәлары теңіз көбігіндей болса да өшіріледі.", "Хадис, Бұхари, 6405; Муслим, 2691"],
-    ru: ["Сто раз в день — и грехи стёрты", "Кто скажет «Субханаллахи ва бихамдихи» сто раз в день, с того снимутся грехи, даже если их как морской пены.", "Хадис, аль-Бухари, 6405; Муслим, 2691"],
-    tr: ["Günde yüz kez — günahlar silinir", "Kim günde yüz kez «Sübhânallâhi ve bihamdihî» derse, deniz köpüğü kadar olsa da günahları silinir.", "Hadis, Buhârî, 6405; Müslim, 2691"] },
-  azim: { kk: ["Тілге жеңіл, таразыда ауыр екі сөз", "Пайғамбар ﷺ: «Тілге жеңіл, таразыда ауыр, Рахманға сүйікті екі сөз бар», — деп, осы зікірді айтқан.", "Хадис, Бұхари, 6406; Муслим, 2694"],
-    ru: ["Два слова: лёгкие для языка, тяжёлые на Весах", "Пророк ﷺ сказал: «Есть два слова, лёгкие для языка, тяжёлые на Весах и любимые Милостивым», — и назвал этот зикр.", "Хадис, аль-Бухари, 6406; Муслим, 2694"],
-    tr: ["Dile hafif, mizanda ağır iki söz", "Peygamber ﷺ «Dile hafif, mizanda ağır, Rahmân'a sevimli iki söz vardır» buyurup bu zikri söyledi.", "Hadis, Buhârî, 6406; Müslim, 2694"] },
-  hawqala: { kk: ["Жәннат қазыналарының бірі", "Пайғамбар ﷺ «Лә хауля уа лә қуууата илла билләһ» сөзін жәннат қазыналарының бірі деп атаған.", "Хадис, Бұхари, 4205; Муслим, 2704"],
-    ru: ["Одно из сокровищ Рая", "Пророк ﷺ назвал слова «Ля хауля ва ля куввата илля билла» одним из сокровищ Рая.", "Хадис, аль-Бухари, 4205; Муслим, 2704"],
-    tr: ["Cennet hazinelerinden biri", "Peygamber ﷺ «Lâ havle velâ kuvvete illâ billâh» sözünü cennet hazinelerinden biri olarak andı.", "Hadis, Buhârî, 4205; Müslim, 2704"] },
-  salli: { kk: ["Бір салауатқа — он рақым", "Кім Пайғамбарға ﷺ бір рет салауат айтса, Аллаһ оған он рет игілік береді.", "Хадис, Муслим, 408"],
-    ru: ["За один салават — десять благословений", "Кто благословит Пророка ﷺ один раз, того Аллах благословит десять раз.", "Хадис, Муслим, 408"],
-    tr: ["Bir salavata on rahmet", "Kim Peygamber'e ﷺ bir kez salavat getirirse, Allah ona on kez rahmet eder.", "Hadis, Müslim, 408"] },
-  tawhid: { kk: ["Зікірдің ең абзалы", "Пайғамбар ﷺ: «Зікірдің ең абзалы — Лә иләһә илләллаһ», — деген.", "Хадис, Тирмизи, 3383"],
-    ru: ["Лучший из зикров", "Пророк ﷺ сказал: «Лучший зикр — „Ля иляха илляллах“».", "Хадис, ат-Тирмизи, 3383"],
-    tr: ["Zikrin en faziletlisi", "Peygamber ﷺ «Zikrin en faziletlisi Lâ ilâhe illallah'tır» buyurdu.", "Hadis, Tirmizî, 3383"] },
+/* ═════════════ зикр: все зикры, избранное, утренние и вечерние азкары ═════════════
+   У каждого зикра свой счёт (сегодня и за всё время); карточка переворачивается — на обороте хадис с источником. */
+// хадисы перепроверены по номерам: аль-Бухари и Муслим — нумерация Фуада Абдуль-Баки; ат-Тирмизи — по изданию Шакира
+const ZF = {
+  subhan: ["Абу Малик әл-Әшғари", "Абу Малика аль-Ашари", "Ebû Mâlik el-Eş'arî",
+    ["«Субханаллаһ» мен «Әлхамдулиллаһ» аспандар мен жердің арасын толтырады", "«„Субханаллах“ и „Альхамдулиллях“ наполняют то, что между небесами и землёй»", "«Sübhânallah ve Elhamdülillah gökler ile yer arasını doldurur»"], ["Муслим, 223", "Сахих Муслим, 223", "Müslim, 223"]],
+  hamd: ["Абу Малик әл-Әшғари", "Абу Малика аль-Ашари", "Ebû Mâlik el-Eş'arî",
+    ["«Әлхамдулиллаһ» таразыны толтырады", "«„Альхамдулиллях“ наполняет Весы»", "«Elhamdülillah mizanı doldurur»"], ["Муслим, 223", "Сахих Муслим, 223", "Müslim, 223"]],
+  akbar: ["Самура ибн Жундуб", "Самуры ибн Джундуба", "Semüre b. Cündeb",
+    ["«Аллаһқа ең сүйікті сөз төртеу: Субханаллаһ, Әлхамдулиллаһ, Лә иләһә илләллаһ және Аллаһу әкбар. Қайсысынан бастасаң да, саған зияны жоқ»", "«Самые любимые Аллахом слова — четыре: „Субханаллах“, „Альхамдулиллях“, „Ля иляха илляллах“ и „Аллаху акбар“. Не важно, с какого из них ты начнёшь»", "«Allah'a en sevimli sözler dörttür: Sübhânallah, Elhamdülillah, Lâ ilâhe illallah ve Allâhu ekber. Hangisiyle başladığın sana zarar vermez»"], ["Муслим, 2137", "Сахих Муслим, 2137", "Müslim, 2137"]],
+  tahlil: ["Әбу Һурайра", "Абу Хурайры", "Ebû Hüreyre",
+    ["«Кім әр намаздан кейін 33 рет Субханаллаһ, 33 рет Әлхамдулиллаһ, 33 рет Аллаһу әкбар деп — барлығы тоқсан тоғыз — жүзін „Лә иләһә илләллаһу уахдаһу лә шәрикә ләһ…“ деп толықтырса, оның күнәлары теңіз көбігіндей болса да кешіріледі»", "«Кто после каждой молитвы скажет „Субханаллах“ тридцать три раза, „Альхамдулиллях“ тридцать три раза и „Аллаху акбар“ тридцать три раза — всего девяносто девять, — а сотым скажет „Ля иляха илляллаху вахдаху ля шарика лях…“, тому простятся его грехи, даже если их столько, сколько морской пены»", "«Kim her namazdan sonra otuz üç kez Sübhânallah, otuz üç kez Elhamdülillah, otuz üç kez Allâhu ekber der — doksan dokuz eder — ve yüzü „Lâ ilâhe illallâhu vahdehû lâ şerîke leh…“ ile tamamlarsa, günahları deniz köpüğü kadar olsa da bağışlanır»"], ["Муслим, 597", "Сахих Муслим, 597", "Müslim, 597"]],
+  istighfar: ["Әбу Һурайра", "Абу Хурайры", "Ebû Hüreyre",
+    ["«Аллаһқа ант етемін, мен күніне жетпіс реттен көп Аллаһтан кешірім сұрап, Оған тәубе етемін»", "«Клянусь Аллахом, поистине, я прошу у Аллаха прощения и приношу Ему покаяние больше семидесяти раз в день»", "«Allah'a yemin ederim ki ben günde yetmiş defadan fazla Allah'tan bağışlanma diler ve O'na tövbe ederim»"], ["Бұхари, 6307", "Сахих аль-Бухари, 6307", "Buhârî, 6307"]],
+  bihamdihi: ["Әбу Һурайра", "Абу Хурайры", "Ebû Hüreyre",
+    ["«Кім күніне жүз рет „Субханаллаһи уә бихамдиһи“ десе, оның күнәлары теңіз көбігіндей болса да өшіріледі»", "«Кто скажет „Субханаллахи ва бихамдихи“ сто раз в день, с того будут сняты его грехи, даже если их столько, сколько морской пены»", "«Kim günde yüz kez „Sübhânallâhi ve bihamdihî“ derse, günahları deniz köpüğü kadar olsa da silinir»"], ["Бұхари, 6405; Муслим, 2691", "Сахих аль-Бухари, 6405; Сахих Муслим, 2691", "Buhârî, 6405; Müslim, 2691"]],
+  tahlil100: ["Әбу Һурайра", "Абу Хурайры", "Ebû Hüreyre",
+    ["«Кім күніне жүз рет „Лә иләһә илләллаһу уахдаһу лә шәрикә ләһ, ләһул-мулку уә ләһул-хамду уә һуә ғалә кулли шәйин қадир“ десе, бұл оған он құл азат еткенмен тең болады, оған жүз сауап жазылып, жүз күнәсі өшіріледі және сол күні кешке дейін шайтаннан қорған болады»", "«Кто скажет сто раз в день: „Ля иляха илляллаху вахдаху ля шарика лях, ляхуль-мульку ва ляхуль-хамду ва хуа аля кулли шайин кадир“, тому это будет равно освобождению десяти рабов, ему запишется сто добрых дел, сотрётся сто дурных, и это будет ему защитой от шайтана в тот день до вечера»", "«Kim günde yüz kez „Lâ ilâhe illallâhu vahdehû lâ şerîke leh, lehu'l-mülkü ve lehu'l-hamdü ve hüve alâ külli şey'in kadîr“ derse, bu ona on köle azat etmeye denk olur, ona yüz iyilik yazılır, yüz günahı silinir ve o gün akşama kadar şeytana karşı korunur»"], ["Бұхари, 6403; Муслим, 2691", "Сахих аль-Бухари, 6403; Сахих Муслим, 2691", "Buhârî, 6403; Müslim, 2691"]],
+  azim: ["Әбу Һурайра", "Абу Хурайры", "Ebû Hüreyre",
+    ["«Тілге жеңіл, таразыда ауыр, Рахманға сүйікті екі сөз бар: Субханаллаһи уә бихамдиһи, Субханаллаһил-ғазим»", "«Есть два слова, лёгкие для языка, тяжёлые на Весах и любимые Милостивым: „Субханаллахи ва бихамдихи, субханаллахиль-азым“»", "«Dile hafif, mizanda ağır, Rahmân'a sevimli iki söz vardır: Sübhânallâhi ve bihamdihî, Sübhânallâhi'l-azîm»"], ["Бұхари, 6406; Муслим, 2694", "Сахих аль-Бухари, 6406; Сахих Муслим, 2694", "Buhârî, 6406; Müslim, 2694"]],
+  hawqala: ["Әбу Мұса әл-Әшғари", "Абу Мусы аль-Ашари", "Ebû Mûsâ el-Eş'arî",
+    ["«Әй, Абдуллаһ ибн Қайс, саған жәннат қазыналарының бірін көрсетейін бе? „Лә хаулә уә лә қууәтә иллә биллаһ“ де»", "«О Абдуллах ибн Кайс, не указать ли тебе на одно из сокровищ Рая? Говори: „Ля хауля ва ля куввата илля билля“»", "«Ey Abdullah b. Kays! Sana cennet hazinelerinden birini göstereyim mi? „Lâ havle ve lâ kuvvete illâ billâh“ de»"], ["Бұхари, 4205; Муслим, 2704", "Сахих аль-Бухари, 4205; Сахих Муслим, 2704", "Buhârî, 4205; Müslim, 2704"]],
+  salli: ["Әбу Һурайра", "Абу Хурайры", "Ebû Hüreyre",
+    ["«Кім маған бір рет салауат айтса, Аллаһ оған он рет салауат етеді»", "«Кто благословит меня один раз, того Аллах благословит десять раз»", "«Kim bana bir kez salavat getirirse, Allah da ona on kez salât eder»"], ["Муслим, 408", "Сахих Муслим, 408", "Müslim, 408"]],
+  tawhid: ["Жәбир ибн Абдуллаһ", "Джабира ибн Абдуллаха", "Câbir b. Abdullah",
+    ["«Зікірдің ең абзалы — Лә иләһә илләллаһ, дұғаның ең абзалы — Әлхамдулиллаһ»", "«Лучший зикр — „Ля иляха илляллах“, а лучшая мольба — „Альхамдулиллях“»", "«Zikrin en faziletlisi „Lâ ilâhe illallah“, duanın en faziletlisi „Elhamdülillah“tır»"], ["Тирмизи, 3383 (хасан)", "Ат-Тирмизи, 3383 (хасан)", "Tirmizî, 3383 (hasen)"]],
+  hasbunallah: ["Ибн Аббас", "Ибн Аббаса", "İbn Abbâs",
+    ["«„Хасбуналлаһу уә ниғмәл-уәкил“ — мұны Ибраһим ғ.с. отқа тасталғанда айтты, Мұхаммед ﷺ да адамдар: „Сендерге қарсы жиналды, олардан қорқыңдар“, — дегенде айтты»", "«„Хасбуналлаху ва ни'маль-вакиль“ — эти слова сказал Ибрахим, мир ему, когда его бросили в огонь, и сказал Мухаммад ﷺ, когда ему говорили: „Против вас собрались люди, бойтесь их!“»", "«„Hasbünallâhu ve ni'me'l-vekîl“ — bunu İbrâhim (a.s.) ateşe atıldığında söyledi; Muhammed ﷺ de „İnsanlar size karşı toplandı, onlardan korkun“ dendiğinde söyledi»"], ["Бұхари, 4563", "Сахих аль-Бухари, 4563", "Buhârî, 4563"]],
+  juwayriya: ["Жууайрия бинт әл-Харис", "Джувайрии бинт аль-Харис", "Cüveyriye bint el-Hâris",
+    ["«Сенен кейін мен төрт сөзді үш рет айттым. Егер оларды бүгін сен айтқанның бәрімен өлшесе, солар басым түсер еді: Субханаллаһи уә бихамдиһи ғадада халқиһи, уә рида нафсиһи, уә зината ғаршиһи, уә мидада кәлиматиһ»", "«После тебя я произнёс четыре фразы трижды. Если взвесить их со всем, что ты сказала сегодня, они перевесят: „Субханаллахи ва бихамдихи адада халкихи, ва рида нафсихи, ва зината аршихи, ва мидада калиматихи“»", "«Senden sonra dört sözü üç kez söyledim. Bugün söylediklerinin hepsiyle tartılsa onlar ağır basar: Sübhânallâhi ve bihamdihî adede halkıhî ve rıdâ nefsihî ve zinete arşihî ve midâde kelimâtih»"], ["Муслим, 2726", "Сахих Муслим, 2726", "Müslim, 2726"]],
 };
-// [ключ, цель на день]; первые четыре — тасбих после намаза (33 + 33 + 33 + 1)
-const ZK = [["subhan", 33], ["hamd", 33], ["akbar", 33], ["tahlil", 1], ["istighfar", 100], ["bihamdihi", 100], ["azim", 33], ["hawqala", 33], ["salli", 33], ["tawhid", 33]];
+// новые зикры (тексты, которых нет в данных намаза); транскрипция уже чистая
+const ZK_TX = {
+  hasbunallah: { ar: "حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ", tr: { kk: "хасбуналлаһу уә ниғмәл-уәкил", ru: "хасбуналлаху ва ни'маль-вакиль", tr: "hasbünallâhu ve ni'me'l-vekîl" },
+    m: { kk: "Бізге Аллаһ жеткілікті, Ол — қандай жақсы Қорғаушы!", ru: "Достаточно нам Аллаха, и как прекрасен Он как Покровитель!", tr: "Allah bize yeter, O ne güzel vekildir!" }, t: { kk: "Хасбуналлаһ", ru: "Хасбуналлах", tr: "Hasbünallah" } },
+  juwayriya: { ar: "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ خَلْقِهِ وَرِضَا نَفْسِهِ وَزِنَةَ عَرْشِهِ وَمِدَادَ كَلِمَاتِهِ", tr: { kk: "субханаллаһи уә бихамдиһи ғадада халқиһи, уә рида нафсиһи, уә зината ғаршиһи, уә мидада кәлиматиһ", ru: "субханаллахи ва бихамдихи адада халкихи, ва рида нафсихи, ва зината аршихи, ва мидада калиматихи", tr: "sübhânallâhi ve bihamdihî adede halkıhî ve rıdâ nefsihî ve zinete arşihî ve midâde kelimâtih" },
+    m: { kk: "Аллаһ пәк және Оған мадақ — жаратылыстарының санындай, Өзі разы болғанындай, Аршының салмағындай, сөздерінің сиясындай.", ru: "Пречист Аллах и хвала Ему — столько раз, сколько Его творений, сколько угодно Ему, сколько весит Его Трон и сколько чернил нужно для Его слов.", tr: "Allah'ı, yarattıklarının sayısınca, rızası kadar, Arşının ağırlığınca ve kelimelerinin mürekkebi kadar hamd ile tesbih ederim." },
+    t: { kk: "Төрт салмақты сөз", ru: "Четыре весомые фразы", tr: "Dört ağır söz" } },
+};
+// [id, текст из данных намаза, цель на день]; первые четыре — тасбих после намаза (33 + 33 + 33 + 1)
+const ZK = [["subhan", "subhan", 33], ["hamd", "hamd", 33], ["akbar", "akbar", 33], ["tahlil", "tahlil", 1], ["istighfar", "istighfar", 100], ["bihamdihi", "bihamdihi", 100],
+  ["tahlil100", "tahlil", 100], ["azim", "azim", 33], ["hawqala", "hawqala", 33], ["salli", "salli", 33], ["tawhid", "tawhid", 33], ["hasbunallah", "hasbunallah", 33], ["juwayriya", "juwayriya", 3]];
 const TS_AFTER = ["subhan", "hamd", "akbar"];
+const zkText = (d, z) => ZK_TX[z[1]] || d.texts[z[1]];
+const zkTitle = (d, z) => z[0] === "tahlil100" ? LX("Тахлиль — 100 раз", "Тәһлил — 100 рет", "Tehlîl — 100 kez") : z[0] === "tahlil" ? LX("Тахлиль после намаза", "Намаздан кейінгі тәһлил", "Namaz sonrası tehlîl") : L(zkText(d, z).t);
 function tsState() {
   const t = S.tsb = Object.assign({ k: 0, day: "", d: {}, t: {}, vib: true }, S.tsb);
   delete t.i; delete t.c; delete t.total; // старый формат
@@ -1771,6 +1811,15 @@ function tsState() {
   return t;
 }
 const tsbTotal = () => { const t = S.tsb && S.tsb.t; return t && typeof t === "object" ? Object.values(t).reduce((a, b) => a + (+b || 0), 0) : 0; };
+const zkFav = () => (S.zkFav = Array.isArray(S.zkFav) ? S.zkFav : []);
+const isFav = id => zkFav().includes(id);
+const togFav = id => { const f = zkFav(), i = f.indexOf(id); if (i >= 0) f.splice(i, 1); else f.push(id); save(); return i < 0; };
+function favBtn(id, small) {
+  const b = h("button", { class: "fav-b" + (small ? " sm" : ""), type: "button" });
+  const draw = () => { const on = isFav(id); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", on ? LX("Убрать из избранного", "Таңдаулыдан алып тастау", "Favorilerden çıkar") : LX("В избранное", "Таңдаулыға", "Favorilere ekle")); b.innerHTML = icon("star"); };
+  b.onclick = e => { e.preventDefault(); e.stopPropagation(); const on = togFav(id); draw(); b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); toast(on ? LX("Добавлено в избранное", "Таңдаулыға қосылды", "Favorilere eklendi") : LX("Убрано из избранного", "Таңдаулыдан алынды", "Favorilerden çıkarıldı")); };
+  draw(); return b;
+}
 // вибрация: Android — Vibration API; iPhone (iOS 18+) — тактильный отклик переключателя
 let HAPT = null;
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -1785,15 +1834,49 @@ function haptic(times = 1) {
   HAPT.click();
   for (let j = 1; j < times; j++) setTimeout(() => HAPT.click(), j * 160);
 }
-async function pageTasbih(v) {
+
+const ZK_TABS = [["", ["Барлық зікір", "Все зикры", "Tüm zikirler"]], ["fav", ["Таңдаулы", "Избранное", "Favoriler"]], ["morning", ["Таңғы", "Утренние", "Sabah"]], ["evening", ["Кешкі", "Вечерние", "Akşam"]]];
+async function pageZikr(v, sub, id) {
+  if (sub === "c") return zkCounter(v, id);
+  const tab = ZK_TABS.some(([k]) => k === (sub || "")) ? (sub || "") : "";
   const d = await loadNZ();
-  const ru = S.lang === "ru";
+  v.append(backHead("#/namaz", LX("Зикр", "Зікір", "Zikir"), LX("Поминание Аллаха — каждый день", "Аллаһты күн сайын еске алу", "Her gün Allah'ı anmak")));
+  const nav = h("nav", { class: "zk-tabs", role: "tablist" }, ZK_TABS.map(([k, t]) => h("a", { href: "#/zikr" + (k ? "/" + k : ""), role: "tab", "aria-selected": String(k === tab), class: k === tab ? "on" : "" }, L({ kk: t[0], ru: t[1], tr: t[2] }))));
+  v.append(nav);
+  requestAnimationFrame(() => { const on = $(".zk-tabs .on"); if (on) nav.scrollTo({ left: on.offsetLeft - (nav.clientWidth - on.offsetWidth) / 2 }); });
+  if (tab === "morning" || tab === "evening") return zkAzkar(v, tab);
   const st = tsState(); save();
-  const vibBtn = canHaptic() ? h("button", { class: "pill vib", type: "button", "aria-pressed": String(st.vib !== false) }) : null;
-  const drawVib = () => { if (vibBtn) { vibBtn.setAttribute("aria-pressed", String(st.vib !== false)); vibBtn.innerHTML = icon("vib") + esc(st.vib !== false ? (LX("Вибрация каждые 33", "Әр 33-те діріл", "Her 33'te titreşim")) : (LX("Вибрация выкл.", "Діріл өшірулі", "Titreşim kapalı"))); } };
+  const list = tab === "fav" ? ZK.filter(z => isFav(z[0])) : ZK;
+  const box = h("div", { class: "zk-list" });
+  list.forEach(z => {
+    const tx = zkText(d, z), n = st.d[z[0]] || 0, g = z[2], pct = Math.min(100, Math.round(n / g * 100));
+    const a = h("a", { class: "zk-item" + (n >= g ? " done" : ""), href: `#/zikr/c/${z[0]}${tab ? "?" + tab : ""}`, html:
+      `<span class="zk-ring" style="--p:${pct}"><b class="num">${n >= g ? icon("check") : n}</b></span><span class="zk-t"><b>${esc(zkTitle(d, z))}</b><span class="ar" lang="ar">${esc(tx.ar)}</span><small class="num">${n} / ${g}${st.t[z[0]] ? ` · ${LX("всего", "барлығы", "toplam")} ${fmtN(st.t[z[0]])}` : ""}</small></span>` });
+    a.append(favBtn(z[0], true)); box.append(a);
+  });
+  // избранные утренние и вечерние азкары
+  if (tab === "fav") {
+    const az = await loadAZ(), favAz = [...az.morning, ...(az.evening || [])].filter(t => isFav(t.id));
+    if (favAz.some(t => t.quran)) await loadSura(2);
+    if (favAz.length) { azkState(); box.append(h("h3", { class: "zk-sub" }, LX("Азкары", "Зікірлер", "Ezkâr")), ...favAz.map(t => azkCardFav(t))); }
+    if (!list.length && !favAz.length) box.append(h("div", { class: "zk-empty", html: `<span>${icon("star")}</span><b>${esc(LX("Здесь пока пусто", "Әзірге бос", "Henüz boş"))}</b><p>${esc(LX("Нажмите звёздочку у зикра или азкара — он появится здесь.", "Зікір не азкардағы жұлдызшаны басыңыз — ол осында шығады.", "Bir zikrin ya da ezkârın yıldızına dokunun — burada görünecek."))}</p>` }));
+  }
+  v.append(box);
+}
+function azkCardFav(t) { const c = duaCard(t, { count: true }); const hd = $(".dua-h", c) || c.firstChild; hd.append(favBtn(t.id, true)); return c; }
+
+async function zkCounter(v, id) {
+  const d = await loadNZ();
+  const ctx = (location.hash.split("?")[1] || "");
+  const st = tsState();
+  let list = ctx === "fav" ? ZK.filter(z => isFav(z[0])) : ZK; if (!list.length) list = ZK;
+  let k = Math.max(0, list.findIndex(z => z[0] === id)); st.k = ZK.indexOf(list[k]); save();
+  const vibBtn = canHaptic() ? h("button", { class: "pill vib", type: "button" }) : null;
+  const drawVib = () => { if (vibBtn) { vibBtn.setAttribute("aria-pressed", String(st.vib !== false)); vibBtn.setAttribute("aria-label", st.vib !== false ? LX("Вибрация включена", "Діріл қосулы", "Titreşim açık") : LX("Вибрация выключена", "Діріл өшірулі", "Titreşim kapalı")); vibBtn.innerHTML = icon("vib"); } };
   if (vibBtn) vibBtn.onclick = () => { st.vib = st.vib === false; save(); drawVib(); if (st.vib) haptic(); };
   drawVib();
-  v.append(backHead("#/namaz", LX("Тасбих", "Тәсбих", "Tesbih"), null, vibBtn));
+  const fav = h("span", { class: "zk-favslot" });
+  v.append(backHead("#/zikr" + (ctx ? "/" + ctx : ""), LX("Зикр", "Зікір", "Zikir"), null, h("span", { class: "row", style: "gap:8px;flex-wrap:nowrap" }, fav, vibBtn)));
 
   const prev = h("button", { class: "tn-b", type: "button", "aria-label": LX("Предыдущий зикр", "Алдыңғы зікір", "Önceki zikir"), html: icon("chevl") });
   const next = h("button", { class: "tn-b", type: "button", "aria-label": LX("Следующий зикр", "Келесі зікір", "Sonraki zikir"), html: icon("chev") });
@@ -1803,48 +1886,57 @@ async function pageTasbih(v) {
   const card = h("button", { class: "ts-card", type: "button" }, h("span", { class: "ts-inner" }, front, back));
   const goalEl = h("div", { class: "ts-goal", role: "status", "aria-live": "polite" });
   const btn = h("button", { class: "ts-count", type: "button" });
-  v.append(h("div", { class: "ts-wrap" }, h("div", { class: "ts-nav" }, prev, ttl, next), dots, h("div", { class: "ts-stage" }, card, goalEl), btn));
+  v.append(h("div", { class: "ts-wrap" }, h("div", { class: "ts-nav" }, prev, ttl, next), dots, h("div", { class: "slide-clip" }, h("div", { class: "ts-stage" }, card, goalEl)), btn));
 
-  const draw = () => {
-    const [k, goal] = ZK[st.k], tx = d.texts[k], f = TS_FACT[k][LX("ru", "kk", "tr")];
-    const n = st.d[k] || 0;
-    ttl.innerHTML = `<b>${esc(L(tx.t))}</b><small>${st.k + 1} ${LX("из", "/", "/")} ${ZK.length} · ${LX("цель", "мақсат", "hedef")} ${goal}</small>`;
-    dots.innerHTML = ZK.map(([key, g], j) => `<i class="${j === st.k ? "cur" : ""}${(st.d[key] || 0) >= g ? " ok" : ""}"></i>`).join("");
+  const lang = LX(1, 0, 2);
+  // лицевая и оборотная стороны рисуются только при смене зикра — переворот идёт плавно, без перерисовки
+  const faces = () => {
+    const z = list[k], tx = zkText(d, z), f = ZF[z[0]] || ZF[z[1]];
     front.classList.toggle("long", tx.ar.length > 60);
-    front.innerHTML = `<span class="ts-ar${tx.ar.length > 30 ? " long" : ""}" lang="ar">${esc(tx.ar)}</span><span class="ts-tl">${esc(TRL(tx.tr))}</span><span class="ts-m">${esc(L(tx.m))}</span>` +
-      `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите — узнаете об этом зикре", "Басыңыз — осы зікір туралы біліңіз", "Dokunun — bu zikri öğrenin"))}</span>`;
-    back.innerHTML = `<span class="ts-know">${icon("bulb")}${esc(LX("Знаете ли вы", "Білесіз бе", "Biliyor muydunuz"))}</span><b class="ts-q">${esc(f[0])}</b><span class="ts-d">${esc(f[1])}</span><span class="pill">${esc(f[2])}</span>` +
-      `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите, чтобы вернуться", "Қайту үшін басыңыз", "Geri dönmek için dokunun"))}</span>`;
-    card.setAttribute("aria-label", (card.classList.contains("flipped") ? f[0] : L(tx.m)) + ". " + (LX("Нажмите, чтобы перевернуть карточку. Листайте влево и вправо, чтобы сменить зикр.", "Карточканы аудару үшін басыңыз. Зікірді ауыстыру үшін солға-оңға сырғытыңыз.", "Kartı çevirmek için dokunun. Zikri değiştirmek için sağa sola kaydırın.")));
-    btn.innerHTML = `<b class="num">${n}</b><small class="num" aria-label="${LX("Всего за всё время", "Барлығы", "Toplam")}">${fmtN(st.t[k] || 0)}</small>`;
+    front.innerHTML = `<span class="ts-ar${tx.ar.length > 30 ? " long" : ""}" lang="ar">${esc(tx.ar)}</span><span class="ts-tl">${esc(TLC(tx.tr))}</span><span class="ts-m">${esc(L(tx.m))}</span>` +
+      `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите — хадис об этом зикре", "Басыңыз — осы зікір туралы хадис", "Dokunun — bu zikir hakkında hadis"))}</span>`;
+    back.innerHTML = f ? `<span class="ts-d">${esc(LX(`Передаётся со слов ${f[1]}, да будет доволен им Аллах, что Посланник Аллаха ﷺ сказал:`, `${f[0]} (Аллаһ оған разы болсын) жеткізеді: Аллаһтың Елшісі ﷺ былай деген:`, `${f[2]}'den (r.a.) rivayet edildiğine göre Resûlullah ﷺ şöyle buyurdu:`))}</span>` +
+      `<span class="ts-q">${esc(f[3][lang])}</span><span class="pill ts-src">${esc(f[4][lang])}</span>` +
+      `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите, чтобы вернуться", "Қайту үшін басыңыз", "Geri dönmek için dokunun"))}</span>` : "";
+    if (z[0] === "hasbunallah") back.querySelector(".ts-d").textContent = LX("Передаётся от Ибн Аббаса, да будет доволен Аллах ими обоими:", "Ибн Аббастан (Аллаһ екеуіне разы болсын) жеткен:", "İbn Abbâs'tan (r.anhümâ) rivayet edildi:");
+    if (z[0] === "juwayriya") back.querySelector(".ts-d").textContent = LX("Передаётся со слов Джувайрии бинт аль-Харис, да будет доволен ею Аллах, что Пророк ﷺ сказал ей:", "Жууайрия бинт әл-Харис (Аллаһ оған разы болсын) жеткізеді: Пайғамбар ﷺ оған былай деген:", "Cüveyriye bint el-Hâris'ten (r.anhâ) rivayet edildiğine göre Peygamber ﷺ ona şöyle buyurdu:");
+    if (z[0] === "hawqala") back.querySelector(".ts-d").textContent = LX("Передаётся со слов Абу Мусы аль-Ашари, да будет доволен им Аллах, что Посланник Аллаха ﷺ сказал ему:", "Әбу Мұса әл-Әшғари (Аллаһ оған разы болсын) жеткізеді: Аллаһтың Елшісі ﷺ оған былай деген:", "Ebû Mûsâ el-Eş'arî'den (r.a.) rivayet edildiğine göre Resûlullah ﷺ ona şöyle buyurdu:");
+    fav.innerHTML = ""; fav.append(favBtn(z[0]));
+  };
+  const draw = () => {
+    const z = list[k], n = st.d[z[0]] || 0;
+    ttl.innerHTML = `<b>${esc(zkTitle(d, z))}</b><small class="num">${k + 1} / ${list.length}</small>`;
+    dots.innerHTML = list.length <= 16 ? list.map((x, j) => `<i class="${j === k ? "cur" : ""}${(st.d[x[0]] || 0) >= x[2] ? " ok" : ""}"></i>`).join("") : "";
+    btn.innerHTML = `<b class="num">${n}</b><small class="num" aria-label="${LX("Всего за всё время", "Барлығы", "Toplam")}">${fmtN(st.t[z[0]] || 0)}</small>`;
     btn.setAttribute("aria-label", `${LX("Посчитать", "Санау", "Say")}: ${n}`);
+    card.setAttribute("aria-label", LX("Нажмите, чтобы перевернуть карточку. Листайте влево и вправо, чтобы сменить зикр.", "Карточканы аудару үшін басыңыз. Зікірді ауыстыру үшін солға-оңға сырғытыңыз.", "Kartı çevirmek için dokunun. Zikri değiştirmek için sağa sola kaydırın."));
   };
   const go = dir => {
-    st.k = (st.k + dir + ZK.length) % ZK.length; save();
-    card.classList.remove("flipped");
-    card.classList.remove("in-l", "in-r"); void card.offsetWidth; card.classList.add(dir > 0 ? "in-r" : "in-l");
-    draw();
+    k = (k + dir + list.length) % list.length; st.k = ZK.indexOf(list[k]); save();
+    history.replaceState(null, "", `#/zikr/c/${list[k][0]}${ctx ? "?" + ctx : ""}`);
+    card.classList.remove("flipped", "in-l", "in-r"); void card.offsetWidth; card.classList.add(dir > 0 ? "in-r" : "in-l");
+    faces(); draw();
   };
   prev.onclick = () => go(-1); next.onclick = () => go(1);
-  // свайп по карточке — смена зикра, нажатие — переворот
+  // свайп по карточке — смена зикра, нажатие — плавный переворот
   let sx = 0, sy = 0, swiped = false;
   card.addEventListener("pointerdown", e => { sx = e.clientX; sy = e.clientY; swiped = false; });
   card.addEventListener("pointerup", e => { const dx = e.clientX - sx, dy = e.clientY - sy; if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) { swiped = true; go(dx < 0 ? 1 : -1); } });
-  card.onclick = () => { if (swiped) { swiped = false; return; } card.classList.toggle("flipped"); draw(); };
-  const onKey = e => { if (document.body.dataset.page !== "tasbih") return document.removeEventListener("keydown", onKey); if (e.key === "ArrowLeft") go(-1); else if (e.key === "ArrowRight") go(1); };
+  card.onclick = () => { if (swiped) { swiped = false; return; } card.classList.remove("flipping"); void card.offsetWidth; card.classList.add("flipping"); card.classList.toggle("flipped"); };
+  const onKey = e => { if (document.body.dataset.page !== "zikr") return document.removeEventListener("keydown", onKey); if (e.key === "ArrowLeft") go(-1); else if (e.key === "ArrowRight") go(1); };
   document.addEventListener("keydown", onKey);
 
   let goalT = 0;
   const showGoal = () => {
-    goalEl.innerHTML = `<span class="g-ic">${icon("check")}</span><b>${esc(LX("Дневная цель достигнута", "Күндік мақсат орындалды", "Günlük hedefe ulaşıldı"))}</b>` +
+    goalEl.innerHTML = `<span class="g-ic">${icon("check")}</span><b>${esc(LX("Тасбих после намаза завершён", "Намаздан кейінгі тәсбих аяқталды", "Namaz sonrası tesbih tamam"))}</b>` +
       `<p>${esc(LX("По 33 раза «Субханаллах», «Альхамдулиллях» и «Аллаху акбар». Да примет Аллах!", "«Субханаллаһ», «Әлхамдулиллаһ» және «Аллаһу әкбар» — 33 реттен. Аллаһ қабыл етсін!", "33'er kez «Sübhânallah», «Elhamdülillah» ve «Allâhu ekber». Allah kabul etsin!"))}</p>`;
     goalEl.classList.add("show"); clearTimeout(goalT);
     goalT = setTimeout(() => goalEl.classList.remove("show"), 4000);
   };
   goalEl.onclick = () => goalEl.classList.remove("show");
   btn.onclick = () => {
-    const [k, goal] = ZK[st.k];
-    const n = st.d[k] = (st.d[k] || 0) + 1; st.t[k] = (st.t[k] || 0) + 1;
+    const z = list[k], key = z[0], goal = z[2];
+    const n = st.d[key] = (st.d[key] || 0) + 1; st.t[key] = (st.t[key] || 0) + 1;
     const after = TS_AFTER.every(x => (st.d[x] || 0) >= 33) && st.goal !== today();
     if (after) st.goal = today();
     if (st.vib !== false && (n % 33 === 0 || n === goal)) haptic(after ? 2 : 1);
@@ -1852,9 +1944,9 @@ async function pageTasbih(v) {
     btn.classList.remove("tap"); void btn.offsetWidth; btn.classList.add("tap");
     if (after) showGoal();
     // тасбих после намаза: после 33 — сам переходит к следующему зикру
-    else if (n === goal && st.k < 3) setTimeout(() => { if (document.body.dataset.page === "tasbih" && ZK[st.k][0] === k) go(1); }, 450);
+    else if (n === goal && ctx !== "fav" && ZK.indexOf(z) < 3) setTimeout(() => { if (document.body.dataset.page === "zikr" && list[k] === z) go(1); }, 450);
   };
-  draw();
+  faces(); draw();
 }
 
 
@@ -1863,11 +1955,12 @@ let AZ = null;
 const loadAZ = () => AZ || (AZ = fetchJSON("data/adhkar.json").catch(e => { AZ = null; throw e; }));
 function azkState() { const a = S.azk = Object.assign({ day: "", c: {} }, S.azk); if (a.day !== today()) { a.day = today(); a.c = {}; } return a; }
 function azkSub() {
-  const ru = S.lang === "ru", a = S.azk && S.azk.day === today() ? S.azk.c : {}, n = Object.keys(a).filter(k => a[k] === "done").length;
-  return n ? (LX(`Сегодня: ${n} из 12`, `Бүгін: 12-нің ${n}-і`, `Bugün: ${n} / 12`)) : (LX("12 азкаров с аудио", "Аудиосы бар 12 зікір", "Sesli 12 zikir"));
+  const a = S.azk && S.azk.day === today() ? S.azk.c : {}, keys = Object.keys(a).filter(k => a[k] === "done");
+  const m = keys.filter(k => !k.startsWith("ev_")).length, e = keys.length - m;
+  return m || e ? LX(`Сегодня: утро ${m}, вечер ${e}`, `Бүгін: таң ${m}, кеш ${e}`, `Bugün: sabah ${m}, akşam ${e}`) : LX("Утренние и вечерние азкары", "Таңғы және кешкі зікірлер", "Sabah ve akşam ezkârı");
 }
 function azkCounter(t, card) {
-  const ru = S.lang === "ru", st = azkState(), need = t.n || 1;
+  const st = azkState(), need = t.n || 1;
   const b = h("button", { class: "azk-c", type: "button" });
   const draw = () => { const v = st.c[t.id], done = v === "done", n = done ? need : (v || 0);
     card.classList.toggle("done", done);
@@ -1875,28 +1968,29 @@ function azkCounter(t, card) {
     b.setAttribute("aria-label", done ? (LX("Прочитано, нажмите, чтобы сбросить", "Оқылды", "Okundu, sıfırlamak için dokunun")) : (LX("Посчитать повтор", "Қайталауды санау", "Tekrarı say"))); };
   b.onclick = () => { const v = st.c[t.id];
     if (v === "done") delete st.c[t.id];
-    else { const n = (v || 0) + 1; st.c[t.id] = n >= need ? "done" : n; if (n >= need && S.tsb && S.tsb.vib !== false) haptic(); }
-    save(); draw(); const pr = $(".azk-pr"); if (pr) pr.replaceWith(azkProgress()); };
+    else { const n = (v || 0) + 1; st.c[t.id] = n >= need ? "done" : n; if (S.tsb && S.tsb.vib !== false) haptic(1); }
+    save(); draw(); const pr = $(".azk-pr"); if (pr && pr.dataset.set) pr.replaceWith(azkProgress(pr.dataset.set, +pr.dataset.tot)); };
   draw(); return b;
 }
-function azkProgress() {
-  const ru = S.lang === "ru", c = azkState().c, tot = (AZ && AZ.then ? 12 : 12), n = Object.values(c).filter(x => x === "done").length;
-  return h("div", { class: "azk-pr" }, h("div", { class: "bar" }, h("i", { style: `width:${Math.round(n / tot * 100)}%` })), h("small", { class: "muted" }, LX(`Сегодня прочитано ${n} из ${tot}`, `Бүгін ${tot}-нің ${n}-і оқылды`, `Bugün okunan: ${n} / ${tot}`)));
+function azkProgress(set, tot) {
+  const c = azkState().c, n = Object.entries(c).filter(([k, x]) => x === "done" && (set === "evening") === k.startsWith("ev_")).length;
+  const el = h("div", { class: "azk-pr" }, h("div", { class: "bar" }, h("i", { style: `width:${Math.round(n / tot * 100)}%` })), h("small", { class: "muted" }, LX(`Сегодня прочитано ${n} из ${tot}`, `Бүгін ${tot}-нің ${n}-і оқылды`, `Bugün okunan: ${n} / ${tot}`)));
+  el.dataset.set = set; el.dataset.tot = tot; return el;
 }
-async function nzAzkar(v) {
-  const ru = S.lang === "ru";
-  const d = await loadAZ();
-  if (d.morning.some(x => x.quran)) await loadSura(2);
+async function zkAzkar(v, set) {
+  const d = await loadAZ(), items = set === "evening" ? (d.evening || []) : d.morning;
+  if (items.some(x => x.quran)) await loadSura(2);
   azkState();
-  v.append(backHead("#/namaz", LX("Утренние и вечерние азкары", "Таңғы және кешкі зікірлер", "Sabah ve akşam zikirleri"), LX("После фаджра и после асра", "Таң намазынан және екінтіден кейін", "Sabah namazından ve ikindiden sonra")), azkProgress());
+  v.append(h("p", { class: "muted small zk-when" }, set === "evening" ? LX("После асра и до заката, можно и после магриба", "Екінтіден кейін, күн батқанға дейін, ақшамнан кейін де болады", "İkindiden sonra güneş batana kadar, akşamdan sonra da olur") : LX("После утреннего намаза и до восхода, можно до полудня", "Таң намазынан кейін, күн шыққанға дейін, түске дейін де болады", "Sabah namazından sonra güneş doğana kadar, öğleye kadar da olur")),
+    azkProgress(set, items.length));
   const wrap = h("div", { class: "azk car" });
-  const cards = d.morning.map(t => duaCard(t, { count: true }));
+  const cards = items.map(t => azkCardFav(t));
   wrap.append(...cards);
-  const st = azkState(), c = carousel(cards, wrap, "azkAt", LX("Азкар", "Зікір", "Zikir"), k => st.c[d.morning[k].id] === "done");
+  const st = azkState(), c = carousel(cards, wrap, "azkAt_" + set, LX("Азкар", "Зікір", "Zikir"), k => st.c[items[k].id] === "done");
   // карточка дочитана — точка отмечается, через мгновение следующая
   wrap.addEventListener("click", e => { if (!e.target.closest(".azk-c")) return; c.paint();
-    const id = d.morning[c.at].id; if (st.c[id] === "done") setTimeout(() => { if (st.c[id] === "done" && c.at < cards.length - 1) c.go(c.at + 1, 1); }, 650); });
-  v.append(c.nav, wrap, c.foot, h("p", { class: "muted small", style: "margin-top:14px" }, L(d.intro)));
+    const id = items[c.at].id; if (st.c[id] === "done") setTimeout(() => { if (st.c[id] === "done" && c.at < cards.length - 1) c.go(c.at + 1, 1); }, 650); });
+  v.append(c.nav, h("div", { class: "slide-clip" }, wrap), c.foot, h("p", { class: "muted small", style: "margin-top:14px" }, L(d.intro)));
 }
 async function nzDuas(v) {
   const ru = S.lang === "ru";
@@ -1909,7 +2003,8 @@ async function nzDuas(v) {
   const tabs = d.daily.map((g, i) => { const b = h("button", { type: "button", role: "tab" }, L(g.g)); b.onclick = () => go(i - gi); nav.append(b); return b; });
   const draw = dir => {
     stopAudio();
-    tabs.forEach((b, i) => { b.setAttribute("aria-selected", String(i === gi)); if (i === gi) b.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" }); });
+    // вкладку прокручиваем только внутри ленты — страница не сдвигается и не «масштабируется»
+    tabs.forEach((b, i) => { b.setAttribute("aria-selected", String(i === gi)); if (i === gi) nav.scrollTo({ left: b.offsetLeft - (nav.clientWidth - b.offsetWidth) / 2, behavior: dir ? "smooth" : "auto" }); });
     dots.innerHTML = d.daily.map((_, i) => `<i class="${i === gi ? "cur" : ""}"></i>`).join("");
     pane.innerHTML = ""; pane.classList.remove("in-l", "in-r"); void pane.offsetWidth; if (dir) pane.classList.add(dir > 0 ? "in-r" : "in-l");
     const g = d.daily[gi];
@@ -1922,7 +2017,7 @@ async function nzDuas(v) {
   pane.addEventListener("touchstart", e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, { passive: true });
   pane.addEventListener("touchend", e => { const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - st < 800) go(dx < 0 ? 1 : -1); }, { passive: true });
-  v.append(nav, dots, pane, h("p", { class: "muted small", style: "margin-top:16px" }, L(d.intro)));
+  v.append(nav, dots, h("div", { class: "slide-clip" }, pane), h("p", { class: "muted small", style: "margin-top:16px" }, L(d.intro)));
   draw(0);
 }
 
@@ -2370,31 +2465,49 @@ function pageLetter(v, ar) {
 /* ═════════════ тренажёры ═════════════ */
 const HARAKAT = [["َ", "а"], ["ِ", "и"], ["ُ", "у"], ["ْ", ""]];
 const consonants = () => CORE.letters.filter(x => !"اءوي".includes(x.ar));
+// подсказка к вопросу — кусочек теории из уроков (на экзамене их ограниченное число)
+const FORM_N = [["бөлек", "отдельно", "ayrı"], ["басында", "в начале", "başta"], ["ортасында", "в середине", "ortada"], ["соңында", "в конце", "sonda"]];
+const hintForms = x => `<div class="hint-forms">${x.forms.map((f, i) => `<span><b class="ar" lang="ar">${esc(f)}</b><small>${esc(L({ kk: FORM_N[i][0], ru: FORM_N[i][1], tr: FORM_N[i][2] }))}</small></span>`).join("")}</div>`;
+const hintLetter = x => `<p><b class="ar" lang="ar">${x.ar}</b> — «${esc(TRL(x.name))}», ${esc(LX("звук", "дыбысы", "ses"))} [${esc(TRL(x.sound))}]</p>`;
+const padLetters = (x, have) => { const o = [...new Set(have)].filter(y => y !== x).slice(0, 3); for (const y of shuffle(CORE.letters)) { if (o.length >= 3) break; if (y !== x && !o.includes(y)) o.push(y); } return o; };
 const TRAINERS = [
   { id: "letters", ic: "ب", t: ["Әріпті тану", "Узнай букву", "Harfi tanı"], d: ["Әріптің формасы — атын табыңыз", "Форма буквы — найдите название", "Harfin şekli — adını bulun"],
-    make() { const x = pick(CORE.letters); const w = shuffle(CORE.letters.filter(y => y !== x)).slice(0, 3); const o = shuffle([x, ...w]);
-      return { kind: "mcq", q: { kk: "Бұл қай әріп?", ru: "Что это за буква?" }, prompt: pick(x.forms), options: o.map(y => ({ t: y.name })), answer: o.indexOf(x) }; } },
+    make() { const x = pick(CORE.letters); const o = shuffle([x, ...padLetters(x, [])]);
+      return { kind: "mcq", q: { kk: "Бұл қай әріп?", ru: "Что это за буква?", tr: "Bu hangi harf?" }, prompt: pick(x.forms), options: o.map(y => ({ t: TRL(y.name) })), answer: o.indexOf(x),
+        hint: `<p>${esc(LX("Одна буква в слове пишется по-разному. Формы этих букв:", "Бір әріп сөзде әртүрлі жазылады. Мына әріптердің формалары:", "Bir harf kelimede farklı yazılır. Bu harflerin şekilleri:"))}</p>` + o.map(y => `<div class="hint-row"><b>${esc(TRL(y.name))}</b>${hintForms(y)}</div>`).join("") }; } },
   { id: "lookalike", ic: "ث", t: ["Ұқсас әріптер", "Похожие буквы", "Benzer harfler"], d: ["Нүктесі мен пішіні ұқсас әріптерді ажыратыңыз", "Различайте буквы с похожими точками и формой", "Noktası ve şekli benzer harfleri ayırt edin"],
-    make() { const x = pick(CORE.letters.filter(y => y.look)); const w = x.look.split("").map(letterBy).filter(Boolean).slice(0, 3); const o = shuffle([x, ...w]);
-      return { kind: "mcq", q: { kk: `«${x.name.kk}» қайсысы?`, ru: `Где «${x.name.ru}»?` }, options: o.map(y => ({ ar: y.ar })), answer: o.indexOf(x) }; } },
+    make() { const x = pick(CORE.letters.filter(y => y.look)); const o = shuffle([x, ...padLetters(x, x.look.split("").map(letterBy).filter(Boolean))]);
+      return { kind: "mcq", q: { kk: `«${x.name.kk}» қайсысы?`, ru: `Где «${x.name.ru}»?`, tr: `«${cyrTr(x.name.ru)}» hangisi?` }, options: o.map(y => ({ ar: y.ar })), answer: o.indexOf(x),
+        hint: `<p>${esc(LX("Похожие буквы различаются точками: их числом и местом — сверху или снизу.", "Ұқсас әріптер нүктелерімен ажыратылады: саны мен орны — үстінде не астында.", "Benzer harfler noktalarıyla ayrılır: sayısı ve yeri — üstte ya da altta."))}</p>` + o.map(hintLetter).join("") }; } },
   { id: "forms", ic: "ـبـ", t: ["Әріп формалары", "Формы букв", "Harf şekilleri"], d: ["Сөз басы, ортасы, соңы — дұрыс форманы табыңыз", "Начало, середина, конец — найдите нужную форму", "Baş, orta, son — doğru şekli bulun"],
-    make() { const x = pick(CORE.letters.filter(y => y.joins)); const pi = 1 + Math.floor(Math.random() * 3); const names = [["басындағы", "в начале"], ["ортасындағы", "в середине"], ["соңындағы", "в конце"]][pi - 1];
-      const o = shuffle([...new Set(x.forms)]); return { kind: "mcq", q: { kk: `⟦${x.ar}⟧ — сөз ${names[0]} формасы?`, ru: `⟦${x.ar}⟧ — форма ${names[1]} слова?` }, options: o.map(y => ({ ar: y })), answer: o.indexOf(x.forms[pi]) }; } },
+    make() { const x = pick(CORE.letters.filter(y => y.joins)); const pi = 1 + Math.floor(Math.random() * 3);
+      let o = [...new Set(x.forms)]; for (const y of shuffle(CORE.letters.filter(z => z.joins && z !== x))) { if (o.length >= 4) break; const f = y.forms[pi]; if (!o.includes(f)) o.push(f); } o = shuffle(o.slice(0, 4));
+      return { kind: "mcq", q: { kk: `⟦${x.ar}⟧ — сөз ${FORM_N[pi][0]} формасы?`, ru: `⟦${x.ar}⟧ — форма ${FORM_N[pi][1]} слова?`, tr: `⟦${x.ar}⟧ — kelimenin ${FORM_N[pi][2]} şekli?` }, options: o.map(y => ({ ar: y })), answer: o.indexOf(x.forms[pi]),
+        hint: `<p>${esc(LX("Буква соединяется с соседями, поэтому у неё до четырёх форм:", "Әріп көршілерімен жалғанады, сондықтан оның төрт формасы бар:", "Harf komşularına bağlanır, bu yüzden dört şekli vardır:"))}</p>` + hintForms(x) }; } },
   { id: "harakat", ic: "بَ", t: ["Буын оқу", "Чтение слогов", "Hece okuma"], d: ["Харакатты буынды оқып, дұрыс оқылуын табыңыз", "Прочитайте слог с огласовкой и выберите чтение", "Harekeli heceyi okuyup doğru okunuşu seçin"],
-    make() { const x = pick(consonants()); const snd = L(x.sound).split(" ")[0]; const hk = pick(HARAKAT.slice(0, 3)); const opts = shuffle(HARAKAT.slice(0, 3).map(([, v]) => snd + v).concat([snd]));
-      return { kind: "mcq", q: { kk: "Қалай оқылады?", ru: "Как читается?" }, prompt: x.ar + hk[0], options: opts.map(o => ({ t: { kk: o, ru: o } })), answer: opts.indexOf(snd + hk[1]) }; } },
+    make() { const x = pick(consonants()); const snd = TRL(x.sound).split(" ")[0]; const hk = pick(HARAKAT.slice(0, 3)); const V = S.lang === "tr" ? ["a", "i", "u"] : ["а", "и", "у"];
+      const opts = shuffle(V.map(v => snd + v).concat([snd]));
+      return { kind: "mcq", q: { kk: "Қалай оқылады?", ru: "Как читается?", tr: "Nasıl okunur?" }, prompt: x.ar + hk[0], options: opts.map(o => ({ t: o })), answer: opts.indexOf(snd + V[HARAKAT.indexOf(hk)]),
+        hint: `<div class="hint-hk">${[["َ", LX("фатха", "фатха", "üstün"), V[0]], ["ِ", LX("кясра", "кәсра", "esre"), V[1]], ["ُ", LX("дамма", "дамма", "ötre"), V[2]], ["ْ", LX("сукун", "сукун", "cezm"), "—"]].map(([m, n, v]) => `<span><b class="ar" lang="ar">ـ${m}</b><small>${esc(n)}</small><i>${esc(v)}</i></span>`).join("")}</div><p class="muted small">${esc(LX("Фатха — чёрточка над буквой, кясра — под буквой, дамма — маленькая «вав» сверху.", "Фатха — әріптің үстіндегі сызықша, кәсра — астындағы, дамма — үстіндегі кішкентай «уау».", "Üstün harfin üstünde çizgi, esre altında, ötre üstte küçük bir «vav»."))}</p>` }; } },
   { id: "listen", ic: "♪", t: ["Тыңдап табу", "Найди на слух", "Dinleyip bul"], d: ["Қаридың дауысын тыңдап, сөзді табыңыз", "Послушайте чтеца и найдите слово", "Kurrayı dinleyip kelimeyi bulun"],
-    make() { const pool = CORE.words.filter(w => w.base.length >= 3 && w.base.length <= 6); const x = pick(pool); const w = shuffle(pool.filter(y => y !== x && Math.abs(y.base.length - x.base.length) <= 1)).slice(0, 3); const o = shuffle([x, ...w]);
-      return { kind: "mcq", listen: x.loc, q: { kk: "Естіген сөзіңізді табыңыз", ru: "Найдите услышанное слово" }, options: o.map(y => ({ ar: y.w })), answer: o.indexOf(x) }; } },
+    make() { const pool = CORE.words.filter(w => w.base.length >= 3 && w.base.length <= 6); const x = pick(pool); const w = shuffle(pool.filter(y => y !== x && y.w !== x.w && Math.abs(y.base.length - x.base.length) <= 1)).slice(0, 3); const o = shuffle([x, ...w]);
+      return { kind: "mcq", listen: x.loc, q: { kk: "Естіген сөзіңізді табыңыз", ru: "Найдите услышанное слово", tr: "Duyduğunuz kelimeyi bulun" }, options: o.map(y => ({ ar: y.w })), answer: o.indexOf(x),
+        hint: `<p>${esc(LX("Слушайте первую и последнюю букву слова. Так звучит каждый вариант:", "Сөздің бірінші және соңғы әрпіне құлақ салыңыз. Әр нұсқа былай оқылады:", "Kelimenin ilk ve son harfine kulak verin. Her seçenek şöyle okunur:"))}</p>` + o.map(y => `<p><b class="ar" lang="ar">${esc(y.w)}</b> — ${esc(TRL(y.tr))}</p>`).join("") }; } },
+  { id: "read", ic: "كَتَبَ", exam: true, t: ["Сөз оқу", "Прочитай слово", "Kelimeyi oku"], d: ["Сөзді оқып, дұрыс оқылуын таңдаңыз", "Прочитайте слово и выберите чтение", "Kelimeyi okuyun ve doğru okunuşu seçin"],
+    make() { const pool = CORE.words.filter(w => w.base.length >= 2 && w.base.length <= 5 && w.tr && w.tr.ru); const x = pick(pool); const w = shuffle(pool.filter(y => y.tr.ru !== x.tr.ru && Math.abs(y.base.length - x.base.length) <= 1)).slice(0, 3); const o = shuffle([x, ...w]);
+      return { kind: "mcq", q: { kk: "Бұл сөз қалай оқылады?", ru: "Как читается это слово?", tr: "Bu kelime nasıl okunur?" }, prompt: x.w, options: o.map(y => ({ t: TRL(y.tr) })), answer: o.indexOf(x),
+        hint: `<p>${esc(LX("Читайте по слогам, справа налево. Буквы этого слова:", "Буынға бөліп, оңнан солға оқыңыз. Осы сөздің әріптері:", "Hece hece, sağdan sola okuyun. Bu kelimenin harfleri:"))}</p>` + [...x.base].map(letterBy).filter(Boolean).map(hintLetter).join("") }; } },
   { id: "build", ic: "قل", t: ["Сөз құрастыру", "Собери слово", "Kelime kur"], d: ["Тыңдап, әріптерден сөз құрыңыз", "Послушайте и соберите слово из букв", "Dinleyin ve harflerden kelimeyi kurun"],
     make() { const pool = CORE.words.filter(w => w.base.length >= 2 && w.base.length <= 4 && !/[ٱآ]/.test(w.base)); const x = pick(pool);
-      return { kind: "order", q: { kk: "Сөзді құрастырыңыз", ru: "Соберите слово" }, pieces: [...x.base], answer: x.w, loc: x.loc, tr: x.tr }; } },
+      return { kind: "order", q: { kk: "Сөзді құрастырыңыз", ru: "Соберите слово", tr: "Kelimeyi kurun" }, pieces: [...x.base], answer: x.w, loc: x.loc, tr: x.tr }; } },
   { id: "tajweed", ic: "ن", t: ["Тәжуид ережесі", "Правило таджвида", "Tecvid kuralı"], d: ["Түспен белгіленген жердің ережесін анықтаңыз", "Определите правило в выделенном месте", "İşaretli yerdeki kuralı bulun"],
     make() { const q = pick(CORE.quiz); const w = shuffle(Object.keys(CORE.rules).filter(k => k !== q.r)).slice(0, 3); const o = shuffle([q.r, ...w]);
-      return { kind: "mcq", q: { kk: `Қандай ереже? (${q.src})`, ru: `Какое правило? (${q.src})` }, promptHTML: spansTarget(q.sp), options: o.map(k => ({ t: CORE.rules[k].name })), answer: o.indexOf(q.r) }; } },
+      return { kind: "mcq", q: { kk: `Қандай ереже? (${q.src})`, ru: `Какое правило? (${q.src})`, tr: `Hangi kural? (${q.src})` }, promptHTML: spansTarget(q.sp), options: o.map(k => ({ t: CORE.rules[k].name })), answer: o.indexOf(q.r),
+        hint: `<p>${esc(LX("Посмотрите, какая буква стоит в выделенном месте и что идёт сразу после неё.", "Белгіленген жердегі әріпке және одан кейінгі әріпке қараңыз.", "İşaretli yerdeki harfe ve hemen ardından geleni bakın."))}</p>` + o.map(k => `<p><b>${esc(L(CORE.rules[k].name))}</b> — ${esc(L(CORE.rules[k].short))}</p>`).join("") }; } },
   { id: "madd", ic: "آ", t: ["Созым ұзақтығы", "Длина мадда", "Med uzunluğu"], d: ["Белгіленген созымды неше харакат созу керек?", "На сколько счётов тянуть выделенный мадд?", "İşaretli med kaç elif uzatılır?"],
-    make() { const q = pick(CORE.quiz.filter(x => x.r.startsWith("madd"))); const o = [{ kk: "2 харакат", ru: "2 счёта" }, { kk: "4–5 харакат", ru: "4–5 счётов" }, { kk: "6 харакат", ru: "6 счётов" }];
-      return { kind: "mcq", q: { kk: `Неше харакат? (${q.src})`, ru: `Сколько счётов? (${q.src})` }, promptHTML: spansTarget(q.sp), options: o.map(t => ({ t })), answer: { madd2: 0, madd46: 1, madd6: 2 }[q.r] }; } },
+    make() { const q = pick(CORE.quiz.filter(x => x.r.startsWith("madd"))); const o = [{ kk: "1 харакат", ru: "1 счёт", tr: "1 hareke" }, { kk: "2 харакат", ru: "2 счёта", tr: "2 hareke" }, { kk: "4–5 харакат", ru: "4–5 счётов", tr: "4–5 hareke" }, { kk: "6 харакат", ru: "6 счётов", tr: "6 hareke" }];
+      return { kind: "mcq", q: { kk: `Неше харакат? (${q.src})`, ru: `Сколько счётов? (${q.src})`, tr: `Kaç hareke? (${q.src})` }, promptHTML: spansTarget(q.sp), options: o.map(t => ({ t })), answer: { madd2: 1, madd46: 2, madd6: 3 }[q.r],
+        hint: `<p><b>${esc(LX("Естественный мадд", "Табиғи мадд", "Tabiî med"))}</b> — ${esc(LX("2 счёта: буква долготы, после неё нет хамзы и сукуна.", "2 харакат: созылу әрпінен кейін һәмза да, сукун да жоқ.", "2 hareke: med harfinden sonra hemze ya da cezm yok."))}</p><p><b>${esc(LX("Мадд с хамзой", "Һәмзалы мадд", "Hemzeli med"))}</b> — ${esc(LX("4–5 счётов: после буквы долготы хамза (в том же слове или в следующем).", "4–5 харакат: созылу әрпінен кейін һәмза (сол сөзде не келесі сөзде).", "4–5 hareke: med harfinden sonra hemze (aynı ya da sonraki kelimede)."))}</p><p><b>${esc(LX("Мадд лязим", "Ләзим мадд", "Med-i lâzım"))}</b> — ${esc(LX("6 счётов: после буквы долготы постоянный сукун или шадда.", "6 харакат: созылу әрпінен кейін тұрақты сукун не шадда.", "6 hareke: med harfinden sonra sabit cezm ya da şedde."))}</p>` }; } },
 ];
 function pagePractice(v) {
   v.append(pageHead(T("learn"), null, learnTabs("practice")), rvCard());
@@ -2476,37 +2589,91 @@ async function pageReview(v) {
   show();
 }
 
-/* ═════════════ входной тест: с какого модуля начать ═════════════ */
-const PLACE = [[1, "letters"], [2, "harakat"], [3, "tajweed"]], PLACE_N = 4, PLACE_OK = 3;
+/* ═════════════ входной тест: объективная оценка уровня ═════════════
+   Как в профессиональных тестах: много заданий на каждый навык, 4 варианта + «Не знаю», ответ не подсвечивается,
+   подсказок нет, за угадывание — поправка (верные − неверные ÷ 3). Навык освоен, если чистый результат ≥ 75 %. */
+const PLACE = [
+  { m: 1, k: "letters", n: ["Әріптер", "Буквы", "Harfler"], items: [["letters", 4], ["lookalike", 2], ["forms", 2]] },
+  { m: 2, k: "reading", n: ["Оқу ережелері", "Правила чтения", "Okuma kuralları"], items: [["harakat", 3], ["read", 4]] },
+  { m: 3, k: "tajweed", n: ["Тәжуид", "Таджвид", "Tecvid"], items: [["tajweed", 4], ["madd", 2]] },
+  { m: 4, k: "quran", n: ["Құранды тыңдау және оқу", "Слух и чтение Корана", "Kur'an'ı dinleme ve okuma"], items: [["listen", 3], ["read", 3]] },
+];
+const PLACE_OK = 0.75, PLACE_STOP = 0.5;
+const PLACE_LV = [
+  [["Нөлдік деңгей", "Нулевой уровень", "Sıfır seviye"], ["Араб әріптері әлі таныс емес. Курсты басынан — әліпбиден бастаңыз.", "Арабские буквы пока незнакомы. Начинайте курс с самого начала — с алфавита.", "Arap harfleri henüz tanıdık değil. Kursa en baştan — alfabeden başlayın."]],
+  [["Бастапқы деңгей", "Начальный уровень", "Başlangıç seviyesi"], ["Кейбір әріптерді танисыз, бірақ берік емес. Әліпбиден бастаңыз — алғашқы сабақтар тез өтеді.", "Часть букв вы узнаёте, но пока неуверенно. Начните с алфавита — первые уроки пройдут быстро.", "Bazı harfleri tanıyorsunuz ama henüz emin değilsiniz. Alfabeden başlayın — ilk dersler hızlı geçer."]],
+  [["Әріптерді білесіз", "Буквы знаете", "Harfleri biliyorsunuz"], ["Әліпби меңгерілген. Енді харакат, сукун, шадда мен танвинмен буынға бөліп оқуды үйрену керек.", "Алфавит освоен. Дальше — чтение по слогам: огласовки, сукун, шадда и танвин.", "Alfabe tamam. Sırada heceleyerek okuma var: harekeler, cezm, şedde ve tenvin."]],
+  [["Буынмен оқисыз", "Читаете по слогам", "Heceleyerek okuyorsunuz"], ["Сөздерді дұрыс оқисыз. Келесі қадам — тәжуид: нун мен мим ережелері, ғунна, мадд.", "Слова читаете правильно. Следующий шаг — таджвид: правила нуна и мима, гунна, мадды.", "Kelimeleri doğru okuyorsunuz. Sonraki adım tecvid: nun ve mim kuralları, gunne, medler."]],
+  [["Тәжуидпен оқисыз", "Читаете с таджвидом", "Tecvidle okuyorsunuz"], ["Тәжуид ережелерін білесіз. Сүрелерді тыңдап, оқып, жаттау кезеңіне өтуге болады.", "Правила таджвида знаете. Можно переходить к чтению, слушанию и заучиванию сур.", "Tecvid kurallarını biliyorsunuz. Sure okuma, dinleme ve ezberleme aşamasına geçebilirsiniz."]],
+  [["Сенімді оқу", "Уверенное чтение", "Akıcı okuma"], ["Барлық бөлім бойынша жоғары нәтиже. Курстың соңғы модулін бекіту үшін өтіңіз немесе бірден сүрелерге көшіңіз.", "Высокий результат во всех разделах. Пройдите последний модуль для закрепления или сразу переходите к сурам.", "Tüm bölümlerde yüksek sonuç. Pekiştirmek için son modülü geçin ya da doğrudan surelere geçin."]],
+];
 function pagePlacement(v) {
-  v.append(backHead("#/course", LX("Входной тест", "Кіріс тест", "Seviye testi"), LX("Подберём модуль под ваш уровень", "Деңгейіңізге сай модуль таңдаймыз", "Seviyenize uygun modülü bulalım")));
+  v.append(backHead("#/course", LX("Входной тест", "Кіріс тест", "Seviye testi"), LX("Объективная оценка вашего уровня", "Деңгейіңізді объективті бағалау", "Seviyenizin objektif değerlendirmesi")));
   const box = h("div", { class: "session" }); v.append(box);
+  const LL = a => L({ kk: a[0], ru: a[1], tr: a[2] });
   const intro = () => { box.innerHTML = "";
-    box.append(h("div", { class: "panel pl-intro" }, h("span", { class: "pl-ic", html: icon("bulb") }),
-      h("p", {}, LX("До 12 вопросов: буквы, чтение слогов, правила таджвида. Если что-то пока незнакомо — тест остановится и подскажет, с чего начать.", "12 сұраққа дейін: әріптер, буын оқу, тәжуид ережелері. Бірдеңе әлі таныс болмаса — тест тоқтап, неден бастау керегін айтады.", "En fazla 12 soru: harfler, hece okuma, tecvid kuralları. Bilmediğiniz bir şey çıkarsa test durur ve nereden başlayacağınızı söyler.")),
+    const prev = S.place;
+    box.append(h("div", { class: "panel pl-intro" }, h("span", { class: "pl-ic", html: icon("target") }),
+      h("p", {}, (N => LX(`До ${N} заданий по четырём разделам курса: буквы, правила чтения, таджвид, слух и чтение Корана. Около 6 минут.`, `Курстың төрт бөлімі бойынша ${N} тапсырмаға дейін: әріптер, оқу ережелері, тәжуид, Құранды тыңдау мен оқу. Шамамен 6 минут.`, `Kursun dört bölümünden en fazla ${N} görev: harfler, okuma kuralları, tecvid, Kur'an'ı dinleme ve okuma. Yaklaşık 6 dakika.`))(PLACE.reduce((a, b) => a + b.items.reduce((x, y) => x + y[1], 0), 0))),
+      h("ul", { class: "pl-rules" }, [LX("В каждом задании 4 варианта и кнопка «Не знаю» — лучше честно её нажать, чем угадывать: за неверные ответы баллы снижаются.", "Әр тапсырмада 4 нұсқа және «Білмеймін» батырмасы бар — болжағаннан гөрі соны басқан дұрыс: қате жауапқа ұпай азаяды.", "Her görevde 4 seçenek ve «Bilmiyorum» düğmesi var — tahmin etmektense onu seçin: yanlış cevaplar puan düşürür."),
+        LX("Правильность ответа не показывается до конца теста, подсказок нет.", "Жауаптың дұрыстығы тест соңына дейін көрсетілмейді, кеңес жоқ.", "Cevabın doğruluğu test bitene kadar gösterilmez, ipucu yoktur."),
+        LX("Если базовый раздел пока не освоен, тест остановится раньше — дальше проверять нет смысла.", "Негізгі бөлім әлі меңгерілмесе, тест ертерек тоқтайды.", "Temel bölüm henüz oturmamışsa test erken biter.")].map(t => h("li", {}, t))),
+      prev ? h("p", { class: "muted small" }, LX(`Прошлый результат: ${LL(PLACE_LV[prev.lv][0])} (${prev.at.split("-").reverse().join(".")})`, `Алдыңғы нәтиже: ${LL(PLACE_LV[prev.lv][0])} (${prev.at.split("-").reverse().join(".")})`, `Önceki sonuç: ${LL(PLACE_LV[prev.lv][0])} (${prev.at.split("-").reverse().join(".")})`)) : null,
       h("div", { class: "row" }, h("button", { class: "btn", onclick: run }, LX("Начать тест", "Тестті бастау", "Teste başla")), h("a", { class: "btn ghost", href: "#/lesson/1" }, LX("Начну с нуля", "Басынан бастаймын", "Sıfırdan başlayacağım"))))); };
   const run = () => {
-    let bi = 0, qi = 0, ok = 0;
-    const finish = level => { // level = номер модуля, с которого начать
-      box.innerHTML = "";
-      const M = COURSE.modules[level - 1];
-      box.append(h("div", { class: "panel result pl-res" }, h("small", { class: "muted" }, LX("Рекомендуем начать с", "Бастауға кеңес береміз", "Şuradan başlamanızı öneririz")),
-        h("div", { class: "pl-mod" }, h("span", { class: "ar", lang: "ar" }, M.ar), h("b", {}, `${T("module")} ${M.id}. ${L(M.title)}`)), h("p", { class: "muted" }, L(M.desc || M.result)),
-        h("div", { class: "row", style: "justify-content:center" },
-          h("button", { class: "btn", onclick: () => { S.placeFrom = M.from; save(); location.hash = `#/lesson/${nextLessonN()}`; } }, LX(`Начать модуль ${M.id}`, `${M.id}-модульді бастау`, `${M.id}. modüle başla`)),
-          level > 1 ? h("a", { class: "btn ghost", href: "#/lesson/1" }, LX("Всё же с начала", "Бәрібір басынан", "Yine de baştan")) : null)));
-    };
+    const res = PLACE.map(() => ({ r: 0, w: 0, s: 0, n: 0, t: [] }));
+    const total = PLACE.reduce((a, b) => a + b.items.reduce((x, y) => x + y[1], 0), 0);
+    let bi = 0, queue = [], done = 0;
+    const fill = () => { queue = shuffle(PLACE[bi].items.flatMap(([id, n]) => Array(n).fill(id))); };
+    const score = R => R.n ? Math.max(0, (R.r - R.w / 3) / R.n) : 0;
+    fill();
     const step = () => {
-      if (qi === PLACE_N) { if (ok < PLACE_OK) return finish(PLACE[bi][0]); bi++; qi = 0; ok = 0; if (bi === PLACE.length) return finish(4); }
+      if (!queue.length) { const sc = score(res[bi]); bi++; if (bi === PLACE.length || sc < PLACE_STOP) return finish(res); fill(); }
       box.innerHTML = "";
-      const tr = TRAINERS.find(t => t.id === PLACE[bi][1]), q = tr.make(), k = bi * PLACE_N + qi;
-      box.append(h("div", { class: "tprog", style: "display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted);margin-bottom:6px" }, h("span", {}, L({ kk: tr.t[0], ru: tr.t[1], tr: tr.t[2] })), h("span", { class: "num" }, `${k + 1} / ${PLACE.length * PLACE_N}`)),
-        h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${k / (PLACE.length * PLACE_N) * 100}%` })));
-      const el = exEl(q, "pl", null, { noTag: true, single: true, onDone: good => { if (good) ok++; qi++; setTimeout(step, good ? 400 : 1100); } });
-      if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
-      box.append(el);
+      const id = queue.shift(), q = TRAINERS.find(t => t.id === id).make(), B = PLACE[bi], t0 = Date.now();
+      box.append(h("div", { class: "pl-top" }, h("span", {}, LL(B.n)), h("span", { class: "num" }, `${done + 1} / ${total}`)),
+        h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${done / total * 100}%` })));
+      const card = h("div", { class: "ex pl-q" }, h("div", { class: "q" }, mdEl(q.q)));
+      if (q.prompt) card.append(h("div", { class: "prompt" }, q.prompt));
+      if (q.promptHTML) card.append(h("div", { class: "prompt", style: "font-size:40px", html: q.promptHTML }));
+      if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); card.append(lb); setTimeout(() => playURL(wordURL(q.listen), lb), 250); }
+      const answer = i => { const R = res[bi]; R.n++; done++;
+        if (i === -1) R.s++; else if (i === q.answer) { R.r++; R.t.push(Date.now() - t0); } else R.w++;
+        [...opts.children].forEach((b, j) => b.classList.toggle("picked", j === i)); opts.classList.add("locked");
+        setTimeout(step, 260); };
+      const opts = h("div", { class: "opts" }, q.options.map((o, i) => { const b = h("button", { class: "opt" + (o.ar ? " ar-o" : ""), type: "button" }); if (o.ar) b.textContent = o.ar; else b.innerHTML = md(o.t).replace(/^<p>|<\/p>$/g, ""); b.onclick = () => answer(i); return b; }));
+      card.append(opts, h("button", { class: "btn ghost pl-idk", type: "button", onclick: () => answer(-1) }, LX("Не знаю", "Білмеймін", "Bilmiyorum")));
+      box.append(card);
     };
     step();
+  };
+  const finish = res => {
+    stopAudio();
+    const sc = res.map(R => R.n ? Math.max(0, (R.r - R.w / 3) / R.n) : null);
+    // уровень: первый неосвоенный раздел; буквы делятся на «нулевой» и «начальный»
+    let lv = 5; for (let i = 0; i < PLACE.length; i++) if (sc[i] == null || sc[i] < PLACE_OK) { lv = i === 0 ? (sc[0] < 0.3 ? 0 : 1) : i + 1; break; }
+    const startM = Math.min(4, Math.max(1, lv <= 1 ? 1 : lv));
+    const items = res.reduce((a, R) => a + R.n, 0), guess = res.reduce((a, R) => a + R.w, 0), idk = res.reduce((a, R) => a + R.s, 0);
+    const rt = res.flatMap(R => R.t).sort((a, b) => a - b), med = rt.length ? rt[Math.floor(rt.length / 2)] / 1000 : null;
+    S.place = { lv, at: today(), sc: sc.map(x => x == null ? null : Math.round(x * 100)) }; save();
+    box.innerHTML = "";
+    const M = COURSE.modules[startM - 1], LL = a => L({ kk: a[0], ru: a[1], tr: a[2] });
+    box.append(h("div", { class: "panel pl-res2" },
+      h("small", { class: "muted" }, LX("Ваш уровень", "Деңгейіңіз", "Seviyeniz")),
+      h("div", { class: "pl-lv" }, h("span", { class: "pl-lvn num" }, `${lv}/5`), h("b", {}, LL(PLACE_LV[lv][0]))),
+      h("p", {}, LL(PLACE_LV[lv][1])),
+      h("div", { class: "pl-sk" }, PLACE.map((B, i) => { const v = sc[i];
+        return h("div", { class: "pl-skr" + (v == null ? " na" : v >= PLACE_OK ? " ok" : "") }, h("span", {}, LL(B.n)),
+          h("span", { class: "pl-bar" }, h("i", { style: `width:${v == null ? 0 : Math.round(v * 100)}%` })),
+          h("b", { class: "num" }, v == null ? "—" : Math.round(v * 100) + "%")); })),
+      h("p", { class: "muted small pl-note" }, LX(`Заданий: ${items}. Чистый результат — с поправкой на угадывание (неверных: ${guess}, «не знаю»: ${idk}). Раздел засчитан при 75 % и выше; «—» — не проверялся.`, `Тапсырма: ${items}. Таза нәтиже — болжауға түзетумен (қате: ${guess}, «білмеймін»: ${idk}). Бөлім 75 % және жоғары болғанда есептеледі; «—» — тексерілмеді.`, `Görev: ${items}. Net sonuç tahmin düzeltmesiyle (yanlış: ${guess}, «bilmiyorum»: ${idk}). Bölüm %75 ve üzerinde geçer; «—» test edilmedi.`) +
+        (med ? " " + LX(`Среднее время верного ответа: ${med.toFixed(1)} с.`, `Дұрыс жауаптың орташа уақыты: ${med.toFixed(1)} с.`, `Doğru cevabın ortalama süresi: ${med.toFixed(1)} sn.`) : "")),
+      h("p", { class: "box tip small" }, LX("Тест проверяет узнавание и знание правил. Произношение (махраджи) онлайн-тест оценить не может — его стоит показать преподавателю.", "Тест тану мен ережені білуді тексереді. Айтылымды (махраж) онлайн-тест бағалай алмайды — оны ұстазға көрсеткен жөн.", "Test tanıma ve kural bilgisini ölçer. Telaffuzu (mahreçleri) çevrimiçi test değerlendiremez — bunu bir hocaya göstermek gerekir.")),
+      h("div", { class: "pl-mod" }, h("span", { class: "ar", lang: "ar" }, M.ar), h("b", {}, `${LX("Рекомендуем начать с модуля", "Ұсынылатын модуль", "Önerilen modül")} ${M.id}. ${L(M.title)}`)),
+      h("div", { class: "row", style: "justify-content:center" },
+        h("button", { class: "btn", onclick: () => { S.placeFrom = M.from; save(); location.hash = `#/lesson/${nextLessonN()}`; } }, LX(`Начать модуль ${M.id}`, `${M.id}-модульді бастау`, `${M.id}. modüle başla`)),
+        startM > 1 ? h("a", { class: "btn ghost", href: "#/lesson/1" }, LX("Всё же с начала", "Бәрібір басынан", "Yine de baştan")) : null,
+        h("button", { class: "btn ghost", onclick: run }, LX("Пройти заново", "Қайта өту", "Yeniden çöz")))));
   };
   intro();
 }
@@ -2533,8 +2700,10 @@ function pageTrainer(v, id) {
       box.append(h("div", { class: "tprog", style: "display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted);margin-bottom:6px" }, h("span", {}, `${T("question")} ${i + 1} / ${N}`), h("span", { class: "num" }, `${ok} ✓`)),
         h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${i / N * 100}%` })));
       const el = exEl(q, "tr", null, { noTag: true, single: true, onDone: good => {
-        S.tr.n++; if (good) { S.tr.ok++; ok++; addXP(2, el); } save(); i++; setTimeout(step, good ? 450 : 1400);
+        buzz(good); S.tr.n++; if (good) { S.tr.ok++; ok++; addXP(2, el); } save(); i++; setTimeout(step, good ? 450 : 1400);
       } });
+      if (q.hint) { const hbox = h("div", { class: "hint-box", hidden: true, html: q.hint }), hb = h("button", { class: "hint-b", type: "button", html: icon("bulb") + `<span>${esc(LX("Подсказка", "Кеңес", "İpucu"))}</span>` });
+        hb.onclick = () => { hbox.hidden = false; hb.disabled = true; requestAnimationFrame(() => hbox.classList.add("in")); }; el.querySelector(".q").append(hb); el.querySelector(".q").after(hbox); }
       if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
       if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); el.querySelector(".q").after(lb); setTimeout(() => playURL(wordURL(q.listen), lb), 250); }
       box.append(el);
@@ -2565,10 +2734,16 @@ async function pageBookmarks(v) {
   }
 }
 
-/* ═════════════ экзамен после модуля: 20 вопросов, зачёт от 16, сертификат ═════════════ */
-const EXAM_MIX = { 1: { letters: 7, lookalike: 5, forms: 5, listen: 3 }, 2: { harakat: 8, build: 4, listen: 5, letters: 3 },
-  3: { tajweed: 10, madd: 6, harakat: 4 }, 4: { listen: 8, tajweed: 6, madd: 3, build: 3 } };
-const EXAM_N = 20, EXAM_PASS = 16;
+/* ═════════════ экзамен после модуля: 20 вопросов, зачёт от 18, 3 подсказки, сертификат ═════════════ */
+const EXAM_MIX = { 1: { letters: 7, lookalike: 5, forms: 5, listen: 3 }, 2: { harakat: 8, read: 4, listen: 5, letters: 3 },
+  3: { tajweed: 10, madd: 6, harakat: 4 }, 4: { listen: 8, tajweed: 6, madd: 3, read: 3 } };
+const EXAM_N = 20, EXAM_PASS = 18, EXAM_HINTS = 3;
+// отклик на ответ: короткая вибрация — верно, двойная — ошибка
+function buzz(good) {
+  if (S.tsb && S.tsb.vib === false) return;
+  if (typeof navigator.vibrate === "function") { navigator.vibrate(good ? 35 : [70, 60, 70]); return; }
+  haptic(good ? 1 : 2);
+}
 const modDoneN = M => { let d = 0; for (let i = M.from; i <= M.to; i++) if (isDone(i)) d++; return d; };
 function examRow(M) {
   const ru = S.lang === "ru", e = (S.exams || {})[M.id], tot = M.to - M.from + 1, d = modDoneN(M);
@@ -2588,7 +2763,8 @@ function pageExam(v, m) {
     box.innerHTML = "";
     const e = S.exams[m], tot = M.to - M.from + 1, d = modDoneN(M);
     box.append(h("section", { class: "card stack" },
-      h("p", {}, LX(`${EXAM_N} вопросов по материалу модуля. Чтобы сдать, нужно ответить верно хотя бы на ${EXAM_PASS}. После сдачи вы получите сертификат.`, `Модуль бойынша ${EXAM_N} сұрақ. Тапсыру үшін кемінде ${EXAM_PASS} сұраққа дұрыс жауап беру керек. Тапсырған соң сертификат аласыз.`, `Modül konularından ${EXAM_N} soru. Geçmek için en az ${EXAM_PASS} doğru cevap gerekir. Geçince sertifika alırsınız.`)),
+      h("p", {}, LX(`${EXAM_N} вопросов по материалу модуля, в каждом 4 варианта. Чтобы сдать, нужно ответить верно хотя бы на ${EXAM_PASS}. После сдачи вы получите сертификат.`, `Модуль бойынша ${EXAM_N} сұрақ, әрқайсысында 4 нұсқа. Тапсыру үшін кемінде ${EXAM_PASS} сұраққа дұрыс жауап беру керек. Тапсырған соң сертификат аласыз.`, `Modül konularından ${EXAM_N} soru, her birinde 4 seçenek. Geçmek için en az ${EXAM_PASS} doğru cevap gerekir. Geçince sertifika alırsınız.`)),
+      h("p", { class: "muted small", html: icon("bulb") + " " + esc(LX(`На экзамен даётся ${EXAM_HINTS} подсказки — короткая теория из уроков.`, `Емтиханға ${EXAM_HINTS} кеңес беріледі — сабақтардан қысқа теория.`, `Sınavda ${EXAM_HINTS} ipucu hakkınız var — derslerden kısa teori.`)) }),
       d < tot ? h("div", { class: "box warn" }, LX(`Пройдено уроков модуля: ${d} из ${tot}. Сдавать можно и сейчас, но лучше сначала закончить уроки.`, `Модуль сабақтары: ${tot}-нан ${d} өтілді. Қазір де тапсыруға болады, бірақ алдымен сабақтарды аяқтаған жөн.`, `Modül dersleri: ${d} / ${tot}. Şimdi de girebilirsiniz ama önce dersleri bitirmek daha iyi.`)) : null,
       e ? h("p", { class: "muted small" }, (LX("Лучший результат: ", "Ең жақсы нәтиже: ", "En iyi sonuç: ")) + `${e.best} / ${EXAM_N}` + (e.passed ? (LX(" — сдан", " — тапсырылды", " — geçti")) : "")) : null,
       h("div", { class: "row" }, h("button", { class: "btn", onclick: run, html: icon("play") + esc(LX("Начать экзамен", "Емтиханды бастау", "Sınava başla")) }),
@@ -2597,21 +2773,28 @@ function pageExam(v, m) {
   const run = () => {
     const mix = EXAM_MIX[m] || EXAM_MIX[1];
     const qs = shuffle(Object.entries(mix).flatMap(([id, k]) => Array.from({ length: k }, () => TRAINERS.find(t => t.id === id))).filter(Boolean)).slice(0, EXAM_N);
-    let i = 0, ok = 0;
+    let i = 0, ok = 0, hints = EXAM_HINTS; const miss = {};
     const step = () => {
       box.innerHTML = "";
-      if (i >= qs.length) return finish(ok);
-      const q = qs[i].make();
+      if (i >= qs.length) return finish(ok, miss);
+      const tr = qs[i], q = tr.make();
       box.append(h("div", { class: "tprog", style: "display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted);margin-bottom:6px" }, h("span", {}, `${T("question")} ${i + 1} / ${qs.length}`), h("span", { class: "num" }, `✓ ${ok}`)),
         h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${i / qs.length * 100}%` })));
-      const el = exEl(q, "tr", null, { noTag: true, single: true, onDone: good => { if (good) ok++; i++; setTimeout(step, good ? 450 : 1400); } });
+      const el = exEl(q, "tr", null, { noTag: true, single: true, onDone: good => { buzz(good); if (good) ok++; else miss[tr.id] = (miss[tr.id] || 0) + 1; i++; hb.disabled = true; setTimeout(step, good ? 550 : 1600); } });
+      // подсказка: теория из уроков, раскрывается под вопросом
+      const hbox = h("div", { class: "hint-box", hidden: true, html: q.hint || "" });
+      const hb = h("button", { class: "hint-b", type: "button", disabled: !q.hint || !hints ? "" : null,
+        html: icon("bulb") + `<span>${esc(LX("Подсказка", "Кеңес", "İpucu"))}</span><small class="num">${hints}</small>` });
+      hb.onclick = () => { if (!hints || !hbox.hidden) return; hints--; hbox.hidden = false; hb.disabled = true; hb.querySelector("small").textContent = hints; requestAnimationFrame(() => hbox.classList.add("in")); };
+      el.querySelector(".q").append(hb);
+      el.querySelector(".q").after(hbox);
       if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
       if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); el.querySelector(".q").after(lb); setTimeout(() => playURL(wordURL(q.listen), lb), 250); }
       box.append(el);
     };
     step();
   };
-  const finish = ok => {
+  const finish = (ok, miss = {}) => {
     const prev = S.exams[m] || { best: 0 };
     const passed = ok >= EXAM_PASS;
     const e = S.exams[m] = { best: Math.max(prev.best || 0, ok), passed: prev.passed || passed, at: passed && !prev.passed ? today() : (prev.at || (passed ? today() : null)), score: passed ? Math.max(prev.score || 0, ok) : prev.score };
@@ -2619,7 +2802,9 @@ function pageExam(v, m) {
     save();
     box.innerHTML = "";
     box.append(h("div", { class: "panel result" }, h("div", { class: "big" }, `${ok} / ${EXAM_N}`),
-      h("p", {}, passed ? (LX("Экзамен сдан! Машаллах.", "Емтихан тапсырылды! Машаллаһ.", "Sınavı geçtiniz! Maşallah.")) : (LX(`Пока не сдан: нужно ${EXAM_PASS}. Повторите уроки и попробуйте снова.`, `Әзірге тапсырылмады: ${EXAM_PASS} керек. Сабақтарды қайталап, қайта көріңіз.`, `Henüz geçmedi: ${EXAM_PASS} gerekli. Dersleri tekrar edip yeniden deneyin.`))),
+      h("p", { class: "ex-verdict " + (passed ? "ok" : "bad") }, passed ? (LX("Экзамен сдан! Машаллах.", "Емтихан тапсырылды! Машаллаһ.", "Sınavı geçtiniz! Maşallah.")) : (LX(`Экзамен не сдан: нужно не меньше ${EXAM_PASS} из ${EXAM_N}.`, `Емтихан тапсырылмады: ${EXAM_N}-нан кемінде ${EXAM_PASS} керек.`, `Sınav geçilmedi: en az ${EXAM_PASS} / ${EXAM_N} gerekli.`))),
+      Object.keys(miss).length ? h("div", { class: "ex-miss" }, h("small", { class: "muted" }, LX("Что повторить:", "Нені қайталау керек:", "Neyi tekrar etmeli:")),
+        ...Object.entries(miss).sort((a, b) => b[1] - a[1]).map(([id, n]) => { const t = TRAINERS.find(x => x.id === id); return h("a", { href: `#/practice/${id}`, html: `<b>${esc(L({ kk: t.t[0], ru: t.t[1], tr: t.t[2] }))}</b><span class="num">−${n}</span>${icon("chev")}` }); })) : null,
       h("div", { class: "row", style: "justify-content:center" },
         passed ? h("button", { class: "btn", onclick: () => cert(e) }, LX("Получить сертификат", "Сертификат алу", "Sertifikayı al")) : h("button", { class: "btn", onclick: run }, T("again")),
         h("a", { class: "btn ghost", href: `#/course#m${M.id}` }, LX("К курсу", "Курсқа", "Kursa dön")))));
