@@ -1447,13 +1447,18 @@ function duaCard(t, opts = {}) {
   } else {
     card.append(h("p", { class: "dua-ar", lang: "ar" }, t.ar), h("p", { class: "dua-tr" }, L(t.tr)), h("p", { class: "dua-m" }, L(t.m)));
   }
+  if (t.note) card.append(h("p", { class: "dua-note", html: icon("bulb") + esc(L(t.note)) }));
+  if (t.src) card.append(h("p", { class: "dua-src" }, L(t.src)));
   // живой голос: аяты — чтец (EveryAyah), дуа и зикры — запись из «Хиснуль-муслим»; синтезатор речи не используем
   const src = t.au ? ayahURL(t.au.s, t.au.a) : t.hm ? hisnURL(t.hm) : null;
+  const foot = h("div", { class: "dua-f" });
   if (src) {
     const pb = h("button", { class: "saybtn", type: "button", html: icon("sound") + `<span>${esc(ru ? "Слушать" : "Тыңдау")}</span>` });
     pb.onclick = () => playURL(src, pb);
-    card.append(h("div", { class: "dua-f" }, pb));
+    foot.append(pb);
   }
+  if (opts.count) foot.append(azkCounter(t, card));
+  if (foot.children.length) card.append(foot);
   return card;
 }
 // позы намаза (ханафитский мазхаб): m_ — мужчины, f_ — женщины; лица не рисуем
@@ -1482,6 +1487,8 @@ async function pageNamaz(v, sub) {
   if (sub === "after") { await loadSura(2); return nzAfter(v, d); }
   if (sub === "witr") return nzWitr(v, d);
   if (sub === "times") return nzTimes(v);
+  if (sub === "azkar") return nzAzkar(v);
+  if (sub === "duas") return nzDuas(v);
   if (sub) return notFound(v);
   v.append(pageHead(T("namaz"), ru ? "Ханафитский мазхаб · шаг за шагом" : "Ханафи мазһабы · қадам-қадаммен"), nextPrayerCard());
   const poses = h("span", { class: "nz-poses" });
@@ -1505,7 +1512,11 @@ async function pageNamaz(v, sub) {
     h("div", { class: "nz-after" },
       h("a", { class: "glass", href: "#/tasbih", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(ru ? "Тасбих" : "Тәсбих")}</b><small class="num">${esc(tsbTotal() ? fmtN(tsbTotal()) : "33 · 33 · 33")}</small></span>` }),
       h("a", { class: "glass", href: "#/namaz/after", html: `<span class="t-ic ar" lang="ar">ٱللَّهُ</span><span><b>${esc(ru ? "Аят аль-Курси" : "Аятул-Күрси")}</b><small>${esc(ru ? "и азкары" : "және зікірлер")}</small></span>` })),
-    h("a", { class: "nz-row", href: "#/namaz/witr", html: `<b>${esc(ru ? "Витр и дуа «Кунут»" : "Үтір және «Құнут» дұғасы")}</b>${icon("chev")}` }),
+    h("a", { class: "nz-row", href: "#/namaz/witr", html: `<b>${esc(ru ? "Витр и дуа «Кунут»" : "Үтір және «Құнут» дұғасы")}</b>${icon("chev")}` }));
+  v.append(shelf(ru ? "Азкары и дуа" : "Зікірлер мен дұғалар"),
+    h("div", { class: "nz-after" },
+      h("a", { class: "glass", href: "#/namaz/azkar", html: `<span class="t-ic solid">${icon("sun")}</span><span><b>${esc(ru ? "Утро и вечер" : "Таң мен кеш")}</b><small>${esc(azkSub())}</small></span>` }),
+      h("a", { class: "glass", href: "#/namaz/duas", html: `<span class="t-ic solid">${icon("learn")}</span><span><b>${esc(ru ? "Дуа на каждый день" : "Күнделікті дұғалар")}</b><small>${esc(ru ? "Сон, дом, еда, мечеть" : "Ұйқы, үй, тамақ, мешіт")}</small></span>` })),
     h("div", { class: "box tip nz-note" }, mdEl(d.intro)));
 }
 function nzHow(v, d) {
@@ -1678,6 +1689,53 @@ async function pageTasbih(v) {
   draw();
 }
 
+
+/* ───── утренние/вечерние азкары и дуа на каждый день («Хиснуль-муслим») ───── */
+let AZ = null;
+const loadAZ = () => AZ || (AZ = fetchJSON("data/adhkar.json").catch(e => { AZ = null; throw e; }));
+function azkState() { const a = S.azk = Object.assign({ day: "", c: {} }, S.azk); if (a.day !== today()) { a.day = today(); a.c = {}; } return a; }
+function azkSub() {
+  const ru = S.lang === "ru", a = S.azk && S.azk.day === today() ? S.azk.c : {}, n = Object.keys(a).filter(k => a[k] === "done").length;
+  return n ? (ru ? `Сегодня: ${n} из 12` : `Бүгін: 12-нің ${n}-і`) : (ru ? "12 азкаров с аудио" : "Аудиосы бар 12 зікір");
+}
+function azkCounter(t, card) {
+  const ru = S.lang === "ru", st = azkState(), need = t.n || 1;
+  const b = h("button", { class: "azk-c", type: "button" });
+  const draw = () => { const v = st.c[t.id], done = v === "done", n = done ? need : (v || 0);
+    card.classList.toggle("done", done);
+    b.innerHTML = done ? icon("check") + `<span>${esc(ru ? "Прочитано" : "Оқылды")}</span>` : need > 1 ? `<span class="num">${n} / ${need}</span>` : `<span>${esc(ru ? "Отметить" : "Белгілеу")}</span>`;
+    b.setAttribute("aria-label", done ? (ru ? "Прочитано, нажмите, чтобы сбросить" : "Оқылды") : (ru ? "Посчитать повтор" : "Қайталауды санау")); };
+  b.onclick = () => { const v = st.c[t.id];
+    if (v === "done") delete st.c[t.id];
+    else { const n = (v || 0) + 1; st.c[t.id] = n >= need ? "done" : n; if (n >= need && S.tsb && S.tsb.vib !== false) haptic(); }
+    save(); draw(); const pr = $(".azk-pr"); if (pr) pr.replaceWith(azkProgress()); };
+  draw(); return b;
+}
+function azkProgress() {
+  const ru = S.lang === "ru", c = azkState().c, tot = (AZ && AZ.then ? 12 : 12), n = Object.values(c).filter(x => x === "done").length;
+  return h("div", { class: "azk-pr" }, h("div", { class: "bar" }, h("i", { style: `width:${Math.round(n / tot * 100)}%` })), h("small", { class: "muted" }, ru ? `Сегодня прочитано ${n} из ${tot}` : `Бүгін ${tot}-нің ${n}-і оқылды`));
+}
+async function nzAzkar(v) {
+  const ru = S.lang === "ru";
+  const d = await loadAZ();
+  if (d.morning.some(x => x.quran)) await loadSura(2);
+  azkState();
+  v.append(backHead("#/namaz", ru ? "Утренние и вечерние азкары" : "Таңғы және кешкі зікірлер", ru ? "После фаджра и после асра" : "Таң намазынан және екінтіден кейін"), azkProgress());
+  const wrap = h("div", { class: "stack azk" });
+  d.morning.forEach(t => wrap.append(duaCard(t, { count: true })));
+  wrap.append(h("p", { class: "muted small" }, L(d.intro)));
+  v.append(wrap);
+}
+async function nzDuas(v) {
+  const ru = S.lang === "ru";
+  const d = await loadAZ();
+  v.append(backHead("#/namaz", ru ? "Дуа на каждый день" : "Күнделікті дұғалар", ru ? "Короткие мольбы на разные случаи" : "Әр жағдайға арналған қысқа дұғалар"));
+  const nav = h("nav", { class: "duas-nav" }, d.daily.map((g, i) => { const a = h("a", { href: "#" }, L(g.g)); a.onclick = e => { e.preventDefault(); document.getElementById("dg" + i).scrollIntoView({ behavior: "smooth", block: "start" }); }; return a; }));
+  v.append(nav);
+  d.daily.forEach((g, i) => { v.append(h("h2", { class: "duas-h", id: "dg" + i }, L(g.g))); const w = h("div", { class: "stack" }); g.items.forEach(t => w.append(duaCard(t))); v.append(w); });
+  v.append(h("p", { class: "muted small", style: "margin-top:16px" }, L(d.intro)));
+}
+
 /* ═════════════ время намазов и кибла ═════════════
    Казахстан — официальное расписание ДУМК (api.muftyat.kz); остальные места — расчёт на устройстве:
    фаджр 18°, иша 17° (Всемирная исламская лига), аср — по ханафитскому мазхабу (тень = 2 длины). */
@@ -1733,10 +1791,10 @@ const cityNow = city => { const d = new Date(); if (city.src !== "dumk") return 
 async function nextPrayer(city) {
   const now = cityNow(city), nm = now.getHours() * 60 + now.getMinutes();
   const t = await timesFor(city, now);
-  for (const k of PT_KEYS) { if (k === "sunrise") continue; const m = tMin(t[k]); if (m != null && m > nm) return { k, at: t[k], left: m - nm, t }; }
+  for (const k of PT_KEYS) { if (k === "sunrise") continue; const m = tMin(t[k]); if (m != null && m > nm) return { k, at: t[k], left: m - nm, today: true }; }
   const tm = new Date(now); tm.setDate(tm.getDate() + 1);
   const t2 = await timesFor(city, tm); const m = tMin(t2.fajr);
-  return { k: "fajr", at: t2.fajr, left: m == null ? null : m + 1440 - nm, t };
+  return { k: "fajr", at: t2.fajr, left: m == null ? null : m + 1440 - nm, today: false };
 }
 const fmtLeft = m => { if (m == null) return ""; const h = Math.floor(m / 60), mm = m % 60; return S.lang === "ru" ? (h ? `через ${h} ч ${mm} мин` : `через ${mm} мин`) : (h ? `${h} сағ ${mm} мин қалды` : `${mm} мин қалды`); };
 const QIBLA = [21.4225, 39.8262];
@@ -1794,7 +1852,7 @@ async function nzTimes(v) {
     const card = h("section", { class: "pt-card" },
       h("div", { class: "pt-h" }, h("div", {}, h("b", {}, c.title), h("small", {}, dateS + (hijri ? " · " + hijri : ""))),
         h("button", { class: "pill", type: "button", onclick: () => { pick.hidden = !pick.hidden; } }, ru ? "Сменить" : "Ауыстыру")),
-      h("ol", { class: "pt-list" }, PT_KEYS.map(k => h("li", { class: (n && n.k === k && n.t === t ? "next" : "") + (k === "sunrise" ? " sun" : ""), html: `<span>${esc(ptName(k))}</span><b class="num">${esc(t[k])}</b>${n && n.k === k && n.t === t ? `<small>${esc(fmtLeft(n.left))}</small>` : ""}` }))),
+      h("ol", { class: "pt-list" }, PT_KEYS.map(k => h("li", { class: (n && n.today && n.k === k ? "next" : "") + (k === "sunrise" ? " sun" : ""), html: `<span>${esc(ptName(k))}</span><b class="num">${esc(t[k])}</b>${n && n.today && n.k === k ? `<small>${esc(fmtLeft(n.left))}</small>` : ""}` }))),
       h("p", { class: "muted small pt-src" }, c.src === "dumk" ? (ru ? "Официальное расписание ДУМК (muftyat.kz)." : "ҚМДБ ресми кестесі (muftyat.kz).")
         : (ru ? "Расчёт на устройстве: фаджр 18°, иша 17°, аср по ханафитскому мазхабу. Уточняйте у местной мечети." : "Құрылғыда есептелді: таң 18°, құптан 17°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз.")));
     pick.hidden = true;

@@ -1128,3 +1128,17 @@ body[data-page="tasbih"] main{overflow-x:clip}
 .qb-rot{width:220px;height:220px;transition:transform .25s ease-out;color:var(--ink)}
 .qb-rot svg{width:100%;height:100%}
 .qb-rot.ok .qb-needle path{fill:#2e8a5c}
+
+/* ───── азкары и дуа ───── */
+.dua-note{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:10px 12px;border-radius:14px;background:var(--warm);color:var(--warm-ink);font-size:14px;line-height:1.45}
+.dua-note svg{width:16px;height:16px;flex:none;margin-top:2px}
+.dua-src{margin-top:8px;font-size:12.5px;color:var(--muted)}
+.dua-f{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.azk-c{margin-left:auto;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 16px;border-radius:999px;border:1.5px solid var(--primary);background:none;color:var(--primary);font-weight:700;cursor:pointer}
+.azk-c svg{width:16px;height:16px}
+.dua.done .azk-c{background:var(--primary);color:var(--primary-ink)}
+.dua.done{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.azk-pr{display:grid;gap:6px;margin:4px 0 14px;max-width:420px}
+.duas-nav{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;margin-bottom:6px;scrollbar-width:none}
+.duas-nav a{flex:none;padding:8px 14px;border-radius:999px;background:var(--surface);color:var(--ink);text-decoration:none;font-weight:600;font-size:14px}
+.duas-h{margin:20px 0 10px;font-size:20px;scroll-margin-top:80px}
