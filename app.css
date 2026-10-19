@@ -1531,3 +1531,6 @@ details>summary>svg{transition:transform .25s cubic-bezier(.2,.7,.2,1)}
 .ram-card.on .ram-t small{color:#b9d0c5}
 .ram-t .ram-it:empty{display:none}
 .ram-card>svg{width:18px;height:18px;flex:none;opacity:.6}
+/* транскрипция дуа, азкаров и зикров — спокойным прямым шрифтом, без курсива */
+.dua-tr,:root[data-theme="light"] .dua-tr{font-style:normal;font-weight:500;font-size:15px;line-height:1.65;color:var(--warm-ink)}
+.ts-tl{font-weight:600;line-height:1.5}

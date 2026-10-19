@@ -1784,13 +1784,13 @@ const ZF = {
   tawhid: ["Жәбир ибн Абдуллаһ", "Джабира ибн Абдуллаха", "Câbir b. Abdullah",
     ["«Зікірдің ең абзалы — Лә иләһә илләллаһ, дұғаның ең абзалы — Әлхамдулиллаһ»", "«Лучший зикр — „Ля иляха илляллах“, а лучшая мольба — „Альхамдулиллях“»", "«Zikrin en faziletlisi „Lâ ilâhe illallah“, duanın en faziletlisi „Elhamdülillah“tır»"], ["Тирмизи, 3383 (хасан)", "Ат-Тирмизи, 3383 (хасан)", "Tirmizî, 3383 (hasen)"]],
   hasbunallah: ["Ибн Аббас", "Ибн Аббаса", "İbn Abbâs",
-    ["«„Хасбуналлаһу уә ниғмәл-уәкил“ — мұны Ибраһим ғ.с. отқа тасталғанда айтты, Мұхаммед ﷺ да адамдар: „Сендерге қарсы жиналды, олардан қорқыңдар“, — дегенде айтты»", "«„Хасбуналлаху ва ни'маль-вакиль“ — эти слова сказал Ибрахим, мир ему, когда его бросили в огонь, и сказал Мухаммад ﷺ, когда ему говорили: „Против вас собрались люди, бойтесь их!“»", "«„Hasbünallâhu ve ni'me'l-vekîl“ — bunu İbrâhim (a.s.) ateşe atıldığında söyledi; Muhammed ﷺ de „İnsanlar size karşı toplandı, onlardan korkun“ dendiğinde söyledi»"], ["Бұхари, 4563", "Сахих аль-Бухари, 4563", "Buhârî, 4563"]],
+    ["«„Хасбуналлаһу уә ниғмәл-уәкил“ — мұны Ибраһим ғ.с. отқа тасталғанда айтты, Мұхаммед ﷺ да адамдар: „Сендерге қарсы жиналды, олардан қорқыңдар“, — дегенде айтты»", "«„Хасбуналлаху ва ниъмаль-вакиль“ — эти слова сказал Ибрахим, мир ему, когда его бросили в огонь, и сказал Мухаммад ﷺ, когда ему говорили: „Против вас собрались люди, бойтесь их!“»", "«„Hasbünallâhu ve ni'me'l-vekîl“ — bunu İbrâhim (a.s.) ateşe atıldığında söyledi; Muhammed ﷺ de „İnsanlar size karşı toplandı, onlardan korkun“ dendiğinde söyledi»"], ["Бұхари, 4563", "Сахих аль-Бухари, 4563", "Buhârî, 4563"]],
   juwayriya: ["Жууайрия бинт әл-Харис", "Джувайрии бинт аль-Харис", "Cüveyriye bint el-Hâris",
     ["«Сенен кейін мен төрт сөзді үш рет айттым. Егер оларды бүгін сен айтқанның бәрімен өлшесе, солар басым түсер еді: Субханаллаһи уә бихамдиһи ғадада халқиһи, уә рида нафсиһи, уә зината ғаршиһи, уә мидада кәлиматиһ»", "«После тебя я произнёс четыре фразы трижды. Если взвесить их со всем, что ты сказала сегодня, они перевесят: „Субханаллахи ва бихамдихи адада халкихи, ва рида нафсихи, ва зината аршихи, ва мидада калиматихи“»", "«Senden sonra dört sözü üç kez söyledim. Bugün söylediklerinin hepsiyle tartılsa onlar ağır basar: Sübhânallâhi ve bihamdihî adede halkıhî ve rıdâ nefsihî ve zinete arşihî ve midâde kelimâtih»"], ["Муслим, 2726", "Сахих Муслим, 2726", "Müslim, 2726"]],
 };
 // новые зикры (тексты, которых нет в данных намаза); транскрипция уже чистая
 const ZK_TX = {
-  hasbunallah: { ar: "حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ", tr: { kk: "хасбуналлаһу уә ниғмәл-уәкил", ru: "хасбуналлаху ва ни'маль-вакиль", tr: "hasbünallâhu ve ni'me'l-vekîl" },
+  hasbunallah: { ar: "حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ", tr: { kk: "хасбуналлаһу уә ниғмәл-уәкил", ru: "хасбуналлаху ва ниъмаль-вакиль", tr: "hasbünallâhu ve ni'me'l-vekîl" },
     m: { kk: "Бізге Аллаһ жеткілікті, Ол — қандай жақсы Қорғаушы!", ru: "Достаточно нам Аллаха, и как прекрасен Он как Покровитель!", tr: "Allah bize yeter, O ne güzel vekildir!" }, t: { kk: "Хасбуналлаһ", ru: "Хасбуналлах", tr: "Hasbünallah" } },
   juwayriya: { ar: "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ خَلْقِهِ وَرِضَا نَفْسِهِ وَزِنَةَ عَرْشِهِ وَمِدَادَ كَلِمَاتِهِ", tr: { kk: "субханаллаһи уә бихамдиһи ғадада халқиһи, уә рида нафсиһи, уә зината ғаршиһи, уә мидада кәлиматиһ", ru: "субханаллахи ва бихамдихи адада халкихи, ва рида нафсихи, ва зината аршихи, ва мидада калиматихи", tr: "sübhânallâhi ve bihamdihî adede halkıhî ve rıdâ nefsihî ve zinete arşihî ve midâde kelimâtih" },
     m: { kk: "Аллаһ пәк және Оған мадақ — жаратылыстарының санындай, Өзі разы болғанындай, Аршының салмағындай, сөздерінің сиясындай.", ru: "Пречист Аллах и хвала Ему — столько раз, сколько Его творений, сколько угодно Ему, сколько весит Его Трон и сколько чернил нужно для Его слов.", tr: "Allah'ı, yarattıklarının sayısınca, rızası kadar, Arşının ağırlığınca ve kelimelerinin mürekkebi kadar hamd ile tesbih ederim." },
@@ -1804,7 +1804,7 @@ const ZK_TL = {
   azim: ["Субханаллаһи уә бихамдиһи, субханаллаһил-ғазим", "Субханаллахи ва бихамдихи, субханаллахиль-азым", "Sübhânallâhi ve bihamdihî, sübhânallâhi'l-azîm"],
   hawqala: ["Лә хаулә уә лә қууәтә иллә билләһ", "Ля хауля ва ля куввата илля билля", "Lâ havle ve lâ kuvvete illâ billâh"],
   salli: ["Аллаһумма салли ғалә Мухаммад", "Аллахумма салли аля Мухаммад", "Allâhümme salli alâ Muhammed"], tawhid: ["Лә иләһә илләллаһ", "Ля иляха илляллах", "Lâ ilâhe illallah"],
-  hasbunallah: ["Хасбуналлаһу уә ниғмәл-уәкил", "Хасбуналлаху ва ни'маль-вакиль", "Hasbünallâhü ve ni'me'l-vekîl"],
+  hasbunallah: ["Хасбуналлаһу уә ниғмәл-уәкил", "Хасбуналлаху ва ниъмаль-вакиль", "Hasbünallâhü ve ni'me'l-vekîl"],
   juwayriya: ["Субханаллаһи уә бихамдиһи ғадада халқиһи, уә рида нафсиһи, уә зината ғаршиһи, уә мидада кәлиматиһ", "Субханаллахи ва бихамдихи адада халкихи, ва рида нафсихи, ва зината аршихи, ва мидада калиматихи", "Sübhânallâhi ve bihamdihî adede halkıhî, ve rıdâ nefsihî, ve zinete arşihî, ve midâde kelimâtih"],
 };
 const zkTl = z => { const t = ZK_TL[z[1]]; return t ? L({ kk: t[0], ru: t[1], tr: t[2] }) : ""; };
@@ -1905,7 +1905,7 @@ async function zkCounter(v, id) {
   const faces = () => {
     const z = list[k], tx = zkText(d, z), f = ZF[z[0]] || ZF[z[1]];
     front.classList.toggle("long", tx.ar.length > 60);
-    front.innerHTML = `<span class="ts-ar${tx.ar.length > 30 ? " long" : ""}" lang="ar">${esc(tx.ar)}</span><span class="ts-tl">${esc(zkTl(z) || TLC(tx.tr))}</span><span class="ts-m">${esc(L(tx.m))}</span>` +
+    front.innerHTML = `<span class="ts-ar${tx.ar.length > 30 ? " long" : ""}" lang="ar">${esc(tx.ar)}</span><span class="ts-tl">${esc(zkTl(z) || TLC(tx.tl || tx.tr))}</span><span class="ts-m">${esc(L(tx.m))}</span>` +
       `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите — хадис об этом зикре", "Басыңыз — осы зікір туралы хадис", "Dokunun — bu zikir hakkında hadis"))}</span>`;
     back.innerHTML = f ? `<span class="ts-d">${esc(LX(`Передаётся со слов ${f[1]}, да будет доволен им Аллах, что Посланник Аллаха ﷺ сказал:`, `${f[0]} (Аллаһ оған разы болсын) жеткізеді: Аллаһтың Елшісі ﷺ былай деген:`, `${f[2]}'den (r.a.) rivayet edildiğine göre Resûlullah ﷺ şöyle buyurdu:`))}</span>` +
       `<span class="ts-q">${esc(f[3][lang])}</span><span class="pill ts-src">${esc(f[4][lang])}</span>` +
