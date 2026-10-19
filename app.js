@@ -186,7 +186,8 @@ const I = {
   mat: '<rect x="6" y="4" width="12" height="16" rx="2"/><path d="M8 4V2M10.7 4V2M13.3 4V2M16 4V2M8 22v-2M10.7 22v-2M13.3 22v-2M16 22v-2"/><path d="M12 8.5l3 3.5-3 3.5-3-3.5z"/>',
   beads: '<circle cx="12" cy="4.2" r="1.3"/><circle cx="16.5" cy="5.8" r="1.3"/><circle cx="18.2" cy="10" r="1.3"/><circle cx="16.5" cy="14.2" r="1.3"/><circle cx="7.5" cy="14.2" r="1.3"/><circle cx="5.8" cy="10" r="1.3"/><circle cx="7.5" cy="5.8" r="1.3"/><path d="M12 15.5v5M10.3 21.5h3.4"/>',
   flip: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5"/>', vib: '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 8v8M20 8v8"/>',
-  chev: '<path d="M9 6l6 6-6 6"/>', chevl: '<path d="M15 6l-6 6 6 6"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', chevl: '<path d="M15 6l-6 6 6 6"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   flame: '<path d="M12 22c4 0 7-3 7-7 0-3-2-5.5-3.5-7-.5 2-1.5 3-3 3 .5-3-1-6-3.5-8 0 3-1.5 5-3 6.5C4.5 11 5 13 5 15c0 4 3 7 7 7z"/>',
   star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
@@ -546,6 +547,12 @@ function ayahOfDay() {
   loadTl(as).then(t => { tlEl.textContent = t[aa - 1] || ""; }).catch(() => {});
   return box;
 }
+function nextPrayerTile() {
+  const ru = S.lang === "ru";
+  const a = h("a", { class: "tile", href: "#/namaz/times", html: `<span class="t-ic">${icon("clock")}</span><b>${esc(ru ? "Время намазов" : "Намаз уақыты")}</b><small>${esc(S.city ? S.city.title : (ru ? "Выберите город" : "Қаланы таңдаңыз"))}</small>` });
+  if (S.city) nextPrayer(S.city).then(n => { a.querySelector("b").innerHTML = `${esc(ptName(n.k))} <span class="num">${esc(n.at)}</span>`; a.querySelector("small").textContent = fmtLeft(n.left); }).catch(() => {});
+  return a;
+}
 async function pageHome(v) {
   const ru = S.lang === "ru";
   const started = doneCount() > 0;
@@ -568,7 +575,7 @@ async function pageHome(v) {
       lastS ? `${L(lastS.name)}, ${S.last.a} ${T("ayahN")}` : (ru ? "114 сур с переводом" : "114 сүре, аудармасымен")),
     tile("#/me", "flame", ru ? `${st} ${plRu(st, "день", "дня", "дней")} подряд` : `${st} күн қатарынан`, ru ? `Цель на день — ${goal} очков` : `Күндік мақсат — ${goal} ұпай`, "warm"),
     tile("#/tasbih", "beads", ru ? "Тасбих" : "Тәсбих", tsbTotal() ? fmtN(tsbTotal()) : (ru ? "После намаза" : "Намаздан кейін")),
-    tile("#/listen", "headph", T("listen"), ru ? `${READERS.length} чтецов` : `${READERS.length} қари`)));
+    nextPrayerTile()));
 
   const mods = h("div", { class: "mods" });
   for (const Mo of COURSE.modules) {
@@ -1474,8 +1481,9 @@ async function pageNamaz(v, sub) {
   if (sub === "read") return nzRead(v, d);
   if (sub === "after") { await loadSura(2); return nzAfter(v, d); }
   if (sub === "witr") return nzWitr(v, d);
+  if (sub === "times") return nzTimes(v);
   if (sub) return notFound(v);
-  v.append(pageHead(T("namaz"), ru ? "Ханафитский мазхаб · шаг за шагом" : "Ханафи мазһабы · қадам-қадаммен"));
+  v.append(pageHead(T("namaz"), ru ? "Ханафитский мазхаб · шаг за шагом" : "Ханафи мазһабы · қадам-қадаммен"), nextPrayerCard());
   const poses = h("span", { class: "nz-poses" });
   const drawP = () => { poses.innerHTML = ["qiyam", "ruku", "sujud", "julus"].map(k => `<span class="nz-pose"><span class="pz">${poseSVG(k)}</span><small>${esc(L({ kk: POSE_NAMES[k][0], ru: POSE_NAMES[k][1] }))}</small></span>`).join(""); };
   drawP();
@@ -1668,6 +1676,153 @@ async function pageTasbih(v) {
     else if (n === goal && st.k < 3) setTimeout(() => { if (document.body.dataset.page === "tasbih" && ZK[st.k][0] === k) go(1); }, 450);
   };
   draw();
+}
+
+/* ═════════════ время намазов и кибла ═════════════
+   Казахстан — официальное расписание ДУМК (api.muftyat.kz); остальные места — расчёт на устройстве:
+   фаджр 18°, иша 17° (Всемирная исламская лига), аср — по ханафитскому мазхабу (тень = 2 длины). */
+const PT_API = "https://api.muftyat.kz";
+const PT_KEYS = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
+const PT_NAMES = { fajr: ["Таң", "Фаджр"], sunrise: ["Күн шығуы", "Восход"], dhuhr: ["Бесін", "Зухр"], asr: ["Екінті", "Аср"], maghrib: ["Ақшам", "Магриб"], isha: ["Құптан", "Иша"] };
+const ptName = k => L({ kk: PT_NAMES[k][0], ru: PT_NAMES[k][1] });
+const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+// расчёт по солнцу (алгоритм PrayTimes, упрощённый): возвращает часы в локальном времени устройства
+function calcTimes(date, lat, lng) {
+  const rad = Math.PI / 180, deg = 180 / Math.PI;
+  const tz = -date.getTimezoneOffset() / 60;
+  const y = date.getFullYear(), m = date.getMonth() + 1, dd = date.getDate();
+  const A = Math.floor((14 - m) / 12), Y = y + 4800 - A, M = m + 12 * A - 3;
+  const jd = dd + Math.floor((153 * M + 2) / 5) + 365 * Y + Math.floor(Y / 4) - Math.floor(Y / 100) + Math.floor(Y / 400) - 32045 - 0.5 - lng / 360;
+  const sun = t => { const D = jd + t - 2451545; const g = (357.529 + 0.98560028 * D) % 360, q = (280.459 + 0.98564736 * D) % 360;
+    const Lm = (q + 1.915 * Math.sin(g * rad) + 0.020 * Math.sin(2 * g * rad)) % 360, e = 23.439 - 0.00000036 * D;
+    const RA = (Math.atan2(Math.cos(e * rad) * Math.sin(Lm * rad), Math.cos(Lm * rad)) * deg / 15 + 24) % 24;
+    return { dec: Math.asin(Math.sin(e * rad) * Math.sin(Lm * rad)) * deg, eqt: q / 15 - RA }; };
+  const fix = h => ((h % 24) + 24) % 24;
+  const noon = t => fix(12 - sun(t).eqt);
+  const hourAngle = (angle, t, ccw) => { const s = sun(t), n = noon(t);
+    const v = Math.acos((-Math.sin(angle * rad) - Math.sin(s.dec * rad) * Math.sin(lat * rad)) / (Math.cos(s.dec * rad) * Math.cos(lat * rad))) * deg / 15;
+    return n + (ccw ? -v : v); };
+  const asrT = (f, t) => { const s = sun(t); const ang = -Math.atan(1 / (f + Math.tan(Math.abs(lat - s.dec) * rad))) * deg; return hourAngle(ang, t); };
+  const adj = h => h + tz - lng / 15;
+  const r = { fajr: adj(hourAngle(18, 5 / 24, true)), sunrise: adj(hourAngle(0.833, 6 / 24, true)), dhuhr: adj(noon(12 / 24)) + 2 / 60,
+    asr: adj(asrT(2, 13 / 24)), maghrib: adj(hourAngle(0.833, 18 / 24)) + 3 / 60, isha: adj(hourAngle(17, 18 / 24)) };
+  const out = {};
+  for (const k of PT_KEYS) { const v = r[k]; if (!isFinite(v)) { out[k] = "—"; continue; } const mm = Math.round(fix(v) * 60); out[k] = String(Math.floor(mm / 60) % 24).padStart(2, "0") + ":" + String(mm % 60).padStart(2, "0"); }
+  return out;
+}
+async function dumkYear(city, year) {
+  const key = `iqra.pt.${city.id}.${year}`;
+  const c = lsGet(key); if (c && c.length) return c;
+  const j = await fetchJSON(`${PT_API}/prayer-times/${year}/${city.lat}/${city.lng}`);
+  const rows = (j.result || []).map(x => [x.Date, x.fajr, x.sunrise, x.dhuhr, x.asr, x.maghrib, x.isha]);
+  lsSet(key, rows); return rows;
+}
+// время на дату: {fajr..isha} строками «чч:мм» (в часовом поясе города)
+async function timesFor(city, date) {
+  if (city.src === "dumk") {
+    const rows = await dumkYear(city, date.getFullYear()); const r = rows.find(x => x[0] === ymd(date));
+    if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; }
+  }
+  return calcTimes(date, +city.lat, +city.lng);
+}
+const tMin = s => { const m = /^(\d+):(\d+)/.exec(s || ""); return m ? +m[1] * 60 + +m[2] : null; };
+// сейчас по часовому поясу города (у ДУМК — UTC+5), чтобы сравнивать с его расписанием
+const cityNow = city => { const d = new Date(); if (city.src !== "dumk") return d; const tz = +(city.tz || 5); return new Date(d.getTime() + (d.getTimezoneOffset() + tz * 60) * 6e4); };
+async function nextPrayer(city) {
+  const now = cityNow(city), nm = now.getHours() * 60 + now.getMinutes();
+  const t = await timesFor(city, now);
+  for (const k of PT_KEYS) { if (k === "sunrise") continue; const m = tMin(t[k]); if (m != null && m > nm) return { k, at: t[k], left: m - nm, t }; }
+  const tm = new Date(now); tm.setDate(tm.getDate() + 1);
+  const t2 = await timesFor(city, tm); const m = tMin(t2.fajr);
+  return { k: "fajr", at: t2.fajr, left: m == null ? null : m + 1440 - nm, t };
+}
+const fmtLeft = m => { if (m == null) return ""; const h = Math.floor(m / 60), mm = m % 60; return S.lang === "ru" ? (h ? `через ${h} ч ${mm} мин` : `через ${mm} мин`) : (h ? `${h} сағ ${mm} мин қалды` : `${mm} мин қалды`); };
+const QIBLA = [21.4225, 39.8262];
+const qiblaDeg = (lat, lng) => { const r = Math.PI / 180, [qa, qn] = QIBLA, dl = (qn - lng) * r;
+  return (Math.atan2(Math.sin(dl), Math.cos(lat * r) * Math.tan(qa * r) - Math.sin(lat * r) * Math.cos(dl)) / r + 360) % 360; };
+const inKZ = (lat, lng) => lat > 40.4 && lat < 55.6 && lng > 46.4 && lng < 87.4;
+async function cityByCoords(lat, lng) {
+  if (inKZ(lat, lng)) {
+    try { const j = await fetchJSON(`${PT_API}/cities/?lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}`); const c = j.results && j.results[0];
+      if (c) return { id: c.id, title: c.title, lat: c.lat, lng: c.lng, tz: c.timezone, src: "dumk" }; } catch (e) {}
+  }
+  return { id: "geo", title: S.lang === "ru" ? "Моё местоположение" : "Менің орным", lat: lat.toFixed(4), lng: lng.toFixed(4), src: "calc" };
+}
+const locate = () => new Promise((res, rej) => { if (!navigator.geolocation) return rej(new Error("geo")); navigator.geolocation.getCurrentPosition(p => res(p.coords), rej, { timeout: 15000, maximumAge: 6e5 }); });
+// карточка «следующий намаз» для «Сегодня» и «Намаза»
+function nextPrayerCard(cls = "") {
+  const ru = S.lang === "ru";
+  const a = h("a", { class: "np-card " + cls, href: "#/namaz/times" });
+  if (!S.city) { a.innerHTML = `<span class="np-ic">${icon("clock")}</span><span class="np-t"><b>${esc(ru ? "Время намазов" : "Намаз уақыттары")}</b><small>${esc(ru ? "Выберите город — покажем расписание и киблу" : "Қаланы таңдаңыз — кесте мен құбыла бағыты")}</small></span>${icon("chev")}`; return a; }
+  a.innerHTML = `<span class="np-ic">${icon("clock")}</span><span class="np-t"><small>${esc(S.city.title)}</small><b>…</b></span>${icon("chev")}`;
+  nextPrayer(S.city).then(n => { a.querySelector(".np-t").innerHTML = `<small>${esc(ru ? "Следующий намаз" : "Келесі намаз")} · ${esc(S.city.title)}</small><b>${esc(ptName(n.k))} <span class="num">${esc(n.at)}</span></b><small class="np-left">${esc(fmtLeft(n.left))}</small>`; })
+    .catch(() => { a.querySelector(".np-t b").textContent = ru ? "Нет связи с расписанием" : "Кестеге қосылу мүмкін болмады"; });
+  return a;
+}
+async function nzTimes(v) {
+  const ru = S.lang === "ru";
+  v.append(backHead("#/namaz", ru ? "Время намазов" : "Намаз уақыттары", ru ? "И направление киблы" : "Және құбыла бағыты"));
+  const box = h("div", { class: "pt-wrap" });
+  v.append(box);
+  const pick = h("section", { class: "card pt-pick" });
+  const draw = async () => {
+    box.innerHTML = "";
+    // выбор города
+    const inp = h("input", { type: "search", placeholder: ru ? "Город или село Казахстана" : "Қазақстандағы қала не ауыл", "aria-label": ru ? "Поиск города" : "Қаланы іздеу", autocomplete: "off" });
+    const res = h("div", { class: "pt-res" });
+    const geoB = h("button", { class: "btn ghost", type: "button", html: icon("pin") + esc(ru ? "Определить автоматически" : "Автоматты анықтау") });
+    let tmr = 0;
+    inp.oninput = () => { clearTimeout(tmr); const q = inp.value.trim(); if (q.length < 2) { res.innerHTML = ""; return; }
+      tmr = setTimeout(async () => { try { const j = await fetchJSON(`${PT_API}/cities/?search=${encodeURIComponent(q)}`);
+        res.innerHTML = ""; (j.results || []).slice(0, 8).forEach(c => { const b = h("button", { type: "button", html: `<b>${esc(c.title)}</b><small>${esc([c.district, c.region].filter(Boolean).join(", "))}</small>` });
+          b.onclick = () => { S.city = { id: c.id, title: c.title, lat: c.lat, lng: c.lng, tz: c.timezone, src: "dumk" }; save(); draw(); }; res.append(b); });
+        if (!(j.results || []).length) res.innerHTML = `<p class="muted small">${esc(ru ? "Ничего не найдено. Попробуйте по-казахски, например «Алматы»." : "Ештеңе табылмады.")}</p>`;
+      } catch (e) { res.innerHTML = `<p class="muted small">${esc(ru ? "Нет связи с сервером ДУМК." : "ҚМДБ серверіне қосылу мүмкін болмады.")}</p>`; } }, 300); };
+    geoB.onclick = async () => { geoB.disabled = true; try { const c = await locate(); S.city = await cityByCoords(c.latitude, c.longitude); save(); draw(); }
+      catch (e) { toast(ru ? "Не удалось определить местоположение" : "Орынды анықтау мүмкін болмады"); geoB.disabled = false; } };
+    pick.innerHTML = "";
+    pick.append(h("h2", {}, S.city ? (ru ? "Сменить город" : "Қаланы ауыстыру") : (ru ? "Ваш город" : "Қалаңыз")), h("label", { class: "sbox", html: icon("search") }, inp), res, geoB);
+    if (!S.city) { box.append(pick); return; }
+    // расписание на сегодня
+    const c = S.city, now = cityNow(c);
+    let t; try { t = await timesFor(c, now); } catch (e) { box.append(h("div", { class: "box warn" }, ru ? "Не удалось загрузить расписание. Проверьте интернет." : "Кестені жүктеу мүмкін болмады."), pick); return; }
+    const n = await nextPrayer(c).catch(() => null);
+    const hijri = (() => { try { return new Intl.DateTimeFormat((ru ? "ru" : "kk") + "-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(now); } catch (e) { return ""; } })();
+    const dateS = new Intl.DateTimeFormat(ru ? "ru-RU" : "kk-KZ", { weekday: "long", day: "numeric", month: "long" }).format(now);
+    const card = h("section", { class: "pt-card" },
+      h("div", { class: "pt-h" }, h("div", {}, h("b", {}, c.title), h("small", {}, dateS + (hijri ? " · " + hijri : ""))),
+        h("button", { class: "pill", type: "button", onclick: () => { pick.hidden = !pick.hidden; } }, ru ? "Сменить" : "Ауыстыру")),
+      h("ol", { class: "pt-list" }, PT_KEYS.map(k => h("li", { class: (n && n.k === k && n.t === t ? "next" : "") + (k === "sunrise" ? " sun" : ""), html: `<span>${esc(ptName(k))}</span><b class="num">${esc(t[k])}</b>${n && n.k === k && n.t === t ? `<small>${esc(fmtLeft(n.left))}</small>` : ""}` }))),
+      h("p", { class: "muted small pt-src" }, c.src === "dumk" ? (ru ? "Официальное расписание ДУМК (muftyat.kz)." : "ҚМДБ ресми кестесі (muftyat.kz).")
+        : (ru ? "Расчёт на устройстве: фаджр 18°, иша 17°, аср по ханафитскому мазхабу. Уточняйте у местной мечети." : "Құрылғыда есептелді: таң 18°, құптан 17°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз.")));
+    pick.hidden = true;
+    box.append(card, pick, qiblaCard(+c.lat, +c.lng));
+  };
+  draw();
+}
+function qiblaCard(lat, lng) {
+  const ru = S.lang === "ru";
+  const q = qiblaDeg(lat, lng);
+  const dial = h("div", { class: "qb-dial", html:
+    `<svg viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="2"/>` +
+    [0, 90, 180, 270].map((a, i) => `<text x="${100 + 78 * Math.sin(a * Math.PI / 180)}" y="${104 - 78 * Math.cos(a * Math.PI / 180)}" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor" opacity="${i ? .45 : .9}">${(ru ? ["С", "В", "Ю", "З"] : ["С", "Ш", "О", "Б"])[i]}</text>`).join("") +
+    Array.from({ length: 72 }, (_, i) => { const a = i * 5 * Math.PI / 180, r1 = i % 6 ? 88 : 84; return `<line x1="${100 + r1 * Math.sin(a)}" y1="${100 - r1 * Math.cos(a)}" x2="${100 + 92 * Math.sin(a)}" y2="${100 - 92 * Math.cos(a)}" stroke="currentColor" stroke-opacity=".25"/>`; }).join("") +
+    `<g class="qb-needle" transform="rotate(${q.toFixed(1)} 100 100)"><path d="M100 26 L109 100 L100 92 L91 100 Z" fill="var(--primary)"/><rect x="92" y="14" width="16" height="16" rx="3" fill="var(--ink)"/></g><circle cx="100" cy="100" r="5" fill="var(--primary)"/></svg>` });
+  const rot = h("div", { class: "qb-rot" }, dial);
+  const st = h("p", { class: "muted small" }, ru ? `Кибла — ${Math.round(q)}° от севера по часовой стрелке. Держите телефон горизонтально.` : `Құбыла — солтүстіктен сағат тілімен ${Math.round(q)}°. Телефонды көлденең ұстаңыз.`);
+  const b = h("button", { class: "btn", type: "button", html: icon("compass") + esc(ru ? "Включить компас" : "Компасты қосу") });
+  const onOri = e => { const head = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.absolute && e.alpha != null ? 360 - e.alpha : null);
+    if (head == null) return; rot.style.transform = `rotate(${-head}deg)`; const diff = Math.abs(((q - head + 540) % 360) - 180); rot.classList.toggle("ok", diff < 5); };
+  b.onclick = async () => {
+    try { if (typeof DeviceOrientationEvent !== "undefined" && DeviceOrientationEvent.requestPermission) { const p = await DeviceOrientationEvent.requestPermission(); if (p !== "granted") throw 0; }
+      window.addEventListener("deviceorientationabsolute", onOri); window.addEventListener("deviceorientation", onOri); b.hidden = true;
+      st.textContent = ru ? "Поворачивайтесь, пока зелёная стрелка не будет смотреть вверх." : "Жасыл тіл жоғары қарағанша бұрылыңыз.";
+    } catch (e) { toast(ru ? "Компас недоступен на этом устройстве" : "Бұл құрылғыда компас жоқ"); }
+  };
+  const isTouch = matchMedia("(pointer: coarse)").matches;
+  return h("section", { class: "card qb" }, h("h2", {}, ru ? "Кибла" : "Құбыла"), rot, st, isTouch ? b : null);
 }
 
 /* ═════════════ справочник ═════════════ */
