@@ -783,40 +783,76 @@ function nextPrayerTile() {
   if (S.city) nextPrayer(S.city).then(n => { a.querySelector("b").innerHTML = `${esc(ptName(n.k))} <span class="num">${esc(n.at)}</span>`; a.querySelector("small").textContent = fmtLeft(n.left); }).catch(() => {});
   return a;
 }
-async function pageHome(v) {
-  const ru = S.lang === "ru";
-  const started = doneCount() > 0;
-  const n = nextLessonN(), les = COURSE.lessons[n - 1], M = moduleOf(n);
-  const tx = S.days[today()] || 0, goal = S.goal;
-  const sub = tx >= goal ? (LX(`Цель дня выполнена: ${tx} очков. Машаллах!`, `Күндік мақсат орындалды: ${tx} ұпай. Машаллаһ!`, `Günlük hedef tamam: ${tx} puan. Maşallah!`))
-    : started ? (LX(`Сегодня ${tx} из ${goal} очков. Ещё один урок — и цель дня ближе.`, `Бүгін ${goal} ұпайдың ${tx}-і жиналды. Тағы бір сабақ — мақсатқа жақындайсыз.`, `Bugün ${goal} puanın ${tx}'i toplandı. Bir ders daha — hedefe yaklaşın.`))
-    : T("heroLead");
-  v.append(pageHead(T("salam"), sub));
-  const pct = Math.round(doneCount() / 110 * 100);
-  const hero = h("a", { class: "hero2", href: `#/lesson/${n}`, html:
-    `<span class="h2-g" lang="ar">${esc(heroGlyph(les))}</span><span class="h2-t"><small>${esc(T("lesson"))} ${n} ${LX("из", "/", "/")} 110 · ${esc(T("module"))} ${M.id}</small><b>${mdInline(les.title)}</b>` +
-    `<span class="h2-bar" aria-hidden="true"><i style="width:${Math.max(3, pct)}%"></i></span><span class="h2-btn">${icon("play")}${esc(started ? T("cont") : T("start"))}</span></span>` });
-  v.append(h("div", { class: "home-top" }, hero, ayahOfDay()));
-
-  const lastS = S.last && suraBy(S.last.s), st = streak(), ts = S.tsb || {};
-  const tile = (href, ic, title, sub, cls = "") => h("a", { class: "tile " + cls, href, html: `<span class="t-ic">${icon(ic)}</span><b>${esc(title)}</b><small>${esc(sub)}</small>` });
-  v.append(h("div", { class: "tiles" },
-    tile(lastS ? `#/sura/${lastS.n}/${S.last.a}` : "#/suras", "stand", lastS ? T("contRead") : T("suras"),
-      lastS ? `${L(lastS.name)}, ${S.last.a} ${T("ayahN")}` : (LX("114 сур с переводом", "114 сүре, аудармасымен", "114 sure, mealiyle"))),
-    tile("#/me", "flame", LX(`${st} ${plRu(st, "день", "дня", "дней")} подряд`, `${st} күн қатарынан`, `${st} gün üst üste`), LX(`Цель на день — ${goal} очков`, `Күндік мақсат — ${goal} ұпай`, `Günlük hedef — ${goal} puan`), "warm"),
-    tile("#/zikr", "beads", LX("Зикр", "Зікір", "Zikir"), tsbTotal() ? fmtN(tsbTotal()) : (LX("Тасбих и азкары", "Тәсбих және зікірлер", "Tesbih ve ezkâr"))),
-    nextPrayerTile()));
-
-  { const r = ramadanRow(); if (r) v.append(r); }
-  // курс — компактной сеткой 2×2; повторение — если есть что повторить
-  if (rvDue().length) v.append(rvCard());
-  const mods = h("div", { class: "mods mini" }, COURSE.modules.map(Mo => {
-    const tot = Mo.to - Mo.from + 1, d = modDoneN(Mo);
-    return h("a", { class: "mod" + (M.id === Mo.id ? " cur" : ""), href: `#/course#m${Mo.id}`, html:
-      `<span class="mar" lang="ar">${Mo.ar}</span><b>${esc(L(Mo.title))}</b><span class="bar"><i style="width:${(d / tot * 100).toFixed(0)}%"></i></span><small class="num">${esc(T("module"))} ${Mo.id} · ${d}/${tot}</small>` });
-  }));
-  v.append(h("div", { class: "section-h sm" }, h("h2", {}, T("modules")), h("a", { class: "small", href: "#/course" }, T("seeCourse"))), mods);
+function homeLearningState() {
+  const total = COURSE.lessons.length;
+  const completed = COURSE.lessons.filter(l => S.lessons[l.n]?.done).length;
+  const allDone = completed === total;
+  const n = allDone ? COURSE.lessons[total - 1].n : nextLessonN();
+  const module = moduleOf(n);
+  const moduleTotal = module.to - module.from + 1;
+  const moduleDone = COURSE.lessons.filter(l => l.n >= module.from && l.n <= module.to && S.lessons[l.n]?.done).length;
+  const completedToday = COURSE.lessons.filter(l => S.lessons[l.n]?.done && S.lessons[l.n].at === today()).length;
+  const points = Math.max(0, Number(S.days[today()]) || 0);
+  const goal = Number(S.goal) > 0 ? Number(S.goal) : 30;
+  return { total, completed, allDone, n, module, moduleTotal, moduleDone, completedToday, points, goal,
+    percent: Math.round(completed / total * 100), dailyPercent: Math.min(100, Math.round(points / goal * 100)),
+    started: completed > 0 || (S.placeFrom || 1) > 1 || Object.keys(S.ex || {}).length > 0 };
 }
+async function pageHome(v) {
+  const d = homeLearningState(), les = COURSE.lessons[d.n - 1], M = d.module;
+  const due = rvDue().length, pool = rvPool().length, st = streak();
+  const lastS = S.last && suraBy(S.last.s);
+  const readHref = lastS ? `#/sura/${lastS.n}/${S.last.a}` : "#/sura/1/1";
+  const nextHref = d.allDone ? "#/practice" : `#/lesson/${d.n}`;
+  const sub = d.allDone
+    ? LX("Весь курс пройден. Сохраняйте навык практикой и чтением.", "Курс толық аяқталды. Дағдыңызды жаттығу мен оқу арқылы сақтаңыз.", "Kurs tamamlandı. Alıştırma ve okumayla becerinizi koruyun.")
+    : d.points >= d.goal
+      ? LX("Цель на сегодня выполнена. Продолжайте, когда будете готовы.", "Бүгінгі мақсат орындалды. Дайын болғанда жалғастырыңыз.", "Bugünkü hedefiniz tamam. Hazır olduğunuzda devam edin.")
+      : LX("Один урок, немного повторения и чтение — двигайтесь в своём темпе.", "Бір сабақ, аздап қайталау және оқу — өз қарқыныңызбен үйреніңіз.", "Bir ders, biraz tekrar ve okuma — kendi temponuzda ilerleyin.");
+  v.append(pageHead(T("salam"), sub));
+  const hero = h("a", { class: "study-next", href: nextHref },
+    h("div", { class: "study-next-top" }, h("span", { class: "study-eyebrow" }, d.allDone ? LX("Новый этап", "Жаңа кезең", "Yeni aşama") : d.started ? LX("Ваш следующий шаг", "Келесі қадамыңыз", "Sıradaki adımınız") : LX("Начните здесь", "Осы жерден бастаңыз", "Buradan başlayın")),
+      h("span", { class: "study-glyph", lang: "ar" }, d.allDone ? "اقرأ" : heroGlyph(les))),
+    h("small", {}, d.allDone ? LX("Все уроки позади", "Барлық сабақ аяқталды", "Tüm dersler tamamlandı") : `${T("module")} ${M.id} · ${L(M.title)}`),
+    h("h2", { html: d.allDone ? esc(LX("Продолжайте читать и повторять", "Оқуды және қайталауды жалғастырыңыз", "Okumaya ve tekrara devam edin")) : mdInline(les.title) }),
+    h("p", {}, d.allDone ? LX("Тренажёры помогут закрепить буквы и правила.", "Жаттығулар әріптер мен ережелерді бекітуге көмектеседі.", "Alıştırmalar harfleri ve kuralları pekiştirmenize yardımcı olur.") : LX(`Урок ${d.n} из ${d.total} · объяснение и задания`, `${d.total} сабақтың ${d.n}-сабағы · түсіндірме және тапсырмалар`, `${d.total} dersten ${d.n}. ders · açıklama ve alıştırmalar`)),
+    h("span", { class: "study-cta", html: icon(d.allDone ? "target" : "play") + esc(d.allDone ? LX("Открыть практику", "Жаттығуға өту", "Alıştırmaları aç") : d.started ? T("cont") : T("start")) }));
+  if (S.lang === "tr" && !d.allDone) hero.append(h("small", { class: "study-language-note" }, "Ders içeriği Rusça ve Kazakça sunulmaktadır."));
+  const progress = h("section", { class: "study-progress", "aria-label": LX("Ваш прогресс", "Сіздің прогресіңіз", "İlerlemeniz") });
+  progress.append(h("div", { class: "study-progress-head" }, h("h2", {}, LX("Ваш прогресс", "Сіздің прогресіңіз", "İlerlemeniz")), h("a", { href: "#/me", "aria-label": LX("Настроить цель дня", "Күндік мақсатты баптау", "Günlük hedefi ayarla") }, LX("Изменить", "Өзгерту", "Değiştir"))),
+    h("div", { class: "study-goal-title" }, h("span", {}, T("dailyGoal")), h("b", { class: "num" }, `${d.points} / ${d.goal} `, h("small", {}, LX("очков", "ұпай", "puan")))),
+    h("progress", { class: "study-meter", max: d.goal, value: Math.min(d.points, d.goal), "aria-label": T("dailyGoal") }),
+    h("p", { class: "study-goal-note" }, d.points >= d.goal ? LX("Цель выполнена. Машаллах!", "Мақсат орындалды. Машаллаһ!", "Hedef tamamlandı. Maşallah!") : LX(`До цели осталось ${d.goal - d.points} очков`, `Мақсатқа дейін ${d.goal - d.points} ұпай қалды`, `Hedefe ${d.goal - d.points} puan kaldı`)),
+    h("div", { class: "study-course-title" }, h("span", {}, LX("Пройдено уроков", "Аяқталған сабақтар", "Tamamlanan dersler")), h("b", { class: "num" }, `${d.completed} / ${d.total}`)),
+    h("progress", { class: "study-meter course", max: d.total, value: d.completed, "aria-label": LX("Пройдено уроков", "Аяқталған сабақтар", "Tamamlanan dersler") }),
+    h("div", { class: "study-progress-foot" }, h("span", { class: "study-streak", html: icon("flame") + esc(LX(`${st} ${plRu(st, "день", "дня", "дней")} подряд`, `${st} күн қатарынан`, `${st} gün üst üste`)) }), h("a", { href: "#/course" }, T("seeCourse"))));
+  v.append(h("div", { class: "study-top" }, hero, progress));
+  if (!d.started) v.append(h("p", { class: "study-placement" }, LX("Уже знаете буквы? ", "Әріптерді білесіз бе? ", "Harfleri biliyor musunuz? "), h("a", { href: "#/placement" }, LX("Определите свой уровень", "Деңгейіңізді анықтаңыз", "Seviyenizi belirleyin"))));
+
+  const plan = h("section", { class: "study-plan" }, h("div", { class: "section-h" }, h("h2", {}, LX("План на сегодня", "Бүгінгі жоспар", "Bugünkü plan")), h("span", { class: "small muted" }, LX("В своём темпе", "Өз қарқыныңызбен", "Kendi temponuzda"))));
+  const step = (num, href, title, text, label, done = false) => h("li", {}, h("a", { class: "study-step" + (done ? " done" : ""), href },
+    h("span", { class: "study-step-no", html: done ? icon("check") : num }), h("div", { class: "study-step-text" }, h("h3", {}, title), h("p", {}, text), h("span", { class: "study-step-action" }, label)), h("span", { class: "study-step-arrow", html: icon("chev") })));
+  plan.append(h("ol", { class: "study-steps" },
+    step("01", nextHref, d.allDone ? LX("Практика", "Жаттығу", "Alıştırma") : LX("Урок", "Сабақ", "Ders"), d.allDone ? LX("Закрепляйте изученное в тренажёрах", "Үйренгеніңізді жаттығумен бекітіңіз", "Öğrendiklerinizi alıştırmalarla pekiştirin") : d.completedToday ? LX(`Сегодня завершено уроков: ${d.completedToday}`, `Бүгін аяқталған сабақ: ${d.completedToday}`, `Bugün tamamlanan ders: ${d.completedToday}`) : L(les.title), d.completedToday ? LX("Выполнено · можно продолжить", "Орындалды · жалғастыруға болады", "Tamamlandı · devam edebilirsiniz") : LX("Перейти к занятию", "Сабаққа өту", "Çalışmaya git"), d.completedToday > 0),
+    step("02", due ? "#/review" : "#/practice", LX("Повторение", "Қайталау", "Tekrar"), due ? LX(`${due} ${plRu(due, "карточка ждёт", "карточки ждут", "карточек ждут")} повторения`, `${due} карточка қайталауды күтуде`, `${due} kart tekrar bekliyor`) : pool ? LX("Карточки на сегодня повторены", "Бүгінгі карточкалар қайталанды", "Bugünkü kartlar tekrar edildi") : LX("После первых букв здесь появятся карточки", "Алғашқы әріптерден кейін карточкалар пайда болады", "İlk harflerden sonra burada kartlar görünecek"), due ? LX("Повторить карточки", "Карточкаларды қайталау", "Kartları tekrar et") : LX("Открыть тренажёры", "Жаттығуларды ашу", "Alıştırmaları aç"), pool > 0 && due === 0),
+    step("03", readHref, LX("Чтение и слух", "Оқу және тыңдау", "Okuma ve dinleme"), lastS ? `${L(lastS.name)} · ${T("ayahN")} ${S.last.a}` : LX("Аль-Фатиха · слушайте и повторяйте", "Әл-Фатиха · тыңдап, қайталаңыз", "Fâtiha · dinleyin ve tekrar edin"), lastS ? T("contRead") : LX("Открыть суру", "Сүрені ашу", "Sureyi aç"))));
+  v.append(plan);
+
+  const mods = h("div", { class: "mods mini" }, COURSE.modules.map(Mo => {
+    const tot = Mo.to - Mo.from + 1, done = modDoneN(Mo);
+    return h("a", { class: "mod" + (!d.allDone && M.id === Mo.id ? " cur" : ""), href: `#/course#m${Mo.id}`, html:
+      `<span class="mar" lang="ar">${Mo.ar}</span><b>${esc(L(Mo.title))}</b><span class="bar" aria-hidden="true"><i style="width:${(done / tot * 100).toFixed(0)}%"></i></span><small class="num">${esc(T("module"))} ${Mo.id} · ${done}/${tot}</small>` });
+  }));
+  v.append(h("div", { class: "section-h sm study-modules-title" }, h("h2", {}, LX("Ваш путь обучения", "Оқу жолыңыз", "Öğrenme yolunuz")), h("a", { class: "small", href: "#/course" }, T("seeCourse"))), mods);
+  const resources = h("section", { class: "study-resources" }, h("h2", {}, LX("Для ежедневной практики", "Күнделікті жаттығуға", "Günlük çalışma için")));
+  const tile = (href, ic, title, sub) => h("a", { class: "tile", href, html: `<span class="t-ic">${icon(ic)}</span><b>${esc(title)}</b><small>${esc(sub)}</small>` });
+  const quick = h("div", { class: "study-quick" }, h("div", { class: "study-quick-tiles" },
+    tile("#/zikr", "beads", LX("Зикр", "Зікір", "Zikir"), LX("Тасбих и азкары", "Тәсбих және зікірлер", "Tesbih ve ezkâr")), nextPrayerTile()));
+  const ramadan = ramadanRow(); if (ramadan) quick.append(ramadan);
+  resources.append(h("div", { class: "study-resources-grid" }, ayahOfDay(), quick));
+  v.append(resources);
+}
+
 
 /* ═════════════ карта курса ═════════════ */
 function lessonLanguageNotice() {

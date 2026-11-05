@@ -11,6 +11,34 @@ function load(code, dependencies) {
   return context;
 }
 
+function homeHarness(state = {}) {
+  const S = { lessons: {}, ex: {}, days: {}, goal: 30, ...state };
+  const COURSE = { lessons: Array.from({ length: 110 }, (_, i) => ({ n: i + 1 })), modules: [{ id: 1, from: 1, to: 30 }, { id: 2, from: 31, to: 55 }, { id: 3, from: 56, to: 95 }, { id: 4, from: 96, to: 110 }] };
+  return load(section('function homeLearningState()', 'async function pageHome('), {
+    S, COURSE, today: () => '2026-11-05',
+    nextLessonN: () => COURSE.lessons.find(l => l.n >= (S.placeFrom || 1) && !S.lessons[l.n]?.done)?.n || 1,
+    moduleOf: n => COURSE.modules.find(m => n >= m.from && n <= m.to)
+  }).homeLearningState();
+}
+test('home: a beginner starts at lesson one with zero course and daily progress', () => {
+  const d = homeHarness();
+  assert.equal(d.started, false); assert.equal(d.n, 1);
+  assert.equal(d.completed, 0); assert.equal(d.points, 0); assert.equal(d.allDone, false);
+});
+test('home: placement skips do not count as completed lessons and points do not imply a completed lesson', () => {
+  const d = homeHarness({ placeFrom: 31, days: { '2026-11-05': 45 }, lessons: { 999: { done: true } } });
+  assert.equal(d.started, true); assert.equal(d.n, 31); assert.equal(d.module.id, 2);
+  assert.equal(d.completed, 0); assert.equal(d.completedToday, 0); assert.equal(d.dailyPercent, 100);
+});
+test('home: only lessons actually completed today get the daily completion marker', () => {
+  const d = homeHarness({ lessons: { 1: { done: true, at: '2026-11-04' }, 2: { done: true, at: '2026-11-05' }, 3: { done: false, at: '2026-11-05' } } });
+  assert.equal(d.n, 3); assert.equal(d.completed, 2); assert.equal(d.completedToday, 1); assert.equal(d.moduleDone, 2);
+});
+test('home: a finished course remains 110 of 110 instead of offering lesson one as new', () => {
+  const d = homeHarness({ lessons: Object.fromEntries(Array.from({ length: 110 }, (_, i) => [i + 1, { done: true, at: '2026-11-04' }])) });
+  assert.equal(d.allDone, true); assert.equal(d.n, 110); assert.equal(d.completed, 110); assert.equal(d.percent, 100);
+});
+
 function offlineHarness(failing = [], { opaque = false, mutate = false } = {}) {
   const S = { reciter: 'reader-a', lang: 'ru' }, stored = new Map();
   const urls = ['text.json', 'translation.json', '1.mp3', '2.mp3'];
