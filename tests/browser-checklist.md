@@ -14,3 +14,12 @@ Run a local static server, e.g. `python3 -m http.server 8765`, from the reposito
 - TR lesson/course: clearly show the available material languages and working RU/KK buttons. Turkish lesson translations are still pending; do not mark them as completed.
 - Check mobile widths 320/390 and desktop 1280; light/dark, reader player, bookmarks, namaz and course navigation. No console errors.
 - Update a previously installed PWA: app.js/app.css and service worker all use version 22; missing offline JSON must fail as data, never return index.html.
+
+
+## Резервная копия прогресса
+
+- В отдельном тестовом профиле скачать JSON с уроками, очками, закладками и расписанием повторений. Проверить файл.
+- В другом тестовом профиле выбрать копию: до «Заменить прогресс» данные не меняются. Проверить отмену.
+- Подтвердить замену, перезагрузить страницу, проверить уроки, очки и закладки. «Вернуть предыдущий прогресс» открывает предварительный просмотр прежней копии.
+- Повторный импорт не добавляет очки. Повреждённый JSON, чужой формат, новая неподдерживаемая версия и файл больше 2 МБ показывают ошибку без замены.
+- На 320/390 пикселях проверить сравнение данных, кнопки, RU/KK/TR и светлую/тёмную тему.

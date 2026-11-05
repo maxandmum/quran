@@ -195,6 +195,7 @@ const arNum = n => String(n).split("").map(d => AR_DIG[d]).join("");
 
 /* ═════════════ иконки ═════════════ */
 const I = {
+  upload: '<path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4"/>',
   home: '<path d="M3.5 10.5 12 3.5l8.5 7M5.5 9v11h4.5v-6h4v6h4.5V9"/>',
   path: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="12" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8.5 6.5c5 0 7 2 7 5M15.5 13.5c0 3-2 4.5-7 4.5"/>',
   book: '<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 0 2 1h13v-3"/><path d="M9 8h6M9 11h4"/>',
@@ -565,7 +566,7 @@ const FAQ_ITEMS = [
   { q: ["Нужна ли регистрация?", "Тіркелу керек пе?", "Kayıt olmam gerekiyor mu?"],
     a: ["Можно заниматься без регистрации. Сейчас прогресс сохраняется в браузере на этом устройстве; автоматического переноса на другой телефон или компьютер нет.", "Тіркелмей оқуға болады. Қазір прогресс осы құрылғының браузерінде сақталады; басқа телефонға не компьютерге автоматты түрде көшірілмейді.", "Kayıt olmadan çalışabilirsiniz. İlerleme şu anda bu cihazın tarayıcısında saklanır; başka bir telefona veya bilgisayara otomatik aktarılmaz."] },
   { q: ["Где хранится мой прогресс?", "Прогресім қайда сақталады?", "İlerlemem nerede saklanıyor?"],
-    a: ["В браузере, которым вы пользуетесь. Возвращайтесь с того же устройства и браузера. Очистка данных сайта или приватный режим могут привести к потере прогресса.", "Сіз пайдаланатын браузерде. Сол құрылғы мен браузер арқылы оралыңыз. Сайт деректерін тазалау немесе жеке режим прогрестің жоғалуына әкелуі мүмкін.", "Kullandığınız tarayıcıda saklanır. Aynı cihaz ve tarayıcıyla geri dönün. Site verilerini temizlemek veya gizli gezinme modu ilerlemenin kaybolmasına neden olabilir."], link: ["#/me", ["Мой профиль", "Менің профилім", "Profilim"]] },
+    a: ["Прогресс хранится в браузере на вашем устройстве. В профиле нажмите «Сохранить прогресс», чтобы скачать резервную копию. На другом устройстве выберите «Восстановить из файла» и проверьте данные перед заменой. После очистки данных браузера прогресс можно вернуть из сохранённого файла.", "Прогресс құрылғыңыздың браузерінде сақталады. Сақтық көшірмені жүктеу үшін профильде «Прогресті сақтау» түймесін басыңыз. Басқа құрылғыда «Файлдан қалпына келтіру» тармағын таңдап, ауыстыру алдында деректерді тексеріңіз. Браузер деректерін тазалағаннан кейін прогресті сақталған файлдан қайтаруға болады.", "İlerleme cihazınızın tarayıcısında saklanır. Profilde İlerlemeyi yedekle ile bir kopya indirin. Başka cihazda Dosyadan geri yükle seçeneğini kullanın ve değiştirmeden önce verileri kontrol edin. Tarayıcı verileri temizlendikten sonra kaydedilmiş dosyadan ilerlemenizi geri getirebilirsiniz."], link: ["#/me", ["Мой профиль", "Менің профилім", "Profilim"]] },
   { q: ["Что работает без интернета?", "Интернетсіз не жұмыс істейді?", "İnternetsiz neler kullanılabilir?"],
     a: ["Откройте суру и нажмите «Скачать для офлайна». Дождитесь завершения: сохранятся текст, перевод и аудио выбранного чтеца. После смены языка или чтеца нужна новая копия. Пословное аудио требует интернета.", "Сүрені ашып, «Офлайнға жүктеу» батырмасын басыңыз. Аяқталуын күтіңіз: мәтін, аударма және таңдалған қаридың аудиосы сақталады. Тілді не қариды ауыстырсаңыз, жаңа көшірме керек. Жеке сөздердің аудиосына интернет қажет.", "Bir sure açıp «Çevrimdışı için indir» düğmesine dokunun ve tamamlanmasını bekleyin. Metin, meal ve seçilen kurranın sesi kaydedilir. Dil veya kurra değişirse yeni bir kopya indirin. Kelime sesleri internet gerektirir."], link: ["#/suras", ["Выбрать суру", "Сүрені таңдау", "Sure seç"]] },
   { q: ["Сколько времени заниматься?", "Қанша уақыт оқу керек?", "Ne kadar çalışmalıyım?"],
@@ -3169,6 +3170,192 @@ function pageExam(v, m) {
   intro();
 }
 
+const BACKUP_FORMAT = "iqra-progress", BACKUP_VERSION = 1, BACKUP_MAX_BYTES = 2 * 1024 * 1024;
+const BACKUP_PREVIOUS_KEY = "iqra.progress-before-restore.v1";
+function backupError(code = "invalid") { throw Object.assign(new Error(code), { code }); }
+function backupAssert(ok) { if (!ok) backupError(); }
+function backupInt(value, min = 0, max = 1e9) { backupAssert(Number.isSafeInteger(value) && value >= min && value <= max); return value; }
+function backupBool(value) { backupAssert(typeof value === "boolean"); return value; }
+function backupFlag(value) { backupAssert([true, false, 0, 1].includes(value)); return value; }
+function backupDate(value) {
+  backupAssert(typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value));
+  const parsed = new Date(value + "T00:00:00Z");
+  backupAssert(Number.isFinite(+parsed) && parsed.toISOString().slice(0, 10) === value); return value;
+}
+function backupDay(value) { return value === "" ? "" : backupDate(value); }
+function backupEnum(value, choices) { backupAssert(choices.includes(value)); return value; }
+function backupRecord(value, fields, required = []) {
+  backupAssert(value !== null && typeof value === "object" && !Array.isArray(value));
+  backupAssert(Object.keys(value).every(k => Object.hasOwn(fields, k)) && required.every(k => Object.hasOwn(value, k) && value[k] !== undefined));
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).map(([k, v]) => [k, fields[k](v)]));
+}
+function backupMap(value, keyOK, item, limit = 12000) {
+  backupAssert(value !== null && typeof value === "object" && !Array.isArray(value));
+  const entries = Object.entries(value); backupAssert(entries.length <= limit);
+  return Object.fromEntries(entries.map(([k, v]) => { backupAssert(keyOK(k)); return [k, item(v)]; }));
+}
+function backupProgressDefaults() {
+  return { xp: 0, days: {}, lessons: {}, ex: {}, tests: {}, badges: {}, hifz: {}, hifzAwarded: {}, hifzBonus: {},
+    tr: { n: 0, ok: 0 }, last: null, bm: {}, rv: {}, exams: {}, lessonSteps: {}, place: null, placeFrom: 1, goal: 30,
+    tsb: { k: 0, day: "", d: {}, t: {}, vib: true }, zkFav: [], azk: { day: "", c: {} }, duaG: 0 };
+}
+function validateBackupProgress(progress) {
+  const lessonKey = k => /^[1-9]\d{0,2}$/.test(k) && +k <= COURSE.lessons.length;
+  const suraKey = k => /^[1-9]\d{0,2}$/.test(k) && CORE.suras.some(s => s.n === +k);
+  const verseKey = k => { const m = /^([1-9]\d{0,2}):([1-9]\d{0,2})$/.exec(k); return !!m && !!CORE.suras.find(s => s.n === +m[1] && +m[2] <= s.c); };
+  const taskKey = (k, prefix) => { const m = (prefix ? /^(?:e|t|test|c)([1-9]\d{0,2})\.\d{1,3}(?:\.\d{1,3})?$/ : /^([1-9]\d{0,2})\.\d{1,3}$/).exec(k); return !!m && +m[1] <= COURSE.lessons.length; };
+  const smallKey = k => /^[a-zA-Z0-9:_-]{1,64}$/.test(k) && !["__proto__", "constructor", "prototype"].includes(k);
+  const count = v => backupInt(v);
+  const counts = v => backupMap(v, smallKey, count, 2000);
+  const fields = {
+    xp: count,
+    days: v => backupMap(v, k => { try { backupDate(k); return true; } catch { return false; } }, count, 20000),
+    lessons: v => backupMap(v, lessonKey, x => backupRecord(x, { done: backupBool, at: backupDate }, ["done"]), COURSE.lessons.length),
+    ex: v => backupMap(v, k => taskKey(k, true), backupFlag),
+    tests: v => backupMap(v, k => taskKey(k, false), x => backupInt(x, 0, 100)),
+    badges: v => backupMap(v, k => BADGES.some(b => b[0] === k), backupDate, BADGES.length),
+    hifzAwarded: v => backupMap(v, verseKey, backupFlag),
+    hifzBonus: v => backupMap(v, suraKey, backupFlag, 114),
+    tr: v => { const x = backupRecord(v, { n: count, ok: count }, ["n", "ok"]); backupAssert(x.ok <= x.n); return x; },
+    last: v => {
+      if (v === null) return null;
+      const x = backupRecord(v, { s: n => backupInt(n, 1, 114), a: n => backupInt(n, 1, 286) }, ["s", "a"]);
+      backupAssert(verseKey(`${x.s}:${x.a}`)); return x;
+    },
+    bm: v => backupMap(v, verseKey, x => backupInt(x, 1, 1e15)),
+    rv: v => backupMap(v, k => k.startsWith("a:") ? verseKey(k.slice(2)) : k.startsWith("r:") ? Object.hasOwn(CORE.rules, k.slice(2)) : k.startsWith("l:") && CORE.letters.some(l => l.ar === k.slice(2)),
+      x => backupRecord(x, { i: n => backupInt(n, -1, 5), due: backupDate }, ["i", "due"])),
+    exams: v => backupMap(v, k => /^[1-4]$/.test(k), x => backupRecord(x, { best: n => backupInt(n, 0, 20), passed: backupBool, at: d => d === null ? null : backupDate(d), score: n => backupInt(n, 0, 20) }, ["best", "passed"]), 4),
+    lessonSteps: v => backupMap(v, lessonKey, x => backupEnum(x, ["theory", "listen", "practice", "check"]), COURSE.lessons.length),
+    place: v => v === null ? null : backupRecord(v, { lv: n => backupInt(n, 0, 5), at: backupDate, sc: a => { backupAssert(Array.isArray(a) && a.length <= 5); return a.map(n => n === null ? null : backupInt(n, 0, 100)); } }, ["lv", "at", "sc"]),
+    placeFrom: v => { backupAssert(COURSE.modules.some(m => m.from === v)); return v; },
+    goal: v => backupEnum(v, [15, 30, 60]),
+    tsb: v => backupRecord(v, { k: n => backupInt(n, 0, 2000), day: backupDay, d: counts, t: counts, vib: backupBool, goal: backupDay }, ["k", "day", "d", "t", "vib"]),
+    zkFav: v => { backupAssert(Array.isArray(v) && v.length <= 2000 && v.every(smallKey)); return [...new Set(v)]; },
+    azk: v => backupRecord(v, { day: backupDay, c: x => backupMap(x, smallKey, n => n === "done" ? n : count(n), 2000) }, ["day", "c"]),
+    duaG: v => backupInt(v, 0, 2000)
+  };
+  fields.hifz = v => {
+    const outer = backupMap(v, suraKey, x => x, 114);
+    return Object.fromEntries(Object.entries(outer).map(([s, marks]) => [s, backupMap(marks, a => /^[1-9]\d{0,2}$/.test(a) && verseKey(`${s}:${a}`), backupFlag, 286)]));
+  };
+  return Object.assign(backupProgressDefaults(), backupRecord(progress, fields, ["xp", "lessons"]));
+}
+function makeProgressBackup(state) {
+  const progress = Object.fromEntries(Object.keys(backupProgressDefaults()).filter(k => state[k] !== undefined).map(k => [k, state[k]]));
+  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: new Date().toISOString(), progress: validateBackupProgress(progress) };
+}
+function parseProgressBackup(text) {
+  if (typeof text !== "string" || new TextEncoder().encode(text).length > BACKUP_MAX_BYTES) backupError("size");
+  let data;
+  try { data = JSON.parse(text); } catch { backupError(); }
+  const pending = [[data, 0]]; let nodes = 0;
+  while (pending.length) {
+    const [value, depth] = pending.pop(); backupAssert(depth <= 8 && ++nodes <= 50000);
+    if (value && typeof value === "object") for (const [k, child] of Object.entries(value)) {
+      backupAssert(!["__proto__", "constructor", "prototype"].includes(k)); pending.push([child, depth + 1]);
+    }
+  }
+  backupAssert(data && typeof data === "object" && !Array.isArray(data));
+  if (data.format !== BACKUP_FORMAT) backupError("format");
+  if (data.version !== BACKUP_VERSION) backupError("version");
+  backupAssert(Object.keys(data).every(k => ["format", "version", "exportedAt", "progress"].includes(k)));
+  backupAssert(typeof data.exportedAt === "string" && data.exportedAt.length <= 40 && Number.isFinite(Date.parse(data.exportedAt)));
+  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: data.exportedAt, progress: validateBackupProgress(data.progress) };
+}
+function restoreProgressBackup(storage, current, progress) {
+  const validated = validateBackupProgress(progress);
+  const previous = JSON.stringify(makeProgressBackup(current));
+  const next = Object.assign({}, current, validated, { at: Date.now() });
+  // Persist both before changing live state. Failed writes never replace the current in-memory progress.
+  storage.setItem(BACKUP_PREVIOUS_KEY, previous);
+  storage.setItem(KEY, JSON.stringify(next));
+  return next;
+}
+function backupSummary(progress) {
+  return { lessons: COURSE.lessons.filter(l => progress.lessons[l.n]?.done).length,
+    bookmarks: Object.keys(progress.bm || {}).length, exams: Object.values(progress.exams || {}).filter(e => e.passed).length, xp: progress.xp };
+}
+
+
+function profileLearningSummary() {
+  const d = homeLearningState(), due = rvDue().length, bookmarks = Object.keys(S.bm || {}).length;
+  return h("section", { class: "card profile-learning" },
+    h("div", { class: "card-h" }, h("h2", {}, LX("Ваше обучение", "Сіздің оқуыңыз", "Öğreniminiz")), h("span", { class: "small muted num" }, `${d.completed} / ${d.total}`)),
+    h("progress", { class: "study-meter", max: d.total, value: d.completed, "aria-label": LX("Пройдено уроков", "Аяқталған сабақтар", "Tamamlanan dersler") }),
+    h("p", { class: "profile-module" }, d.allDone ? LX("Курс завершён", "Курс аяқталды", "Kurs tamamlandı") : `${T("module")} ${d.module.id} · ${L(d.module.title)}`),
+    h("p", { class: "profile-next" }, d.allDone ? LX("Продолжайте закреплять чтение практикой.", "Оқуды жаттығумен бекітуді жалғастырыңыз.", "Okumayı alıştırmalarla pekiştirmeye devam edin.") : `${T("lesson")} ${d.n} · ${L(COURSE.lessons[d.n - 1].title)}`),
+    h("div", { class: "profile-summary-links" },
+      h("a", { href: due ? "#/review" : "#/practice", html: icon("repeat") + esc(LX(`Повторение: ${due} ${plRu(due, "карточка", "карточки", "карточек")}`, `Қайталау: ${due} карточка`, `Tekrar: ${due} kart`)) }),
+      h("a", { href: "#/bookmarks", html: icon("bookmark") + esc(LX(`Закладки: ${bookmarks}`, `Бетбелгілер: ${bookmarks}`, `Yer imleri: ${bookmarks}`)) })),
+    h("a", { class: "btn", href: d.allDone ? "#/practice" : `#/lesson/${d.n}` }, d.allDone ? LX("Открыть практику", "Жаттығуларды ашу", "Alıştırmaları aç") : T("cont")));
+}
+function progressBackupCard() {
+  const card = h("section", { class: "card progress-backup" }, h("h2", {}, LX("Сохранение прогресса", "Прогресті сақтау", "İlerlemeyi yedekle")),
+    h("p", { class: "muted small" }, LX("Скачайте копию и перенесите обучение на другой телефон или компьютер без регистрации.", "Көшірмені жүктеп алып, оқуыңызды басқа телефонға не компьютерге тіркелусіз көшіріңіз.", "Bir kopya indirip kayıt olmadan başka telefon veya bilgisayarda öğrenmeye devam edin.")));
+  const status = h("p", { class: "backup-status small", role: "status", "aria-live": "polite" });
+  const preview = h("div", { class: "backup-preview", hidden: "", tabindex: "-1", role: "region", "aria-label": LX("Просмотр резервной копии", "Сақтық көшірмені қарау", "Yedek önizlemesi") });
+  let pending = null, request = 0;
+  const message = (text, error = false) => { status.textContent = text; status.className = "backup-status small" + (error ? " error" : ""); };
+  const errorMessage = e => message(e?.code === "size" ? LX("Файл слишком большой. Допустимый размер — до 2 МБ.", "Файл тым үлкен. Рұқсат етілген көлем — 2 МБ дейін.", "Dosya çok büyük. En fazla 2 MB olabilir.") : e?.code === "version" ? LX("Эта версия файла пока не поддерживается. Обновите сайт и попробуйте снова.", "Файлдың бұл нұсқасы қолдау таппайды. Сайтты жаңартып, қайта көріңіз.", "Bu dosya sürümü henüz desteklenmiyor. Siteyi yenileyip tekrar deneyin.") : LX("Не удалось прочитать копию Iqra. Выберите файл, сохранённый через «Сохранить прогресс».", "Iqra көшірмесін оқу мүмкін болмады. «Прогресті сақтау» арқылы сақталған файлды таңдаңыз.", "Iqra yedeği okunamadı. İlerlemeyi yedekle ile kaydedilmiş bir dosya seçin."), true);
+  const clearPreview = () => { pending = null; preview.hidden = true; preview.innerHTML = ""; };
+  const exportFile = () => {
+    try {
+      const blob = new Blob([JSON.stringify(makeProgressBackup(S), null, 2)], { type: "application/json" });
+      if (blob.size > BACKUP_MAX_BYTES) backupError("size");
+      const url = URL.createObjectURL(blob), link = h("a", { href: url, download: `iqra-progress-${today()}.json` });
+      document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      message(LX("Файл подготовлен. Сохраните его в надёжном месте и проверьте загрузки браузера.", "Файл дайын. Оны сенімді жерге сақтап, браузер жүктеулерін тексеріңіз.", "Dosya hazırlandı. Güvenli bir yere kaydedin ve tarayıcı indirmelerini kontrol edin."));
+    } catch (e) { errorMessage(e); }
+  };
+  const summaryList = (title, state) => {
+    const data = backupSummary(state);
+    return h("section", {}, h("h4", {}, title), h("dl", { class: "backup-summary" },
+      [[LX("Уроков", "Сабақ", "Ders"), data.lessons], [LX("Экзаменов сдано", "Тапсырылған емтихан", "Geçilen sınav"), data.exams], [LX("Закладок", "Бетбелгі", "Yer imi"), data.bookmarks], [LX("Очков", "Ұпай", "Puan"), data.xp]].map(([label, value]) => h("div", {}, h("dt", {}, label), h("dd", { class: "num" }, value)))));
+  };
+  const prepare = (text, filename) => {
+    const parsed = parseProgressBackup(text);
+    pending = parsed; preview.innerHTML = ""; preview.hidden = false;
+    const date = new Intl.DateTimeFormat(LX("ru-RU", "kk-KZ", "tr-TR"), { dateStyle: "medium", timeStyle: "short" }).format(new Date(parsed.exportedAt));
+    preview.append(h("h3", {}, LX("Проверьте копию перед восстановлением", "Қалпына келтірмес бұрын көшірмені тексеріңіз", "Geri yüklemeden önce yedeği kontrol edin")),
+      h("p", { class: "backup-filename small" }, filename), h("p", { class: "muted small" }, LX("Копия создана: ", "Көшірме жасалған: ", "Yedek oluşturuldu: ") + date),
+      h("div", { class: "backup-compare" }, summaryList(LX("На этом устройстве", "Осы құрылғыда", "Bu cihazda"), S), summaryList(LX("В выбранной копии", "Таңдалған көшірмеде", "Seçilen yedekte"), parsed.progress)),
+      h("p", { class: "backup-replace-note" }, LX("Прогресс на этом устройстве будет заменён данными из копии. Перед заменой сохраним предыдущий прогресс в этом браузере.", "Осы құрылғыдағы прогресс көшірмедегі деректермен ауыстырылады. Ауыстыру алдында алдыңғы прогресті осы браузерде сақтаймыз.", "Bu cihazdaki ilerleme yedekteki verilerle değiştirilecek. Önce mevcut ilerleme bu tarayıcıda saklanacak.")),
+      h("div", { class: "backup-actions" }, h("button", { class: "btn backup-restore-confirm", type: "button", onclick: () => {
+        if (!pending) return;
+        let restored;
+        try { restored = restoreProgressBackup(localStorage, S, pending.progress); }
+        catch { message(LX("Браузер не смог сохранить данные. Прогресс не заменён. Сохраните текущую копию и повторите попытку.", "Браузер деректерді сақтай алмады. Прогресс ауыстырылмады. Ағымдағы көшірмені сақтап, қайта көріңіз.", "Tarayıcı verileri kaydedemedi. İlerleme değiştirilmedi. Mevcut yedeği kaydedip tekrar deneyin."), true); return; }
+        S = restored; pending = null;
+        try { if (onSave) onSave(); } catch (e) { console.warn("restore sync", e); }
+        shell(); route(); toast(LX("Прогресс восстановлен", "Прогресс қалпына келтірілді", "İlerleme geri yüklendi"));
+      } }, LX("Заменить прогресс", "Прогресті ауыстыру", "İlerlemeyi değiştir")),
+      h("button", { class: "btn ghost", type: "button", onclick: () => { clearPreview(); message(LX("Восстановление отменено.", "Қалпына келтіру тоқтатылды.", "Geri yükleme iptal edildi.")); } }, T("cancel"))));
+    message(LX("Файл проверен. Прогресс ещё не изменён.", "Файл тексерілді. Прогресс әлі өзгерген жоқ.", "Dosya kontrol edildi. İlerleme henüz değiştirilmedi."));
+    preview.focus({ preventScroll: true });
+    routeDelay(() => { if (preview.isConnected && !preview.hidden) preview.scrollIntoView({ block: "start", behavior: "instant" }); }, 0);
+  };
+  const input = h("input", { type: "file", accept: ".json,application/json", hidden: "", "aria-label": LX("Файл прогресса Iqra", "Iqra прогресс файлы", "Iqra ilerleme dosyası") });
+  const select = h("button", { class: "btn ghost backup-select", type: "button", onclick: () => input.click(), html: icon("upload") + esc(LX("Восстановить из файла", "Файлдан қалпына келтіру", "Dosyadan geri yükle")) });
+  input.onchange = async () => {
+    const file = input.files?.[0]; if (!file) return;
+    const token = ++request; clearPreview(); select.disabled = true;
+    message(LX("Проверяем файл…", "Файл тексерілуде…", "Dosya kontrol ediliyor…"));
+    try { if (file.size > BACKUP_MAX_BYTES) backupError("size"); const text = await file.text(); if (token === request && card.isConnected) prepare(text, file.name); }
+    catch (e) { if (token === request && card.isConnected) errorMessage(e); }
+    finally { if (token === request) { select.disabled = false; input.value = ""; } }
+  };
+  card.append(h("div", { class: "backup-actions" }, h("button", { class: "btn backup-export", type: "button", onclick: exportFile, html: icon("download") + esc(LX("Сохранить прогресс", "Прогресті сақтау", "İlerlemeyi yedekle")) }), select), input,
+    h("p", { class: "muted small backup-includes" }, LX("В копии: уроки, задания, результаты, повторение, закладки, заучивание и счётчики зикра. Аудио для офлайн-режима скачайте на новом устройстве.", "Көшірмеде: сабақтар, тапсырмалар, нәтижелер, қайталау, бетбелгілер, жаттау және зікір санауыштары. Офлайн аудионы жаңа құрылғыда қайта жүктеңіз.", "Yedek; dersler, görevler, sonuçlar, tekrarlar, yer imleri, ezber ve zikir sayaçlarını içerir. Çevrimdışı sesleri yeni cihazda yeniden indirin.")), status, preview);
+  try { if (localStorage.getItem(BACKUP_PREVIOUS_KEY)) card.append(h("button", { class: "backup-undo", type: "button", onclick: () => {
+    try { clearPreview(); prepare(localStorage.getItem(BACKUP_PREVIOUS_KEY), LX("Копия перед последним восстановлением", "Соңғы қалпына келтіру алдындағы көшірме", "Son geri yüklemeden önceki yedek")); }
+    catch (e) { errorMessage(e); }
+  } }, LX("Вернуть предыдущий прогресс", "Алдыңғы прогресті қайтару", "Önceki ilerlemeye dön"))); } catch {}
+  onRouteLeave(() => { request++; });
+  return card;
+}
+
+
 /* ═════════════ профиль ═════════════ */
 const BADGE_IC = { first: "learn", m1: "ab", m2: "stand", m3: "rule", m4: "star", s3: "flame", s7: "flame", s30: "flame", t100: "target", perfect: "check", fatiha: "stand", hifz5: "star" };
 const badgeIcon = id => BADGE_IC[id] === "ab" ? '<span class="ar" lang="ar">أ ب</span>' : icon(BADGE_IC[id] || "star");
@@ -3195,6 +3382,7 @@ function pageMe(v) {
     h("a", { href: "#/course", html: `<b class="num">${dc}</b><small>${esc(LX(plRu(dc, "урок", "урока", "уроков"), "сабақ", "ders"))}</small>` }),
     h("div", { class: "warm", html: `<b class="num">${st}</b><small>${esc(streakLabel(st))}</small>` }),
     h("a", { href: "#/practice", html: `<b class="num">${memN}</b><small>${esc(LX(plRu(memN, "сура наизусть", "суры наизусть", "сур наизусть"), "сүре жатқа", "sure ezber"))}</small>` })));
+  wrap.append(profileLearningSummary(), progressBackupCard());
   // награды
   const got = BADGES.filter(b => S.badges[b[0]]).length;
   const aw = h("div", { class: "awards" });
