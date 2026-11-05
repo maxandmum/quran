@@ -349,17 +349,18 @@ const Audio1 = new Audio();
 Audio1.preload = "auto";
 let audioDone = null, audioEl = null;
 function stopAudio() {
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
   Audio1.pause(); Audio1.onended = null; Audio1.onerror = null;
   if (audioEl) audioEl.classList.remove("playing"); audioEl = null;
   const f = audioDone; audioDone = null; if (f) f(false);
 }
-function playURL(url, el, rate = 1) {
+function playURL(url, el, rate = null) {
   return new Promise(res => {
     stopAudio();
     if (LP && !LP.a.paused) LP.a.pause();
     audioDone = res; audioEl = el || null;
     if (el) el.classList.add("playing");
-    Audio1.src = OFF_MAP[url] || url; Audio1.playbackRate = rate;
+    Audio1.src = OFF_MAP[url] || url; Audio1.playbackRate = rate ?? Number(el?.closest(".lesson-view")?.dataset.audioRate || 1);
     Audio1.onended = () => { if (el) el.classList.remove("playing"); audioEl = null; audioDone = null; res(true); };
     Audio1.onerror = () => { if (el) el.classList.remove("playing"); audioEl = null; audioDone = null; toast(T("audioErr")); res(false); };
     Audio1.play().catch(() => { if (audioDone === res) { audioDone = null; if (el) el.classList.remove("playing"); res(false); } });
@@ -946,14 +947,100 @@ async function allowLesson(n) {
 }
 
 /* ═════════════ урок ═════════════ */
+function lessonStagePlan(blocks, hasAudio) {
+  const entries = blocks.map((block, index) => ({ block, index }));
+  const firstTask = blocks.findIndex(b => ["ex", "trace", "test", "check"].includes(b.type));
+  let start = firstTask < 0 ? blocks.length : firstTask;
+  if (start > 0 && blocks[start - 1].type === "h") start--;
+  const testAt = blocks.findIndex(b => b.type === "test");
+  let checkAt = testAt;
+  if (checkAt < 0) for (let i = blocks.length - 1; i >= start; i--) if (blocks[i].type === "check") { checkAt = i; break; }
+  if (checkAt < 0) checkAt = blocks.length;
+  if (testAt >= 0) while (checkAt > start && ["h", "p", "sep"].includes(blocks[checkAt - 1].type)) checkAt--;
+  // Keep original indices and order: saved exercise keys must never change.
+  const steps = [{ id: "theory", entries: entries.slice(0, start) }];
+  if (hasAudio) steps.push({ id: "listen", entries: [] });
+  if (checkAt > start) steps.push({ id: "practice", entries: entries.slice(start, checkAt) });
+  steps.push({ id: "check", entries: entries.slice(checkAt) });
+  return steps;
+}
+function lessonAudioSamples(les) {
+  const samples = [], seen = new Set();
+  const add = (url, ar, label) => { if (url && !seen.has(url)) { seen.add(url); samples.push({ url, ar, label }); } };
+  const word = w => { if (w?.loc) add(wordURL(w.loc), w.w, L(w.tr) || w.loc); };
+  const ayah = (s, a) => {
+    const ay = SURA_D[s]?.ayat[a - 1];
+    if (ay) add(ayahURL(s, a), ay.sp.map(x => x[0]).join(""), `${L(suraBy(s).name)} · ${T("ayahN")} ${a}`);
+  };
+  for (const b of les.blocks) {
+    if (b.type === "letter" || b.type === "words") (letterBy(b.ar)?.words || []).slice(0, 2).forEach(word);
+    if (b.type === "wordlist") b.items.slice(0, 2).forEach(word);
+    if (b.type === "ayah") ayah(b.s, b.a);
+    if (b.type === "sura") ayah(b.n, 1);
+    if (b.type === "ar" && b.loc) {
+      const parts = b.loc.split(":").map(Number);
+      add(parts.length === 3 ? wordURL(b.loc) : ayahURL(...parts), b.text, LX("Пример из урока", "Сабақтағы мысал", "Dersten örnek"));
+    }
+    if (b.type === "rex") for (const it of b.items.slice(0, 2)) {
+      const [s, a] = it.src.split(":").map(Number);
+      add(ayahURL(s, a), it.sp.map(x => x[0]).join(""), `${L(suraBy(s).name)} ${it.src}`);
+    }
+  }
+  return samples.slice(0, 4);
+}
+function lessonListening(samples, lessonWrap) {
+  let selected = 0, request = 0, playing = false;
+  const panel = h("div", { class: "lesson-listening" });
+  const text = h("p", { class: "lesson-audio-ar ar", lang: "ar" }, samples[0].ar);
+  const label = h("p", { class: "muted small" }, samples[0].label);
+  const status = h("p", { class: "lesson-audio-status", role: "status", "aria-live": "polite" }, LX("Послушайте пример, затем повторите вслух.", "Мысалды тыңдап, дауыстап қайталаңыз.", "Örneği dinleyin, ardından sesli tekrar edin."));
+  const play = h("button", { class: "btn", type: "button" });
+  const repeat = h("button", { class: "btn ghost", type: "button", html: icon("repeat") + esc(LX("Повторить запись", "Жазбаны қайталау", "Kaydı tekrarla")) });
+  const setButton = () => { play.innerHTML = icon(playing ? "x" : "play") + esc(playing ? LX("Остановить", "Тоқтату", "Durdur") : LX("Послушать", "Тыңдау", "Dinle")); };
+  const start = async () => {
+    const token = ++request; playing = true; setButton();
+    status.textContent = LX("Слушайте произношение.", "Айтылымды тыңдаңыз.", "Telaffuzu dinleyin.");
+    const ok = await playURL(samples[selected].url, panel, Number(lessonWrap.dataset.audioRate || 1));
+    if (token !== request || !panel.isConnected) return;
+    playing = false; setButton();
+    status.textContent = ok ? LX("Теперь повторите вслух. При необходимости включите запись ещё раз.", "Енді дауыстап қайталаңыз. Қажет болса, жазбаны қайта қосыңыз.", "Şimdi sesli tekrar edin. Gerekirse kaydı yeniden dinleyin.") : LX("Запись остановлена или недоступна. Попробуйте включить её снова.", "Жазба тоқтатылды немесе қолжетімсіз. Қайта қосып көріңіз.", "Kayıt durduruldu veya kullanılamıyor. Yeniden deneyin.");
+  };
+  play.onclick = () => { if (playing) { request++; playing = false; stopAudio(); setButton(); status.textContent = LX("Остановлено. Можно послушать заново.", "Тоқтатылды. Қайта тыңдауға болады.", "Durduruldu. Yeniden dinleyebilirsiniz."); } else start(); };
+  repeat.onclick = start;
+  const rate = h("select", { "aria-label": T("speed") }, [0.75, 1, 1.25].map(n => h("option", { value: n, selected: n === 1 ? "" : null }, `${n}×`)));
+  rate.onchange = () => { lessonWrap.dataset.audioRate = rate.value; if (audioEl === panel) Audio1.playbackRate = Number(rate.value); };
+  const choices = h("div", { class: "lesson-audio-choices", role: "group", "aria-label": LX("Аудиопримеры", "Аудиомысалдар", "Ses örnekleri") });
+  samples.forEach((sample, i) => {
+    const choice = h("button", { type: "button", "aria-pressed": String(i === 0) }, `${LX("Пример", "Мысал", "Örnek")} ${i + 1}`);
+    choice.onclick = () => {
+      request++; playing = false; if (audioEl === panel) stopAudio(); setButton(); selected = i;
+      for (const [j, button] of [...choices.children].entries()) button.setAttribute("aria-pressed", String(i === j));
+      text.textContent = sample.ar; label.textContent = sample.label;
+      status.textContent = LX("Послушайте пример, затем повторите вслух.", "Мысалды тыңдап, дауыстап қайталаңыз.", "Örneği dinleyin, ardından sesli tekrar edin.");
+    };
+    choices.append(choice);
+  });
+  setButton();
+  panel.append(choices, text, label, h("div", { class: "lesson-audio-controls" }, play, repeat, h("label", {}, T("speed"), rate)), status);
+  onRouteLeave(() => { request++; });
+  return panel;
+}
+function focusLessonContent(el, progress = el.closest(".lesson-view")?.querySelector(".lesson-progress")) {
+  if (!progress) return;
+  el.focus({ preventScroll: true });
+  routeDelay(() => {
+    if (!el.isConnected || el.closest(".lesson-stage")?.hidden) return;
+    const inset = Number.parseFloat(getComputedStyle(progress).top) || 0;
+    window.scrollTo({ top: Math.max(0, window.scrollY + el.getBoundingClientRect().top - inset - progress.offsetHeight - 18), behavior: "instant" });
+  }, 0);
+}
 async function pageLesson(v, n) {
   const meta = COURSE.lessons[n - 1];
   if (!meta || !meta.ready) return notFound(v);
   const okL = await allowLesson(n);
-  if (okL === null) return; // ушли на другую страницу, пока был открыт диалог
+  if (okL === null) return;
   if (!okL) { location.replace(`#/lesson/${undoneBefore(n)[0]}`); return; }
-  const M = moduleOf(n);
-  const list = await loadModule(M.id);
+  const M = moduleOf(n), list = await loadModule(M.id);
   if (!v.isConnected) return;
   const les = list.find(x => x.n === n);
   if (!les) return notFound(v);
@@ -962,55 +1049,93 @@ async function pageLesson(v, n) {
   await Promise.all([...need].map(loadSura));
   if (!v.isConnected) return;
   exCounter = 0;
-  const wrap = h("article", { class: "read" });
+  const wrap = h("article", { class: "read lesson-view", "data-audio-rate": "1" });
   const required = les.blocks.flatMap((b, i) => {
     const prefix = { ex: "e", trace: "t", test: "test" }[b.type];
     return prefix ? [prefix + n + "." + i] : [];
   });
-  const total = required.length;
+  const total = required.length, samples = lessonAudioSamples(les), steps = lessonStagePlan(les.blocks, samples.length > 0);
+  const labels = { theory: LX("Разбор", "Түсіндіру", "Açıklama"), listen: LX("Слушаем", "Тыңдау", "Dinleme"), practice: LX("Практика", "Жаттығу", "Alıştırma"), check: LX("Проверка", "Тексеру", "Kontrol") };
+  const hints = {
+    theory: LX("Прочитайте объяснение и рассмотрите примеры.", "Түсіндірмені оқып, мысалдарды қараңыз.", "Açıklamayı okuyun ve örnekleri inceleyin."),
+    listen: LX("Слушайте, повторяйте вслух и сравнивайте произношение.", "Тыңдап, дауыстап қайталаңыз және айтылымды салыстырыңыз.", "Dinleyin, sesli tekrar edin ve telaffuzunuzu karşılaştırın."),
+    practice: LX("Выполните задания. К объяснению можно вернуться в любой момент.", "Тапсырмаларды орындаңыз. Түсіндірмеге кез келген уақытта оралуға болады.", "Alıştırmaları yapın. İstediğiniz zaman açıklamaya dönebilirsiniz."),
+    check: LX("Проверьте себя и завершите урок после всех заданий.", "Өзіңізді тексеріп, барлық тапсырмадан кейін сабақты аяқтаңыз.", "Kendinizi kontrol edin; tüm görevlerden sonra dersi tamamlayın.")
+  };
+  let active = Math.max(0, steps.findIndex(s => s.id === S.lessonSteps?.[n]));
   let refreshCompletion = () => {};
   const languageNote = lessonLanguageNotice(); if (languageNote) wrap.append(languageNote);
-  wrap.append(h("div", { class: "lhead" },
-    h("div", { class: "crumbs", html: `<a href="#/course#m${M.id}">${esc(T("module"))} ${M.id} · ${esc(L(M.title))}</a><span>·</span><span>${esc(T("lesson"))} ${n} / 110</span>` }),
+  wrap.append(h("header", { class: "lhead" }, h("div", { class: "crumbs", html: `<a href="#/course#m${M.id}">${esc(T("module"))} ${M.id} · ${esc(L(M.title))}</a><span>·</span><span>${esc(T("lesson"))} ${n} / ${COURSE.lessons.length}</span>` }),
     h("h1", { lang: S.lang === "tr" ? "ru" : S.lang, html: mdInline(les.title) }),
-    h("p", { class: "goal" }, T("goal") + ": ", h("span", { lang: S.lang === "tr" ? "ru" : S.lang, html: md(les.goal).replace(/<\/?p>/g, "") }))));
-  const progBar = h("div", { class: "bar" }, h("i", { style: "width:0%" }));
-  if (total) wrap.append(h("div", { class: "lprog" }, progBar));
-  const blocksEl = h("div", { class: "blocks", lang: S.lang === "tr" ? "ru" : S.lang });
+    h("p", { class: "goal" }, T("goal") + ": ", h("span", { lang: S.lang === "tr" ? "ru" : S.lang, html: mdInline(les.goal) }))));
+  const position = h("span", { class: "lesson-position" }), taskCount = h("span", { class: "lesson-task-count num" });
+  const progBar = h("progress", { class: "study-meter", max: total || 1, value: 0, "aria-label": LX("Выполненные задания", "Орындалған тапсырмалар", "Tamamlanan görevler") });
+  const stepNav = h("nav", { class: "lesson-step-nav", "aria-label": LX("Шаги урока", "Сабақ қадамдары", "Ders adımları") });
+  const progressWrap = h("div", { class: "lesson-progress" }, h("div", { class: "lesson-progress-line" }, position, taskCount), progBar, stepNav);
+  wrap.append(progressWrap);
   const ctx = { n, solved: new Set(required.filter(key => S.ex[key])), total, onSolve(key, el, xp = 5) {
+    if (!required.includes(key)) return;
     if (!ctx.solved.has(key)) { ctx.solved.add(key); if (!S.ex[key]) { S.ex[key] = 1; addXP(xp, el); } save(); }
     refreshCompletion();
   } };
-  les.blocks.forEach((b, i) => { const el = renderBlock(b, `${n}.${i}`, ctx); if (el) blocksEl.append(el); });
-  wrap.append(blocksEl);
-
-  const done = S.lessons[n] && S.lessons[n].done;
-  const fin = h("button", { class: "btn" + (done ? " ghost" : ""), html: (done ? icon("check") : "") + esc(done ? T("finished") : T("finish")) });
-  fin.onclick = () => {
-    if (!done && required.some(key => !ctx.solved.has(key))) return;
-    if (!(S.lessons[n] && S.lessons[n].done)) {
-      S.lessons[n] = { done: true, at: today() }; save(); addXP(20, fin);
-      fin.className = "btn ghost"; fin.innerHTML = icon("check") + esc(T("finished"));
+  const buttons = [], panels = [], heads = [];
+  const showStep = (i, focus = true) => {
+    active = i;
+    for (let j = 0; j < steps.length; j++) { panels[j].hidden = j !== i; buttons[j].setAttribute("aria-current", j === i ? "step" : "false"); }
+    position.textContent = LX(`Шаг ${i + 1} из ${steps.length} · ${labels[steps[i].id]}`, `${steps.length} қадамның ${i + 1}-і · ${labels[steps[i].id]}`, `${steps.length} adımdan ${i + 1}. adım · ${labels[steps[i].id]}`);
+    if (focus) {
+      stopAudio(); S.lessonSteps = S.lessonSteps || {}; S.lessonSteps[n] = steps[i].id; save();
+      focusLessonContent(heads[i], progressWrap);
     }
-    checkBadges();
-    const nx = COURSE.lessons[n];
-    if (nx && nx.ready) routeDelay(() => location.hash = `#/lesson/${n + 1}`, 650);
   };
+  steps.forEach((step, i) => {
+    const id = `lesson-${n}-${step.id}`;
+    const button = h("button", { type: "button", "aria-controls": id, onclick: () => showStep(i) }, h("span", { class: "lesson-step-number" }, i + 1), h("span", {}, labels[step.id]));
+    button.onkeydown = e => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const next = (i + (e.key === "ArrowRight" ? 1 : -1) + steps.length) % steps.length; showStep(next); buttons[next].focus(); } };
+    buttons.push(button); stepNav.append(button);
+    const heading = h("h2", { class: "lesson-stage-title", tabindex: "-1" }, labels[step.id]); heads.push(heading);
+    const panel = h("section", { class: "lesson-stage", id, "aria-label": labels[step.id] }, heading, h("p", { class: "lesson-stage-hint" }, hints[step.id]));
+    if (step.id === "listen") panel.append(lessonListening(samples, wrap));
+    const blocks = h("div", { class: "blocks", lang: S.lang === "tr" ? "ru" : S.lang });
+    for (const { block, index } of step.entries) { const el = renderBlock(block, `${n}.${index}`, ctx); if (el) blocks.append(el); }
+    panel.append(blocks);
+    panels.push(panel); wrap.append(panel);
+  });
+  const isComplete = () => !!S.lessons[n]?.done;
+  const fin = h("button", { class: "btn lesson-finish", type: "button" });
   const completionText = h("p", { class: "muted small", role: "status", "aria-live": "polite" });
+  const result = h("section", { class: "lesson-result", hidden: "", tabindex: "-1", "aria-label": LX("Итог урока", "Сабақ қорытындысы", "Ders sonucu") });
+  const showResult = (awarded = false, focus = true) => {
+    result.hidden = false; result.innerHTML = "";
+    const next = COURSE.lessons[n];
+    result.append(h("span", { class: "lesson-result-icon", html: icon("check") }), h("h2", {}, LX("Урок завершён", "Сабақ аяқталды", "Ders tamamlandı")),
+      h("p", { class: "lesson-result-goal", lang: S.lang === "tr" ? "ru" : S.lang, html: mdInline(les.goal) }),
+      h("p", { class: "muted small" }, awarded ? LX("Прогресс сохранён · +20 очков за урок", "Прогресс сақталды · сабақ үшін +20 ұпай", "İlerleme kaydedildi · ders için +20 puan") : LX("Результат сохранён. Материал можно повторять.", "Нәтиже сақталды. Материалды қайталауға болады.", "Sonuç kaydedildi. Konuyu tekrar edebilirsiniz.")),
+      h("div", { class: "lesson-result-actions" }, next?.ready ? h("a", { class: "btn", href: `#/lesson/${n + 1}`, html: esc(LX("Следующий урок", "Келесі сабақ", "Sonraki ders")) + icon("arrow") }) : h("a", { class: "btn", href: "#/practice" }, LX("Перейти к практике", "Жаттығуға өту", "Alıştırmalara git")),
+        h("a", { class: "btn ghost", href: "#/course" }, T("seeCourse"))));
+    if (focus) { focusLessonContent(result, progressWrap); }
+  };
+  fin.onclick = () => {
+    if (!isComplete() && required.some(key => !ctx.solved.has(key))) return;
+    const awarded = !isComplete();
+    if (awarded) { S.lessons[n] = { done: true, at: today() }; save(); addXP(20, fin); }
+    checkBadges(); refreshCompletion(); showResult(awarded);
+  };
   refreshCompletion = () => {
     const solved = required.filter(key => ctx.solved.has(key)).length;
-    progBar.firstChild.style.width = (total ? solved / total * 100 : 100).toFixed(0) + "%";
-    fin.disabled = !done && solved < total;
-    completionText.textContent = total ? LX(`Заданий выполнено: ${solved} из ${total}. Завершите все задания, чтобы отметить урок.`, `Орындалған тапсырма: ${solved} / ${total}. Сабақты аяқтау үшін барлық тапсырманы орындаңыз.`, `Tamamlanan görev: ${solved} / ${total}. Dersi bitirmek için tüm görevleri tamamlayın.`) : T("finishHint");
+    progBar.value = solved; taskCount.textContent = LX(`Задания: ${solved} / ${total}`, `Тапсырмалар: ${solved} / ${total}`, `Görevler: ${solved} / ${total}`);
+    fin.disabled = !isComplete() && solved < total;
+    fin.innerHTML = (isComplete() ? icon("check") : "") + esc(isComplete() ? LX("Показать итог", "Қорытындыны көрсету", "Sonucu göster") : T("finish"));
+    completionText.textContent = isComplete() ? LX("Урок уже пройден. Можно вернуться к любому шагу.", "Сабақ аяқталған. Кез келген қадамға оралуға болады.", "Bu ders tamamlandı. Her adıma dönebilirsiniz.") : solved < total ? LX(`Заданий выполнено: ${solved} из ${total}. Выполните оставшиеся задания.`, `Орындалған тапсырма: ${solved} / ${total}. Қалған тапсырмаларды орындаңыз.`, `Tamamlanan görev: ${solved} / ${total}. Kalan görevleri tamamlayın.`) : LX("Все задания выполнены. Можно завершить урок.", "Барлық тапсырма орындалды. Сабақты аяқтауға болады.", "Tüm görevler tamamlandı. Dersi bitirebilirsiniz.");
   };
-  wrap.append(h("div", { class: "done-bar" }, completionText, fin));
-  const prev = COURSE.lessons[n - 2], next = COURSE.lessons[n];
-  wrap.append(h("div", { class: "lnav" },
-    prev ? h("a", { class: "btn ghost", href: `#/lesson/${n - 1}`, html: icon("back") + esc(T("prev")) }) : h("span"),
-    next && next.ready ? h("a", { class: "btn ghost", href: `#/lesson/${n + 1}`, html: esc(T("next")) + icon("arrow") }) : h("span")));
-  v.append(wrap);
-  refreshCompletion();
+  panels[panels.length - 1].append(h("div", { class: "done-bar lesson-done-bar" }, completionText, fin), result);
+  panels.forEach((panel, i) => panel.append(h("div", { class: "lesson-stage-actions" },
+    i ? h("button", { class: "btn ghost", type: "button", onclick: () => showStep(i - 1), html: icon("back") + esc(T("prev")) }) : h("span"),
+    i < steps.length - 1 ? h("button", { class: "btn", type: "button", onclick: () => showStep(i + 1), html: esc(LX("Далее: ", "Келесі: ", "Sonraki: ") + labels[steps[i + 1].id]) + icon("arrow") }) : h("a", { class: "btn ghost", href: "#/course" }, T("seeCourse")))));
+  v.append(wrap); refreshCompletion(); showStep(active, false);
+  if (isComplete()) showResult(false, false);
 }
+
 
 /* ═════════════ блоки ═════════════ */
 function renderBlock(b, key, ctx) {
@@ -1353,7 +1478,22 @@ function exEl(b, key, ctx, opts = {}) {
           done(tries ? 2 : 5);
         } else {
           tries++; btn.classList.add("wrong"); fb.className = "fb bad"; fb.textContent = opts.single ? LX("Неверно. Правильный ответ выделен.", "Қате. Дұрыс жауап белгіленді.", "Yanlış. Doğru cevap işaretlendi.") : T("wrongTry");
-          if (opts.single) { over = true; box.children[b.answer].classList.add("right"); if (b.explain) fb.innerHTML += " " + md(b.explain).replace(/<\/?p>/g, ""); fail(); }
+          if (!opts.single) {
+            if (b.explain) fb.append(h("div", { class: "fb-explain", html: md(b.explain) }));
+            else {
+              const answer = b.options[b.answer];
+              fb.append(h("details", { class: "fb-explain" }, h("summary", {}, LX("Показать подсказку", "Көмекті көрсету", "İpucu göster")),
+                h("p", {}, LX("Верный вариант: ", "Дұрыс нұсқа: ", "Doğru seçenek: "), h("span", { class: answer.ar ? "ar" : "", html: answer.ar ? esc(answer.ar) : mdInline(answer.t) })),
+                h("p", {}, LX("Сравните его со своим ответом. К правилу можно вернуться на шаге «Разбор».", "Оны өз жауабыңызбен салыстырыңыз. Ережеге «Түсіндіру» қадамында оралуға болады.", "Kendi yanıtınızla karşılaştırın. Kurala Açıklama adımında dönebilirsiniz."))));
+            }
+          }
+          if (opts.single) {
+            over = true; box.children[b.answer].classList.add("right");
+            const correct = b.options[b.answer];
+            fb.append(h("p", {}, LX("Верный ответ: ", "Дұрыс жауап: ", "Doğru yanıt: "), h("span", { class: correct.ar ? "ar" : "", html: correct.ar ? esc(correct.ar) : mdInline(correct.t) })));
+            if (b.explain) fb.append(h("div", { class: "fb-explain", html: md(b.explain) }));
+            fail();
+          }
         }
       };
       box.append(btn);
@@ -1430,7 +1570,7 @@ function exEl(b, key, ctx, opts = {}) {
 
 /* ───── контрольная ───── */
 function testEl(b, key, ctx) {
-  const box = h("div", { class: "test" });
+  const box = h("div", { class: "test", tabindex: "-1" });
   const best = S.tests[key];
   const intro = () => {
     box.innerHTML = "";
@@ -1454,9 +1594,15 @@ function testEl(b, key, ctx) {
       box.append(h("div", { class: "tprog" }, h("span", {}, `${T("question")} ${i + 1} / ${b.items.length}`), h("span", { class: "num" }, `${score} ✓`)),
         h("div", { class: "bar" }, h("i", { style: `width:${i / b.items.length * 100}%` })));
       const it = b.items[i];
-      box.append(exEl(it, key + "q" + i, null, { noTag: true, single: true, onDone: ok => { if (ok) score++; i++; routeDelay(step, ok ? 500 : 1300); } }));
+      let answered = false;
+      const next = h("button", { class: "btn test-next", type: "button", hidden: "", onclick: () => { if (!answered) return; i++; step(); focusLessonContent(box); } },
+        i + 1 === b.items.length ? LX("Показать результат", "Нәтижені көрсету", "Sonucu göster") : LX("Следующий вопрос", "Келесі сұрақ", "Sonraki soru"));
+      box.append(exEl(it, key + "q" + i, null, { noTag: true, single: true, onDone: ok => {
+        if (answered) return;
+        answered = true; if (ok) score++; next.hidden = false;
+      } }), next);
     };
-    step();
+    step(); focusLessonContent(box);
   };
   intro();
   return box;
