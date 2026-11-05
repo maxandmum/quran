@@ -302,13 +302,13 @@ async function offPrep(n) {
   else for (const u of Object.values(prepared)) URL.revokeObjectURL(u);
 }
 async function offDrop(n) { const c = await caches.open(OFF_CACHE), o = S.off[n]; for (const u of offURLs(n, o.rec, o.lang)) await c.delete(u); delete S.off[n]; save(); }
-function offBtn(n) {
+function offBtn(n, onChanged = () => {}) {
   const b = h("button", { class: "tog off-b" });
-  const draw = () => { b.innerHTML = icon(isOff(n) ? "check" : "download") + esc(isOff(n) ? LX("Сохранена офлайн", "Офлайн сақталған", "Çevrimdışı kayıtlı") : LX("Скачать для офлайна", "Офлайнға жүктеу", "Çevrimdışı için indir")); b.setAttribute("aria-pressed", String(isOff(n))); };
+  const draw = () => { b.innerHTML = icon(isOff(n) ? "check" : "download") + esc(isOff(n) ? LX("Сохранена офлайн", "Офлайн сақталған", "Çevrimdışı kayıtlı") : LX("Скачать для офлайна", "Офлайнға жүктеу", "Çevrimdışı için indir")); b.setAttribute("aria-pressed", String(isOff(n))); onChanged(); };
   b.onclick = async () => {
     if (isOff(n)) { if (await ask({ title: LX("Удалить из офлайна?", "Офлайннан өшіру керек пе?", "Çevrimdışından silinsin mi?"), text: LX("Текст и аудио этой суры будут снова загружаться из интернета.", "Бұл сүренің мәтіні мен аудиосы қайтадан интернеттен жүктеледі.", "Bu surenin metni ve sesi yeniden internetten yüklenecek."), yes: LX("Удалить", "Өшіру", "Sil"), no: LX("Оставить", "Қалдыру", "Kalsın"), icon: "download" })) { await offDrop(n); draw(); } return; }
     b.disabled = true;
-    try { await offSave(n, p => { b.innerHTML = icon("download") + `<span class="num">${Math.round(p * 100)}%</span>`; }); toast(LX("Сура доступна без интернета", "Сүре интернетсіз қолжетімді", "Sure internetsiz kullanılabilir")); offPrep(n); }
+    try { await offSave(n, p => { b.innerHTML = icon("download") + `<span class="num">${Math.round(p * 100)}%</span>`; }); toast(LX("Сура доступна без интернета", "Сүре интернетсіз қолжетімді", "Sure internetsiz kullanılabilir")); if (b.isConnected) offPrep(n); }
     catch (e) { toast(LX("Не удалось скачать — проверьте интернет", "Жүктеу мүмкін болмады — интернетті тексеріңіз", "İndirilemedi — interneti kontrol edin")); }
     b.disabled = false; draw(); };
   draw(); return b;
@@ -361,7 +361,7 @@ function playURL(url, el, rate = null) {
     if (LP && !LP.a.paused) LP.a.pause();
     audioDone = res; audioEl = el || null;
     if (el) el.classList.add("playing");
-    Audio1.src = OFF_MAP[url] || url; Audio1.playbackRate = rate ?? Number(el?.closest(".lesson-view")?.dataset.audioRate || 1);
+    Audio1.src = OFF_MAP[url] || url; Audio1.playbackRate = rate ?? Number(el?.closest(".lesson-view, .reader-view")?.dataset.audioRate || 1);
     Audio1.onended = () => { if (el) el.classList.remove("playing"); audioEl = null; audioDone = null; res(true); };
     Audio1.onerror = () => { if (el) el.classList.remove("playing"); audioEl = null; audioDone = null; toast(T("audioErr")); res(false); };
     Audio1.play().catch(() => { if (audioDone === res) { audioDone = null; if (el) el.classList.remove("playing"); res(false); } });
@@ -685,6 +685,7 @@ let RTIP = null;
 async function ruleTip(k, at) {
   if (RTIP) { const same = RTIP.k === k; RTIP.el.remove(); RTIP = null; if (same) return; }
   const c = CORE.rules[k]; let r = null; try { r = (await loadTJ()).rules[k]; } catch (e) {}
+  if (!at.isConnected) return;
   const el = h("div", { class: "rtip", role: "dialog", style: `--rc:${RC(k)}` },
     h("div", { class: "rtip-h" }, h("i"), h("b", {}, L(c.name)), h("button", { class: "rtip-x", type: "button", "aria-label": LX("Закрыть", "Жабу", "Kapat"), html: icon("x"), onclick: () => close() })),
     h("p", {}, L(c.short)), r && r.simple ? mdEl(r.simple, "md rtip-d") : null,
@@ -1720,6 +1721,36 @@ function suraEmbed(n) {
   wrap.append(legendEl([...new Set(d.ayat.flatMap(a => a.r))]), list);
   return wrap;
 }
+function readingAudioPreferences(value, hifz) {
+  return { rate: [0.75, 1, 1.25].includes(value?.rate) ? value.rate : 1,
+    repeats: [1, 3, 5, 10].includes(value?.repeats) ? value.repeats : hifz ? 3 : 1,
+    mode: value?.mode === "range" ? "range" : "ayah" };
+}
+function readingPlaybackQueue(from, to, total, repeats, mode = "ayah") {
+  if (![from, to, total, repeats].every(Number.isInteger) || from < 1 || to < from || to > total || ![1, 3, 5, 10].includes(repeats) || !["ayah", "range"].includes(mode)) return null;
+  const queue = [];
+  if (mode === "range") for (let repeat = 1; repeat <= repeats; repeat++) for (let ayah = from; ayah <= to; ayah++) queue.push({ ayah, repeat });
+  else for (let ayah = from; ayah <= to; ayah++) for (let repeat = 1; repeat <= repeats; repeat++) queue.push({ ayah, repeat });
+  return queue;
+}
+function readingPlaybackController({ play, onItem, onFinish }) {
+  let token = 0;
+  return {
+    cancel() { token++; },
+    async start(queue) {
+      const current = ++token;
+      for (const item of queue) {
+        if (current !== token) return;
+        onItem(item);
+        let ok; try { ok = await play(item.ayah); } catch { ok = false; }
+        if (current !== token) return;
+        if (!ok) { onFinish(false); return; }
+      }
+      if (current === token) onFinish(true);
+    }
+  };
+}
+
 async function pageSura(v, n, hifz, goto) {
   const s = suraBy(n);
   if (!s) return notFound(v);
@@ -1732,7 +1763,7 @@ async function pageSura(v, n, hifz, goto) {
   try { d = await loadSura(n); } catch (e) { loading.textContent = T("audioErr"); return; }
   if (!v.isConnected) return;
   loading.remove();
-  const wrap = h("div", { class: "read" });
+  const wrap = h("div", { class: "read reader-view" });
   wrap.append(h("div", { class: "crumbs", html: `<a href="#/suras">${esc(T("suras"))}</a><span>·</span><span>${s.n}</span>` }),
     h("div", { class: "shead" },
       h("div", {}, h("h1", {}, L(s.name)), h("p", { class: "muted" }, `${ayatN(s.c)} · ${T(s.p === "m" ? "mecca" : "medina")}`, isOff(n) ? h("span", { class: "off-pill", html: icon("download") + esc(LX("офлайн", "офлайн", "çevrimdışı")) }) : null)),
@@ -1742,52 +1773,125 @@ async function pageSura(v, n, hifz, goto) {
     h("button", { "aria-pressed": String(!!hifz), onclick: () => location.hash = `#/sura/${n}/hifz` }, T("hifz")));
   wrap.append(modeTabs);
 
-  // плеер по аятам
-  let playing = false, idx = 0, rep = 1, rate = 1, hzLevel = 0;
-  const playBtn = h("button", { class: "play", html: icon("play"), title: T("playAll") });
-  const recOpt = ([id, nm]) => h("option", { value: id, selected: id === S.reciter ? "" : null }, L({ kk: nm[0], ru: nm[1], tr: nm[2] }));
-  const recSel = h("select", { "aria-label": T("reciter") },
-    h("optgroup", { label: LX("Для обучения", "Үйрену үшін", "Öğrenmek için") }, RECITERS.filter(r => r[2] === "learn").map(recOpt)),
-    h("optgroup", { label: LX("Чтецы", "Қарилар", "Kurralar") }, RECITERS.filter(r => !r[2]).map(recOpt)));
-  recSel.onchange = () => {
-    stopAll(); S.reciter = recSel.value; save(); offPrep(n);
-    player.querySelector(".off-b").replaceWith(offBtn(n));
+  const savedPlace = S.last ? { ...S.last } : null;
+  const prefsKey = hifz ? "hifz" : "read", prefs = readingAudioPreferences(S.readingAudio?.[prefsKey], hifz);
+  const firstUnmarked = d.ayat.find(a => !S.hifz[n]?.[a.n])?.n || 1;
+  let idx = goto >= 1 && goto <= s.c ? goto - 1 : hifz ? firstUnmarked - 1 : savedPlace?.s === n ? savedPlace.a - 1 : 0;
+  idx = Math.max(0, Math.min(s.c - 1, idx));
+  let playing = false, rate = prefs.rate, rep = prefs.repeats, repeatMode = prefs.mode, hzLevel = 0, guideStep = 0, audioReady = true, selectionVersion = 0;
+  wrap.dataset.audioRate = String(rate);
+  const saveAudioPrefs = () => { S.readingAudio = S.readingAudio || {}; S.readingAudio[prefsKey] = { rate, repeats: rep, mode: repeatMode }; save(); };
+  const panel = h("section", { class: "reading-panel", "aria-label": LX("Настройки чтения и аудио", "Оқу және аудио баптаулары", "Okuma ve ses ayarları") });
+  const textFold = h("details", { class: "reading-fold reading-text" }, h("summary", {}, h("span", {}, LX("Вид текста", "Мәтін көрінісі", "Metin görünümü")), h("span", { class: "reading-fold-caption" }, LX("Размер, перевод, таджвид", "Өлшем, аударма, тәжуид", "Boyut, meal, tecvid")), h("i", { html: icon("chev") })));
+  const toggle = title => h("button", { class: "reading-toggle", type: "button" }, h("span", {}, title), h("span", { class: "reading-toggle-state" }));
+  const colorT = toggle(T("colors")), trT = toggle(T("translit")), tlT = toggle(T("tl"));
+  const refreshTextControls = () => {
+    for (const [button, key] of [[colorT, "color"], [trT, "tr"], [tlT, "tl"]]) {
+      button.setAttribute("aria-pressed", String(S.view[key]));
+      button.lastChild.textContent = S.view[key] ? LX("Вкл", "Қосулы", "Açık") : LX("Выкл", "Өшірулі", "Kapalı");
+    }
+  };
+  const textBody = h("div", { class: "reading-fold-body" }, arzRow(false), h("div", { class: "reading-toggles" }, colorT, hifz ? null : trT, hifz ? null : tlT));
+  const levelButtons = [];
+  const setLevel = level => {
+    stopAll(); hzLevel = level; draw();
+    levelButtons.forEach((button, i) => button.setAttribute("aria-pressed", String(i === level)));
+  };
+  if (hifz) {
+    const levels = h("div", { class: "reading-hide-levels", role: "group", "aria-label": LX("Подсказки при заучивании", "Жаттаудағы көмек", "Ezber ipuçları") });
+    ["hz0", "hz1", "hz2", "hz3"].forEach((key, i) => { const button = h("button", { class: "tog", type: "button", "aria-pressed": String(i === 0), onclick: () => { setLevel(i); setGuide(i ? 2 : 3); } }, T(key)); levelButtons.push(button); levels.append(button); });
+    textBody.append(h("p", { class: "muted small" }, LX("Как скрывать текст", "Мәтінді жасыру тәсілі", "Metin gizleme şekli")), levels);
+  }
+  textFold.append(textBody); panel.append(textFold);
+
+  const audioCaption = h("span", { class: "reading-fold-caption" });
+  const audioFold = h("details", { class: "reading-fold reading-audio" }, h("summary", {}, h("span", {}, LX("Чтец и повтор", "Қари және қайталау", "Kurra ve tekrar")), audioCaption, h("i", { html: icon("chev") })));
+  const recOpt = ([id, names]) => h("option", { value: id, selected: id === S.reciter ? "" : null }, L({ kk: names[0], ru: names[1], tr: names[2] }));
+  const recSel = h("select", { "aria-label": T("reciter") }, h("optgroup", { label: LX("Для обучения", "Үйрену үшін", "Öğrenmek için") }, RECITERS.filter(r => r[2] === "learn").map(recOpt)), h("optgroup", { label: LX("Чтецы", "Қарилар", "Kurralar") }, RECITERS.filter(r => !r[2]).map(recOpt)));
+  const rangeFrom = h("input", { type: "number", min: "1", max: s.c, step: "1", value: idx + 1, inputmode: "numeric", "aria-label": LX("Начальный аят", "Бастапқы аят", "Başlangıç ayeti") });
+  const rangeTo = h("input", { type: "number", min: "1", max: s.c, step: "1", value: s.c, inputmode: "numeric", "aria-label": LX("Последний аят диапазона", "Аралықтың соңғы аяты", "Aralığın son ayeti") });
+  const rangeError = h("p", { class: "reading-range-error small", role: "alert" });
+  const repSel = h("select", { "aria-label": T("repeat") }, [1, 3, 5, 10].map(k => h("option", { value: k, selected: k === rep ? "" : null }, `×${k}`)));
+  const rateSel = h("select", { "aria-label": T("speed") }, [0.75, 1, 1.25].map(k => h("option", { value: k, selected: k === rate ? "" : null }, `${k}×`)));
+  const repeatModeSel = h("select", { "aria-label": LX("Порядок повтора", "Қайталау реті", "Tekrar sırası") }, h("option", { value: "ayah", selected: repeatMode === "ayah" ? "" : null }, LX("Каждый аят", "Әр аят", "Her ayet")), h("option", { value: "range", selected: repeatMode === "range" ? "" : null }, LX("Диапазон целиком", "Толық аралық", "Tüm aralık")));
+  const field = (title, control) => h("label", { class: "reading-field" }, h("span", {}, title), control);
+  const offSlot = h("div", { class: "reading-offline" });
+  const refreshOffline = () => {
     wrap.querySelectorAll(".off-pill").forEach(el => el.remove());
     if (isOff(n)) wrap.querySelector(".shead p").append(h("span", { class: "off-pill", html: icon("download") + esc(LX("офлайн", "офлайн", "çevrimdışı")) }));
   };
-  const repSel = h("select", { "aria-label": T("repeat") }, [1, 3, 5, 10].map(k => h("option", { value: k }, `${T("repeat")} ×${k}`)));
-  repSel.onchange = () => rep = +repSel.value;
-  if (hifz) { rep = 3; repSel.value = "3"; }
-  const rateSel = h("select", { "aria-label": T("speed") }, [[0.75, "0.75×"], [1, "1×"], [1.25, "1.25×"]].map(([k, t]) => h("option", { value: k, selected: k === 1 ? "" : null }, t)));
-  rateSel.onchange = () => rate = +rateSel.value;
-  const colorT = h("button", { class: "tog", "aria-pressed": String(S.view.color) }, T("colors"));
-  const trT = h("button", { class: "tog", "aria-pressed": String(S.view.tr) }, T("translit"));
-  const tlT = h("button", { class: "tog", "aria-pressed": String(S.view.tl) }, T("tl"));
-  recSel.classList.add("rec");
-  const moreBtn = h("button", { class: "iconbtn more", title: T("settings"), "aria-expanded": "false", html: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>' });
-  const player = h("div", { class: "player" }, playBtn, recSel, moreBtn, h("div", { class: "xtra" }, repSel, rateSel, hifz ? null : colorT, hifz ? null : trT, hifz ? null : tlT, offBtn(n)));
-  moreBtn.onclick = () => { player.classList.toggle("open"); moreBtn.setAttribute("aria-expanded", String(player.classList.contains("open"))); };
-  wrap.append(player);
-
+  offSlot.append(offBtn(n, refreshOffline));
+  audioFold.append(h("div", { class: "reading-fold-body" }, field(T("reciter"), recSel),
+    h("div", { class: "reading-range" }, field(LX("С аята", "Бастапқы аят", "İlk ayet"), rangeFrom), field(LX("По аят", "Соңғы аят", "Son ayet"), rangeTo)), rangeError,
+    h("div", { class: "reading-audio-options" }, field(T("repeat"), repSel), field(T("speed"), rateSel)), field(LX("Повторять", "Қайталау", "Tekrarlanacak"), repeatModeSel), offSlot));
+  panel.append(audioFold);
+  const ruleKeys = [...new Set(d.ayat.flatMap(a => a.r))].filter(k => CORE.rules[k]);
+  if (ruleKeys.length) panel.append(h("details", { class: "reading-fold reading-colors" }, h("summary", {}, h("span", {}, LX("Что означают цвета?", "Түстер нені білдіреді?", "Renkler ne anlama geliyor?")), h("i", { html: icon("chev") })),
+    h("div", { class: "reading-fold-body reading-legend" }, h("p", { class: "muted small" }, LX("Правила этой суры. Нажмите на название для объяснения.", "Осы сүренің ережелері. Түсіндірме үшін атауын басыңыз.", "Bu suredeki kurallar. Açıklama için adına dokunun.")),
+      ruleKeys.map(k => h("button", { class: "reading-rule", type: "button", style: `--rc:${RC(k)}`, onclick: e => ruleTip(k, e.currentTarget) }, h("i"), h("span", {}, h("b", {}, L(CORE.rules[k].name)), h("small", {}, L(CORE.rules[k].short))), h("span", { html: icon("chev") }))))));
+  wrap.append(panel);
+  const playBtn = h("button", { class: "btn reading-play", type: "button" });
+  const audioStatus = h("p", { class: "reading-audio-status", role: "status", "aria-live": "polite" });
+  const adjust = h("button", { class: "reading-adjust", type: "button", onclick: () => { audioFold.open = true; routeDelay(() => audioFold.scrollIntoView({ block: "start", behavior: "instant" }), 0); } }, LX("Настроить", "Баптау", "Ayarla"));
+  const playBar = h("section", { class: "reading-playbar", "aria-label": LX("Прослушивание аятов", "Аяттарды тыңдау", "Ayetleri dinleme") }, h("div", { class: "reading-play-row" }, playBtn, adjust), audioStatus);
+  const guideButtons = [], guideNote = h("p", { class: "hifz-guide-note" });
+  const setGuide = i => {
+    guideStep = i; guideButtons.forEach((button, j) => button.setAttribute("aria-pressed", String(i === j)));
+    guideNote.textContent = [LX("Послушайте чтеца и обратите внимание на произношение.", "Қариды тыңдап, айтылымға назар аударыңыз.", "Kurrayı dinleyin ve telaffuza dikkat edin."), LX("Повторите аяты вслух, глядя на текст.", "Мәтінге қарап, аяттарды дауыстап қайталаңыз.", "Metne bakarak ayetleri sesli tekrar edin."), LX("Прочитайте по памяти. Нажмите на скрытое слово для подсказки.", "Жатқа оқыңыз. Көмек үшін жасырылған сөзді басыңыз.", "Ezberden okuyun. İpucu için gizli kelimeye dokunun."), LX("Сравните чтение с текстом. Отмечайте «Выучено», когда уверены.", "Оқуыңызды мәтінмен салыстырыңыз. Сенімді болғанда «Жаттадым» деп белгілеңіз.", "Okuyuşunuzu metinle karşılaştırın. Emin olduğunuzda Ezberledim olarak işaretleyin.")][i];
+  };
   if (hifz) {
-    const lv = h("div", { class: "hz-levels", style: "margin-top:12px" });
-    ["hz0", "hz1", "hz2", "hz3"].forEach((k, i) => { const b = h("button", { class: "tog", "aria-pressed": String(i === 0) }, T(k)); b.onclick = () => { hzLevel = i; $$("button", lv).forEach((x, j) => x.setAttribute("aria-pressed", String(j === i))); draw(); }; lv.append(b); });
-    wrap.append(lv, h("p", { class: "muted small", style: "margin-top:8px" }, T("hzHint")));
-  } else {
-    wrap.append(h("p", { class: "muted small", style: "margin-top:10px" }, T(WBW_SURAS.has(n) && WBW_D ? "tapWordWbw" : "tapWordNo")));
+    const guide = h("nav", { class: "hifz-guide", "aria-label": LX("Шаги заучивания", "Жаттау қадамдары", "Ezber adımları") });
+    [LX("Слушать", "Тыңдау", "Dinle"), LX("Повторить", "Қайталау", "Tekrar et"), LX("Скрыть", "Жасыру", "Gizle"), LX("Проверить", "Тексеру", "Kontrol et")].forEach((title, i) => {
+      const button = h("button", { type: "button", "aria-pressed": String(i === 0), onclick: () => { setLevel(i === 2 ? 3 : 0); setGuide(i); if (i === 0) startPlayback(false); } }, h("span", {}, i + 1), title);
+      guideButtons.push(button); guide.append(button);
+    });
+    playBar.append(guide, guideNote); setGuide(0);
   }
+  wrap.append(playBar);
+  if (!hifz && savedPlace && suraBy(savedPlace.s)) {
+    const same = savedPlace.s === n, target = suraBy(savedPlace.s);
+    const caption = `${L(target.name)} · ${T("ayahN")} ${savedPlace.a}`;
+    wrap.insertBefore(h("div", { class: "reading-resume" }, h("div", {}, h("b", {}, T("contRead")), h("small", {}, caption)),
+      same ? h("button", { class: "btn", type: "button", onclick: () => { stopAll(); rangeFrom.value = savedPlace.a; if (+rangeTo.value < savedPlace.a) rangeTo.value = s.c; syncPlayer(); jumpTo(savedPlace.a); } }, LX("К аяту", "Аятқа", "Ayete git")) : h("a", { class: "btn", href: `#/sura/${savedPlace.s}/${savedPlace.a}` }, LX("Продолжить", "Жалғастыру", "Devam et"))), panel);
+  }
+  if (!hifz) wrap.append(h("p", { class: "muted small reader-word-hint" }, T(WBW_SURAS.has(n) && WBW_D ? "tapWordWbw" : "tapWordNo")));
+  const syncPlayer = () => {
+    const queue = readingPlaybackQueue(+rangeFrom.value, +rangeTo.value, s.c, rep, repeatMode);
+    const valid = !!queue;
+    rangeError.textContent = valid ? "" : LX(`Укажите аяты от 1 до ${s.c}; начало должно быть не больше конца.`, `1–${s.c} аяттарын көрсетіңіз; бастапқы аят соңғысынан үлкен болмауы керек.`, `1–${s.c} arasında ayet seçin; başlangıç bitişten büyük olamaz.`);
+    rangeFrom.setAttribute("aria-invalid", String(!valid)); rangeTo.setAttribute("aria-invalid", String(!valid));
+    playBtn.disabled = !audioReady || (!valid && !playing);
+    playButtons.forEach(button => button.disabled = !audioReady);
+    playBtn.innerHTML = icon(playing ? "x" : "play") + esc(playing ? LX("Остановить", "Тоқтату", "Durdur") : LX("Слушать", "Тыңдау", "Dinle"));
+    const reader = RECITERS.find(r => r[0] === S.reciter);
+    audioCaption.textContent = `${reader ? L({ kk: reader[1][0], ru: reader[1][1], tr: reader[1][2] }) : ""} · ${rate}×`;
+    if (!playing) audioStatus.textContent = valid ? LX(`Аяты ${rangeFrom.value}–${rangeTo.value} · ${repeatMode === "range" ? "диапазон" : "каждый аят"} ×${rep}`, `${rangeFrom.value}–${rangeTo.value} аяттар · ${repeatMode === "range" ? "аралық" : "әр аят"} ×${rep}`, `Ayetler ${rangeFrom.value}–${rangeTo.value} · ${repeatMode === "range" ? "aralık" : "her ayet"} ×${rep}`) : LX("Проверьте диапазон аятов.", "Аяттар аралығын тексеріңіз.", "Ayet aralığını kontrol edin.");
+  };
+  const changeRange = () => { stopAll(); syncPlayer(); };
+  rangeFrom.oninput = rangeTo.oninput = changeRange;
+  repSel.onchange = () => { stopAll(); rep = +repSel.value; saveAudioPrefs(); syncPlayer(); };
+  repeatModeSel.onchange = () => { stopAll(); repeatMode = repeatModeSel.value; saveAudioPrefs(); syncPlayer(); };
+  rateSel.onchange = () => { rate = +rateSel.value; wrap.dataset.audioRate = String(rate); if (playing) Audio1.playbackRate = rate; saveAudioPrefs(); syncPlayer(); };
+  recSel.onchange = async () => {
+    stopAll(); audioReady = false; S.reciter = recSel.value; save(); const version = ++selectionVersion; syncPlayer();
+    await offPrep(n); if (!v.isConnected || version !== selectionVersion) return;
+    audioReady = true; offSlot.replaceChildren(offBtn(n, refreshOffline)); refreshOffline(); syncPlayer();
+  };
+  refreshTextControls();
+
   if (n !== 1 && n !== 9) wrap.append(h("div", { class: "bism", lang: "ar" }, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"));
-  const list = h("div", { class: "ayahs" + (S.view.color || hifz ? "" : " nocolor") + (S.view.tr && !hifz ? "" : " notr") + (S.view.tl && !hifz ? "" : " notl") });
-  const cards = [];
+  const list = h("div", { class: "ayahs" + (S.view.color ? "" : " nocolor") + (S.view.tr && !hifz ? "" : " notr") + (S.view.tl && !hifz ? "" : " notl") });
+  const cards = [], playButtons = [];
   let tlData = null;
   const fillTl = () => { if (!tlData) return; cards.forEach((c, i) => { const el = $(".tl", c); if (el) el.textContent = tlData[i] || ""; }); };
   const draw = () => {
-    list.innerHTML = ""; cards.length = 0;
+    list.innerHTML = ""; cards.length = 0; playButtons.length = 0;
     d.ayat.forEach((a, i) => {
-      const card = h("div", { class: "ay", id: "a" + a.n, "data-n": a.n });
+      const card = h("div", { class: "ay", id: "a" + a.n, "data-n": a.n, tabindex: "-1" });
       card.append(ayahLine(s, a, hifz ? hzLevel : 0));
-      const pb = h("button", { class: "pa", html: icon("play"), title: T("play") });
-      pb.onclick = () => { stopAll(); playOne(i, true); };
+      const pb = h("button", { class: "pa", type: "button", html: icon("play"), "aria-label": LX(`Слушать аят ${a.n}`, `${a.n}-аятты тыңдау`, `${a.n}. ayeti dinle`) });
+      pb.onclick = () => { if (playing && idx === i) stopAll(); else startPlayback(true, i); };
+      playButtons.push(pb);
       const right = h("span", { class: "row" });
       if (hifz) {
         const st = S.hifz[n] || (S.hifz[n] = {});
@@ -1829,9 +1933,9 @@ async function pageSura(v, n, hifz, goto) {
   const tlNote = h("p", { class: "muted small tlby" }, T("tlBy"));
   const getTl = () => { if (hifz || tlData) return; loadTl(n).then(t => { tlData = t; fillTl(); }).catch(() => { tlNote.textContent = T("tlErr"); }); };
   if (S.view.tl) getTl();
-  colorT.onclick = () => { S.view.color = !S.view.color; save(); colorT.setAttribute("aria-pressed", String(S.view.color)); list.classList.toggle("nocolor", !S.view.color); };
-  trT.onclick = () => { S.view.tr = !S.view.tr; save(); trT.setAttribute("aria-pressed", String(S.view.tr)); list.classList.toggle("notr", !S.view.tr); };
-  tlT.onclick = () => { S.view.tl = !S.view.tl; save(); tlT.setAttribute("aria-pressed", String(S.view.tl)); list.classList.toggle("notl", !S.view.tl); if (S.view.tl) getTl(); };
+  colorT.onclick = () => { S.view.color = !S.view.color; save(); colorT.setAttribute("aria-pressed", String(S.view.color)); list.classList.toggle("nocolor", !S.view.color); refreshTextControls(); };
+  trT.onclick = () => { S.view.tr = !S.view.tr; save(); trT.setAttribute("aria-pressed", String(S.view.tr)); list.classList.toggle("notr", !S.view.tr); refreshTextControls(); };
+  tlT.onclick = () => { S.view.tl = !S.view.tl; save(); tlT.setAttribute("aria-pressed", String(S.view.tl)); list.classList.toggle("notl", !S.view.tl); if (S.view.tl) getTl(); refreshTextControls(); };
 
   // место чтения запоминается
   const mark = a => { if (hifz) return; if (!S.last || S.last.s !== n || S.last.a !== a) { S.last = { s: n, a }; save(); } };
@@ -1841,25 +1945,48 @@ async function pageSura(v, n, hifz, goto) {
     onRouteLeave(() => io.disconnect());
   }
 
-  let token = 0;
-  const stopAll = () => { token++; playing = false; playBtn.innerHTML = icon("play"); cards.forEach(c => c.classList.remove("cur")); stopAudio(); };
-  const playOne = async (i, single) => {
-    const my = ++token; playing = true; playBtn.innerHTML = icon("pause");
-    for (; i < d.ayat.length; i++) {
-      idx = i; mark(i + 1);
-      cards.forEach(c => c.classList.remove("cur")); cards[i].classList.add("cur");
-      cards[i].scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-      for (let r = 0; r < rep; r++) {
-        const ok = await playURL(ayahURL(n, d.ayat[i].n), null, rate);
-        if (my !== token || !ok) { if (my === token) stopAll(); return; }
-      }
-      if (single) break;
-    }
-    if (my === token) stopAll();
+  const jumpTo = ayah => {
+    const card = cards[ayah - 1]; if (!card) return;
+    idx = ayah - 1; mark(ayah); card.classList.add("flash");
+    routeDelay(() => {
+      if (!card.isConnected) return;
+      card.focus({ preventScroll: true });
+      const inset = Number.parseFloat(getComputedStyle(playBar).top) || 0;
+      window.scrollTo({ top: Math.max(0, window.scrollY + card.getBoundingClientRect().top - inset - playBar.offsetHeight - 18), behavior: "instant" });
+    }, 0);
   };
-  playBtn.onclick = () => { if (playing) stopAll(); else playOne(idx >= d.ayat.length - 1 ? 0 : idx, false); };
+  let lastPlayed = 0;
+  const stopAll = (text = "") => {
+    controller.cancel(); playing = false; stopAudio(); cards.forEach(card => card.classList.remove("cur"));
+    playButtons.forEach((button, i) => { button.innerHTML = icon("play"); button.setAttribute("aria-label", LX(`Слушать аят ${i + 1}`, `${i + 1}-аятты тыңдау`, `${i + 1}. ayeti dinle`)); });
+    syncPlayer(); if (text) audioStatus.textContent = text;
+  };
+  const controller = readingPlaybackController({
+    play: ayah => playURL(ayahURL(n, ayah), null, rate),
+    onItem: ({ ayah, repeat }) => {
+      idx = ayah - 1; mark(ayah); cards.forEach(card => card.classList.remove("cur")); cards[idx].classList.add("cur");
+      playButtons.forEach((button, i) => { button.innerHTML = icon(i === idx ? "x" : "play"); button.setAttribute("aria-label", i === idx ? LX("Остановить аят", "Аятты тоқтату", "Ayeti durdur") : LX(`Слушать аят ${i + 1}`, `${i + 1}-аятты тыңдау`, `${i + 1}. ayeti dinle`)); });
+      audioStatus.textContent = LX(`Аят ${ayah} из ${s.c} · ${repeatMode === "range" ? "круг" : "повтор"} ${repeat} / ${rep}`, `${s.c} аяттың ${ayah}-і · қайталау ${repeat} / ${rep}`, `${s.c} ayetten ${ayah}. ayet · tekrar ${repeat} / ${rep}`);
+      if (lastPlayed !== ayah) cards[idx].scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      lastPlayed = ayah;
+    },
+    onFinish: ok => {
+      stopAll(ok ? LX("Прослушивание завершено.", "Тыңдау аяқталды.", "Dinleme tamamlandı.") : LX("Прослушивание прервано. Можно включить запись снова.", "Тыңдау үзілді. Жазбаны қайта қосуға болады.", "Dinleme kesildi. Kaydı yeniden başlatabilirsiniz."));
+      if (ok && hifz && guideStep === 0) setGuide(1);
+    }
+  });
+  const startPlayback = (single, index = idx) => {
+    if (!audioReady) return;
+    const queue = single ? readingPlaybackQueue(index + 1, index + 1, s.c, rep) : readingPlaybackQueue(+rangeFrom.value, +rangeTo.value, s.c, rep, repeatMode);
+    if (!queue) { audioFold.open = true; syncPlayer(); return; }
+    stopAll(); playing = true; lastPlayed = 0; syncPlayer(); controller.start(queue);
+  };
+  playBtn.onclick = () => playing ? stopAll(LX("Остановлено.", "Тоқтатылды.", "Durduruldu.")) : startPlayback(false);
+  onRouteLeave(() => { selectionVersion++; stopAll(); });
+  syncPlayer();
+
   wrap.append(list);
-  if (!hifz) wrap.append(tlNote, h("div", { style: "margin-top:16px" }, legendEl([...new Set(d.ayat.flatMap(a => a.r))])));
+  if (!hifz) wrap.append(tlNote);
   const pv = suraBy(n - 1), nx = suraBy(n + 1);
   wrap.append(h("div", { class: "lnav" },
     pv ? h("a", { class: "btn ghost", href: `#/sura/${pv.n}${hifz ? "/hifz" : ""}`, html: icon("back") + esc(L(pv.name)) }) : h("span"),
@@ -1870,8 +1997,8 @@ async function pageSura(v, n, hifz, goto) {
   const side = h("aside", { class: "sura-side", "aria-label": T("surasT") }, suraSearch((q, m) => { suraFilter(sl, q, m, sHref); markCur(); }), sl);
   suraFilter(sl, "", "all", sHref); markCur();
   v.append(h("div", { class: "sura-layout" }, side, wrap));
-  setTimeout(() => { const a = sl.querySelector(".now"); if (a && sl.offsetParent) sl.scrollTop = a.offsetTop - sl.offsetTop - 140; }, 40);
-  if (goto && cards[goto - 1]) { idx = goto - 1; setTimeout(() => cards[goto - 1].scrollIntoView({ block: "center" }), 60); cards[goto - 1].classList.add("flash"); }
+  routeDelay(() => { const a = sl.querySelector(".now"); if (a && sl.offsetParent) sl.scrollTop = a.offsetTop - sl.offsetTop - 140; }, 40);
+  if (goto && cards[goto - 1]) routeDelay(() => jumpTo(goto), 60);
 }
 
 /* ═════════════ чтецы ═════════════ */
@@ -3237,7 +3364,7 @@ function validateBackupProgress(progress) {
   };
   fields.hifz = v => {
     const outer = backupMap(v, suraKey, x => x, 114);
-    return Object.fromEntries(Object.entries(outer).map(([s, marks]) => [s, backupMap(marks, a => /^[1-9]\d{0,2}$/.test(a) && verseKey(`${s}:${a}`), backupFlag, 286)]));
+    return Object.fromEntries(Object.entries(outer).map(([s, marks]) => [s, backupMap(marks, a => /^[1-9]\d{0,2}$/.test(a) && verseKey(`${s}:${a}`), value => typeof value === "string" ? backupDate(value) : backupFlag(value), 286)]));
   };
   return Object.assign(backupProgressDefaults(), backupRecord(progress, fields, ["xp", "lessons"]));
 }
@@ -3359,14 +3486,14 @@ function progressBackupCard() {
 /* ═════════════ профиль ═════════════ */
 const BADGE_IC = { first: "learn", m1: "ab", m2: "stand", m3: "rule", m4: "star", s3: "flame", s7: "flame", s30: "flame", t100: "target", perfect: "check", fatiha: "stand", hifz5: "star" };
 const badgeIcon = id => BADGE_IC[id] === "ab" ? '<span class="ar" lang="ar">أ ب</span>' : icon(BADGE_IC[id] || "star");
-function arzRow() {
+function arzRow(showDemo = true) {
   const ru = S.lang === "ru";
   const out = h("span", { class: "num arz-v" }, Math.round((S.arz || 1) * 100) + "%");
   const r = h("input", { type: "range", min: "0.8", max: "1.6", step: "0.1", value: String(S.arz || 1), "aria-label": LX("Размер арабского текста", "Араб мәтінінің өлшемі", "Arapça metin boyutu") });
   r.oninput = () => { S.arz = +r.value; applyArz(); out.textContent = Math.round(S.arz * 100) + "%"; };
   r.onchange = () => save();
   return h("div", { class: "arz" }, h("div", { class: "setrow" }, h("span", {}, LX("Размер арабского текста", "Араб мәтінінің өлшемі", "Arapça metin boyutu")), out), r,
-    h("p", { class: "ar arz-demo", lang: "ar" }, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"));
+    showDemo ? h("p", { class: "ar arz-demo", lang: "ar" }, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ") : null);
 }
 function pageMe(v) {
   const ru = S.lang === "ru";
