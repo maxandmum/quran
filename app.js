@@ -6,10 +6,13 @@
 const KEY = "qoqu.v1";
 const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const blank = () => ({ lang: null, theme: null, xp: 0, days: {}, lessons: {}, ex: {}, tests: {},
-  badges: {}, hifz: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true, tl: true },
+  badges: {}, hifz: {}, hifzAwarded: {}, hifzBonus: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true, tl: true },
   last: null, listen: { r: "mishary-alafasy/r1", s: 1 }, tsb: { k: 0, day: "", d: {}, t: {}, vib: true }, nzg: "m", at: 0 });
 let S = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch (e) {}
+S.hifzAwarded = S.hifzAwarded || {};
+S.hifzBonus = S.hifzBonus || {};
+for (const [n, marks] of Object.entries(S.hifz || {})) for (const [a, marked] of Object.entries(marks)) if (marked) S.hifzAwarded[`${n}:${a}`] = true;
 S.view = Object.assign({ color: true, tr: true, tl: true }, S.view);
 let onSave = null;
 const save = () => { S.at = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} if (onSave) onSave(); };
@@ -251,27 +254,53 @@ const loadSura = n => SURA_P[n] || (SURA_P[n] = fetchJSON(`quran/${String(n).pad
 const TL = {};
 /* ───── суры без интернета: текст, перевод и аудио чтеца — в отдельный кэш (его не трогают обновления сайта) ───── */
 const OFF_CACHE = "iqra-off";
-const offURLs = (n, rec = S.reciter) => { const s = suraBy(n), u = [new URL(`quran/${pad3(n)}.json`, location.href).href,
-  `https://api.alquran.cloud/v1/surah/${n}/${LX("ru.kuliev", "kk.khalifahaltai", "tr.diyanet")}`];
+const offURLs = (n, rec = S.reciter, lang = S.lang) => { const s = suraBy(n), u = [new URL(`quran/${pad3(n)}.json`, location.href).href,
+  `https://api.alquran.cloud/v1/surah/${n}/${({ ru: "ru.kuliev", kk: "kk.khalifahaltai", tr: "tr.diyanet" })[lang]}`];
   for (let a = 1; a <= s.c; a++) u.push(ayahURL(n, a, rec)); return u; };
-const isOff = n => !!(S.off && S.off[n]);
+const isOff = n => !!(S.off && S.off[n] && S.off[n].complete && S.off[n].rec === S.reciter && S.off[n].lang === S.lang);
 async function offSave(n, onP) {
   if (!("caches" in window)) throw new Error("nocache");
-  const c = await caches.open(OFF_CACHE), urls = offURLs(n); let k = 0, bad = 0;
-  const one = async u => { try { if (!(await c.match(u))) { let r = await fetch(u, { mode: "cors" }).catch(() => null); if (!r || !r.ok) r = await fetch(u, { mode: "no-cors" }); await c.put(u, r); } } catch (e) { bad++; } onP(++k / urls.length); };
+  const rec = S.reciter, lang = S.lang;
+  const c = await caches.open(OFF_CACHE), urls = offURLs(n, rec, lang); let k = 0, bad = 0;
+  const one = async u => {
+    try {
+      let response = await c.match(u);
+      const download = !response || !response.ok || response.type === "opaque";
+      if (download) {
+        response = await fetch(u, { mode: "cors" });
+      }
+      if (!response.ok || response.type === "opaque") throw new Error("unreadable");
+      if (u.endsWith(".mp3")) {
+        if (!/^(audio\/|application\/octet-stream)/i.test(response.headers.get("content-type") || "")) throw new Error("not audio");
+        if (!(await response.clone().blob()).size) throw new Error("empty audio");
+      } else await response.clone().json();
+      if (download) await c.put(u, response);
+    } catch (e) { bad++; }
+    onP(++k / urls.length);
+  };
   const q = [...urls]; await Promise.all([0, 1, 2, 3, 4].map(async () => { while (q.length) await one(q.shift()); }));
-  if (bad > 2) throw new Error("net");
-  S.off = S.off || {}; S.off[n] = { rec: S.reciter, lang: S.lang }; save();
+  if (bad > 0) throw new Error("net");
+  S.off = S.off || {}; S.off[n] = { rec, lang, complete: true }; save();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
 // для сохранённой суры заранее готовим локальные ссылки на аудио — плеер берёт их без сети и без задержки (важно для iPhone)
-let OFF_MAP = {};
+let OFF_MAP = {}, OFF_PREP_SEQ = 0;
 async function offPrep(n) {
+  const seq = ++OFF_PREP_SEQ;
   for (const u of Object.values(OFF_MAP)) URL.revokeObjectURL(u); OFF_MAP = {};
   if (!isOff(n) || !("caches" in window)) return;
-  try { const c = await caches.open(OFF_CACHE); for (const u of offURLs(n, S.off[n].rec).slice(2)) { const r = await c.match(u); if (r && r.type !== "opaque") OFF_MAP[u] = URL.createObjectURL(await r.blob()); } } catch (e) {}
+  const prepared = {};
+  try {
+    const c = await caches.open(OFF_CACHE);
+    for (const u of offURLs(n, S.off[n].rec).slice(2)) {
+      const r = await c.match(u);
+      if (r && r.ok && r.type !== "opaque") prepared[u] = URL.createObjectURL(await r.blob());
+    }
+  } catch (e) {}
+  if (seq === OFF_PREP_SEQ) OFF_MAP = prepared;
+  else for (const u of Object.values(prepared)) URL.revokeObjectURL(u);
 }
-async function offDrop(n) { const c = await caches.open(OFF_CACHE), o = S.off[n]; for (const u of offURLs(n, o.rec)) await c.delete(u); delete S.off[n]; save(); }
+async function offDrop(n) { const c = await caches.open(OFF_CACHE), o = S.off[n]; for (const u of offURLs(n, o.rec, o.lang)) await c.delete(u); delete S.off[n]; save(); }
 function offBtn(n) {
   const b = h("button", { class: "tog off-b" });
   const draw = () => { b.innerHTML = icon(isOff(n) ? "check" : "download") + esc(isOff(n) ? LX("Сохранена офлайн", "Офлайн сақталған", "Çevrimdışı kayıtlı") : LX("Скачать для офлайна", "Офлайнға жүктеу", "Çevrimdışı için indir")); b.setAttribute("aria-pressed", String(isOff(n))); };
@@ -539,12 +568,13 @@ function shell() {
   document.title = LX("Iqra — учимся читать Коран с нуля", "Iqra — Құранды нөлден оқып үйрену", "Iqra — Kur'an okumayı sıfırdan öğreniyoruz");
   renderTopStats(); renderAvatar(); lpRender();
 }
+const streakLabel = n => S.lang === "ru" ? `${plRu(n, "день", "дня", "дней")} подряд` : T("streak");
 function renderTopStats() {
   const n = streak();
   const el = $("#topstats");
   if (el) { el.innerHTML = icon("flame") + `<span class="num">${n}</span>`; el.classList.toggle("on", n > 0); }
   const sd = $("#sidestreak");
-  if (sd) { sd.innerHTML = `<span class="ss-ic">${icon("flame")}</span><span><b class="num">${n}</b><small>${esc(T("streak"))}</small></span>`; sd.classList.toggle("on", n > 0); }
+  if (sd) { sd.innerHTML = `<span class="ss-ic">${icon("flame")}</span><span><b class="num">${n}</b><small>${esc(streakLabel(n))}</small></span>`; sd.classList.toggle("on", n > 0); }
 }
 function setLang(l) { S.lang = l; save(); shell(); route(); }
 function toggleTheme() { S.theme = isDark() ? "light" : "dark"; save(); applyTheme(); shell(); route(); }
@@ -579,19 +609,32 @@ async function ruleTip(k, at) {
   RTIP = { k, el };
 }
 /* ═════════════ маршрутизация ═════════════ */
+let ROUTE_SEQ = 0;
+const ROUTE_CLEANUPS = [];
+const onRouteLeave = cleanup => ROUTE_CLEANUPS.push(cleanup);
+const routeDelay = (fn, ms) => {
+  const seq = ROUTE_SEQ;
+  const timer = setTimeout(() => { if (seq === ROUTE_SEQ) fn(); }, ms);
+  onRouteLeave(() => clearTimeout(timer));
+  return timer;
+};
 async function route() {
+  const seq = ++ROUTE_SEQ;
+  ROUTE_CLEANUPS.splice(0).forEach(cleanup => cleanup());
+  document.querySelectorAll(".wbw-tip").forEach(el => el.remove());
   if (ASK_DISMISS) ASK_DISMISS();
   if (RTIP) { RTIP.el.remove(); RTIP = null; }
   stopAudio(); onListenChange = null;
   if ("speechSynthesis" in window) speechSynthesis.cancel();
-  const view = $("#view");
+  const previous = $("#view"), view = previous.cloneNode(false);
+  previous.replaceWith(view);
+  try {
   const parts = (location.hash.replace(/^#\/?/, "").split("#")[0].split("?")[0] || "").split("/").map(decodeURIComponent); // «#/course#m1» → course
   const [p0, p1, p2] = parts;
   view.innerHTML = "";
   view.classList.remove("vin"); void view.offsetWidth; view.classList.add("vin");
   document.body.dataset.page = p0 || "home";
   window.scrollTo(0, 0);
-  try {
     if (!p0) { markNav("today"); await pageHome(view); }
     else if (p0 === "course") { markNav("learn"); pageCourse(view); }
     else if (p0 === "lesson") { markNav("learn"); await pageLesson(view, +p1); }
@@ -611,7 +654,7 @@ async function route() {
     else if (p0 === "me") { markNav("me"); pageMe(view); }
     else notFound(view);
   } catch (e) { console.error(e); notFound(view); }
-  view.focus({ preventScroll: true });
+  if (seq === ROUTE_SEQ) view.focus({ preventScroll: true });
 }
 function notFound(v) { v.append(h("div", { class: "loading" }, h("div", { class: "stack", style: "justify-items:center" }, h("h2", {}, T("notFound")), h("a", { class: "btn", href: "#/" }, T("toHome"))))); }
 
@@ -682,10 +725,20 @@ async function pageHome(v) {
 }
 
 /* ═════════════ карта курса ═════════════ */
+function lessonLanguageNotice() {
+  if (S.lang !== "tr") return null;
+  return h("aside", { class: "box tip lesson-language", role: "note", lang: "tr" },
+    h("b", {}, "Derslerin dili: Rusça ve Kazakça"),
+    h("p", {}, "Derslerin Türkçe çevirisi henüz hazır değil. Aşağıdaki ders metni ve sorular Rusçadır. Türkçe alıştırmalar ve diğer bölümler kullanılabilir."),
+    h("div", { class: "row" },
+      h("button", { class: "btn ghost", onclick: () => setLang("ru") }, "Русский"),
+      h("button", { class: "btn ghost", onclick: () => setLang("kk") }, "Қазақша")));
+}
 function pageCourse(v) {
+  const languageNote = lessonLanguageNotice(); if (languageNote) v.append(languageNote);
   v.append(h("div", { class: "read" }, pageHead(T("learn"), T("wordsLearned"), learnTabs("course"))));
   const cur = nextLessonN();
-  if (!Object.keys(S.lessons).length && !S.placeFrom) v.append(h("a", { class: "rv-card pl-card", href: "#/placement", html: `<span class="rv-ic">${icon("bulb")}</span><span><b>${esc(LX("Уже немного читаете?", "Аздап оқи аласыз ба?", "Biraz okuyabiliyor musunuz?"))}</b><small>${esc(LX("Входной тест за 3 минуты подскажет, с какого модуля начать", "3 минуттық кіріс тест қай модульден бастауды айтады", "3 dakikalık test hangi modülden başlayacağınızı söyler"))}</small></span>${icon("chev")}` }));
+  v.append(h("a", { class: "rv-card pl-card", href: "#/placement", html: `<span class="rv-ic">${icon("bulb")}</span><span><b>${esc(LX("Уже немного читаете?", "Аздап оқи аласыз ба?", "Biraz okuyabiliyor musunuz?"))}</b><small>${esc(LX("Входной тест примерно за 6 минут подскажет, с какого модуля начать", "Шамамен 6 минуттық кіріс тест қай модульден бастауды айтады", "Yaklaşık 6 dakikalık test hangi modülden başlayacağınızı söyler"))}</small></span>${icon("chev")}` }));
   for (const M of COURSE.modules) {
     // модуль — раскрывающаяся карточка; открыт только тот, где следующий урок (или куда ведёт ссылка)
     const target0 = location.hash.split("#")[2];
@@ -712,7 +765,7 @@ function pageCourse(v) {
     v.append(sec);
   }
   const target = location.hash.split("#")[2];
-  setTimeout(() => { const el = target ? document.getElementById(target) : document.querySelector(".path li a .ros.cur"); if (el) el.scrollIntoView({ block: target ? "start" : "center" }); }, 30);
+  routeDelay(() => { const el = target ? document.getElementById(target) : v.querySelector(".path li a .ros.cur"); if (el) el.scrollIntoView({ block: target ? "start" : "center" }); }, 30);
 }
 
 /* ═════════════ окно подтверждения ═════════════ */
@@ -771,24 +824,32 @@ async function pageLesson(v, n) {
   if (!okL) { location.replace(`#/lesson/${undoneBefore(n)[0]}`); return; }
   const M = moduleOf(n);
   const list = await loadModule(M.id);
+  if (!v.isConnected) return;
   const les = list.find(x => x.n === n);
   if (!les) return notFound(v);
   const need = new Set();
   les.blocks.forEach(b => { if (b.type === "ayah") need.add(b.s); if (b.type === "sura") need.add(b.n); });
   await Promise.all([...need].map(loadSura));
+  if (!v.isConnected) return;
   exCounter = 0;
   const wrap = h("article", { class: "read" });
-  const total = les.blocks.filter(b => b.type === "ex").length;
+  const required = les.blocks.flatMap((b, i) => {
+    const prefix = { ex: "e", trace: "t", test: "test" }[b.type];
+    return prefix ? [prefix + n + "." + i] : [];
+  });
+  const total = required.length;
+  let refreshCompletion = () => {};
+  const languageNote = lessonLanguageNotice(); if (languageNote) wrap.append(languageNote);
   wrap.append(h("div", { class: "lhead" },
     h("div", { class: "crumbs", html: `<a href="#/course#m${M.id}">${esc(T("module"))} ${M.id} · ${esc(L(M.title))}</a><span>·</span><span>${esc(T("lesson"))} ${n} / 110</span>` }),
-    h("h1", { html: mdInline(les.title) }),
-    h("p", { class: "goal", html: esc(T("goal")) + ": " + md(les.goal).replace(/<\/?p>/g, "") })));
+    h("h1", { lang: S.lang === "tr" ? "ru" : S.lang, html: mdInline(les.title) }),
+    h("p", { class: "goal" }, T("goal") + ": ", h("span", { lang: S.lang === "tr" ? "ru" : S.lang, html: md(les.goal).replace(/<\/?p>/g, "") }))));
   const progBar = h("div", { class: "bar" }, h("i", { style: "width:0%" }));
   if (total) wrap.append(h("div", { class: "lprog" }, progBar));
-  const blocksEl = h("div", { class: "blocks" });
-  const ctx = { n, solved: new Set(), total, onSolve(key, el, xp = 5) {
+  const blocksEl = h("div", { class: "blocks", lang: S.lang === "tr" ? "ru" : S.lang });
+  const ctx = { n, solved: new Set(required.filter(key => S.ex[key])), total, onSolve(key, el, xp = 5) {
     if (!ctx.solved.has(key)) { ctx.solved.add(key); if (!S.ex[key]) { S.ex[key] = 1; addXP(xp, el); } save(); }
-    progBar.firstChild.style.width = (ctx.solved.size / Math.max(1, total) * 100).toFixed(0) + "%";
+    refreshCompletion();
   } };
   les.blocks.forEach((b, i) => { const el = renderBlock(b, `${n}.${i}`, ctx); if (el) blocksEl.append(el); });
   wrap.append(blocksEl);
@@ -796,22 +857,29 @@ async function pageLesson(v, n) {
   const done = S.lessons[n] && S.lessons[n].done;
   const fin = h("button", { class: "btn" + (done ? " ghost" : ""), html: (done ? icon("check") : "") + esc(done ? T("finished") : T("finish")) });
   fin.onclick = () => {
+    if (!done && required.some(key => !ctx.solved.has(key))) return;
     if (!(S.lessons[n] && S.lessons[n].done)) {
       S.lessons[n] = { done: true, at: today() }; save(); addXP(20, fin);
       fin.className = "btn ghost"; fin.innerHTML = icon("check") + esc(T("finished"));
     }
     checkBadges();
     const nx = COURSE.lessons[n];
-    if (nx && nx.ready) setTimeout(() => location.hash = `#/lesson/${n + 1}`, 650);
+    if (nx && nx.ready) routeDelay(() => location.hash = `#/lesson/${n + 1}`, 650);
   };
-  wrap.append(h("div", { class: "done-bar" }, h("p", { class: "muted small" }, T("finishHint")), fin));
+  const completionText = h("p", { class: "muted small", role: "status", "aria-live": "polite" });
+  refreshCompletion = () => {
+    const solved = required.filter(key => ctx.solved.has(key)).length;
+    progBar.firstChild.style.width = (total ? solved / total * 100 : 100).toFixed(0) + "%";
+    fin.disabled = !done && solved < total;
+    completionText.textContent = total ? LX(`Заданий выполнено: ${solved} из ${total}. Завершите все задания, чтобы отметить урок.`, `Орындалған тапсырма: ${solved} / ${total}. Сабақты аяқтау үшін барлық тапсырманы орындаңыз.`, `Tamamlanan görev: ${solved} / ${total}. Dersi bitirmek için tüm görevleri tamamlayın.`) : T("finishHint");
+  };
+  wrap.append(h("div", { class: "done-bar" }, completionText, fin));
   const prev = COURSE.lessons[n - 2], next = COURSE.lessons[n];
   wrap.append(h("div", { class: "lnav" },
     prev ? h("a", { class: "btn ghost", href: `#/lesson/${n - 1}`, html: icon("back") + esc(T("prev")) }) : h("span"),
     next && next.ready ? h("a", { class: "btn ghost", href: `#/lesson/${n + 1}`, html: esc(T("next")) + icon("arrow") }) : h("span")));
   v.append(wrap);
-  // восстановить решённые
-  progBar.firstChild.style.width = "0%";
+  refreshCompletion();
 }
 
 /* ═════════════ блоки ═════════════ */
@@ -1132,12 +1200,13 @@ function traceEl(ch, key, ctx) {
 /* ───── упражнения ───── */
 let exCounter = 0;
 function exEl(b, key, ctx, opts = {}) {
-  const el = h("div", { class: "ex" });
+  const restored = !!(ctx && S.ex["e" + key]);
+  const el = h("div", { class: "ex" + (restored ? " solved" : "") });
   const head = h("div", { class: "q" });
   if (!opts.noTag) head.append(h("span", { class: "tag" }, ++exCounter));
   head.append(mdEl(b.q));
   el.append(head);
-  const fb = h("div", { class: "fb" });
+  const fb = h("div", { class: "fb" + (restored ? " ok" : ""), role: "status", "aria-live": "polite" }, restored ? LX("Уже выполнено. Можно повторить.", "Орындалды. Қайталауға болады.", "Tamamlandı. Tekrar edebilirsiniz.") : "");
   const done = (xp = 5) => { el.classList.add("solved"); if (ctx && ctx.onSolve) ctx.onSolve("e" + key, el, xp); if (opts.onDone) opts.onDone(true); };
   const fail = () => { if (opts.onDone) opts.onDone(false); };
   if (b.kind === "mcq") {
@@ -1153,7 +1222,7 @@ function exEl(b, key, ctx, opts = {}) {
           over = true; btn.classList.add("right"); fb.className = "fb ok"; fb.innerHTML = esc(T("right")) + (b.explain ? " " + md(b.explain).replace(/<\/?p>/g, "") : "");
           done(tries ? 2 : 5);
         } else {
-          tries++; btn.classList.add("wrong"); fb.className = "fb bad"; fb.textContent = T("wrongTry");
+          tries++; btn.classList.add("wrong"); fb.className = "fb bad"; fb.textContent = opts.single ? LX("Неверно. Правильный ответ выделен.", "Қате. Дұрыс жауап белгіленді.", "Yanlış. Doğru cevap işaretlendi.") : T("wrongTry");
           if (opts.single) { over = true; box.children[b.answer].classList.add("right"); if (b.explain) fb.innerHTML += " " + md(b.explain).replace(/<\/?p>/g, ""); fail(); }
         }
       };
@@ -1255,7 +1324,7 @@ function testEl(b, key, ctx) {
       box.append(h("div", { class: "tprog" }, h("span", {}, `${T("question")} ${i + 1} / ${b.items.length}`), h("span", { class: "num" }, `${score} ✓`)),
         h("div", { class: "bar" }, h("i", { style: `width:${i / b.items.length * 100}%` })));
       const it = b.items[i];
-      box.append(exEl(it, key + "q" + i, null, { noTag: true, single: true, onDone: ok => { if (ok) score++; i++; setTimeout(step, ok ? 500 : 1300); } }));
+      box.append(exEl(it, key + "q" + i, null, { noTag: true, single: true, onDone: ok => { if (ok) score++; i++; routeDelay(step, ok ? 500 : 1300); } }));
     };
     step();
   };
@@ -1290,14 +1359,17 @@ function showGloss(sp, s, a, i, arText) {
   tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
   tip.style.top = (r.bottom + window.scrollY + 6) + "px";
   const off = e => { if (!tip.contains(e.target) && e.target !== sp && !sp.contains(e.target)) { tip.remove(); document.removeEventListener("pointerdown", off, true); } };
-  setTimeout(() => document.addEventListener("pointerdown", off, true), 0);
+  routeDelay(() => document.addEventListener("pointerdown", off, true), 0);
+  onRouteLeave(() => { tip.remove(); document.removeEventListener("pointerdown", off, true); });
 }
 function ayahLine(sura, ay, mode = 0, peek) {
   const at = h("div", { class: "at", lang: "ar" });
   const ws = ayahWordsHTML(ay.sp);
   ws.forEach((w, i) => {
     const html = w.map(([t, r]) => r ? `<span class="tj" style="color:${RC(r)}">${esc(t)}</span>` : esc(t)).join("");
-    const sp = h("span", { class: "wd", html });
+    const sp = h("span", { class: "wd", role: "button", tabindex: "0", html,
+      "aria-label": mode ? LX(`Показать и прослушать слово ${i + 1}`, `${i + 1}-сөзді көрсету және тыңдау`, `${i + 1}. kelimeyi göster ve dinle`) : T("play") + ": " + w.map(x => x[0]).join("") });
+    sp.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sp.click(); } };
     const hide = mode === 3 || (mode === 1 && i % 2 === 1);
     if (hide) sp.classList.add("hidew");
     if (mode === 2) { const plain = w.map(x => x[0]).join(""); const first = plain.match(/^[\u0621-\u064A\u0671][\u064B-\u0670\u06D6-\u06ED\u08F0-\u08F2]*/u); sp.innerHTML = `<span>${esc(first ? first[0] : plain[0])}</span><span class="rest">${esc(plain.slice(first ? first[0].length : 1))}</span>`; sp.classList.add("firstl"); }
@@ -1375,10 +1447,13 @@ async function pageSura(v, n, hifz, goto) {
   const s = suraBy(n);
   if (!s) return notFound(v);
   if (WBW_SURAS.has(n)) { try { WBW_D = await loadWBW(); } catch (e) {} }
-  offPrep(n);
+  if (!v.isConnected) return;
+  await offPrep(n);
+  if (!v.isConnected) return;
   const loading = h("div", { class: "loading" }, "…"); v.append(loading);
   let d;
   try { d = await loadSura(n); } catch (e) { loading.textContent = T("audioErr"); return; }
+  if (!v.isConnected) return;
   loading.remove();
   const wrap = h("div", { class: "read" });
   wrap.append(h("div", { class: "crumbs", html: `<a href="#/suras">${esc(T("suras"))}</a><span>·</span><span>${s.n}</span>` }),
@@ -1397,7 +1472,12 @@ async function pageSura(v, n, hifz, goto) {
   const recSel = h("select", { "aria-label": T("reciter") },
     h("optgroup", { label: LX("Для обучения", "Үйрену үшін", "Öğrenmek için") }, RECITERS.filter(r => r[2] === "learn").map(recOpt)),
     h("optgroup", { label: LX("Чтецы", "Қарилар", "Kurralar") }, RECITERS.filter(r => !r[2]).map(recOpt)));
-  recSel.onchange = () => { S.reciter = recSel.value; save(); };
+  recSel.onchange = () => {
+    stopAll(); S.reciter = recSel.value; save(); offPrep(n);
+    player.querySelector(".off-b").replaceWith(offBtn(n));
+    wrap.querySelectorAll(".off-pill").forEach(el => el.remove());
+    if (isOff(n)) wrap.querySelector(".shead p").append(h("span", { class: "off-pill", html: icon("download") + esc(LX("офлайн", "офлайн", "çevrimdışı")) }));
+  };
   const repSel = h("select", { "aria-label": T("repeat") }, [1, 3, 5, 10].map(k => h("option", { value: k }, `${T("repeat")} ×${k}`)));
   repSel.onchange = () => rep = +repSel.value;
   if (hifz) { rep = 3; repSel.value = "3"; }
@@ -1434,12 +1514,21 @@ async function pageSura(v, n, hifz, goto) {
       const right = h("span", { class: "row" });
       if (hifz) {
         const st = S.hifz[n] || (S.hifz[n] = {});
-        const mb = h("button", { class: "mem", "aria-pressed": String(!!st[a.n]), disabled: st[a.n] ? "" : null, html: icon("check") + esc(T("memorized")) });
+        const mb = h("button", { class: "mem", "aria-pressed": String(!!st[a.n]), html: icon("check") + esc(T("memorized")) });
         mb.onclick = () => {
-          if (st[a.n]) return; // отметку «Выучил» не снимаем — она сбрасывается только сбросом прогресса
-          const on = true; st[a.n] = today(); addXP(10, mb); mb.disabled = true;
-          mb.setAttribute("aria-pressed", "true"); save();
-          if (on && suraMemorized(n)) { addXP(50, mb); toast((LX("Сура выучена: ", "Сүре жатталды: ", "Sure ezberlendi: ")) + L(s.name), "✓"); }
+          if (suraMemorized(n)) S.hifzBonus[n] = true; // migrate legacy full-sura awards
+          const on = !st[a.n], awardKey = `${n}:${a.n}`;
+          if (on) {
+            st[a.n] = today();
+            if (!S.hifzAwarded[awardKey]) { S.hifzAwarded[awardKey] = true; addXP(10, mb); }
+          } else {
+            delete st[a.n];
+            if (S.rv) delete S.rv[`a:${n}:${a.n}`];
+          }
+          mb.setAttribute("aria-pressed", String(on)); save();
+          if (on && suraMemorized(n) && !S.hifzBonus[n]) {
+            S.hifzBonus[n] = true; addXP(50, mb); toast(LX("Сура выучена: ", "Сүре жатталды: ", "Sure ezberlendi: ") + L(s.name), "✓");
+          }
           checkBadges();
         };
         right.append(mb);
@@ -1472,6 +1561,7 @@ async function pageSura(v, n, hifz, goto) {
   if ("IntersectionObserver" in window && !hifz) {
     const io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) mark(+e.target.dataset.n); }, { rootMargin: "-45% 0px -50% 0px" });
     cards.forEach(c => io.observe(c));
+    onRouteLeave(() => io.disconnect());
   }
 
   let token = 0;
@@ -1828,6 +1918,7 @@ async function pageZikr(v, sub, id) {
 
 async function zkCounter(v, id) {
   const d = await loadZD();
+  if (!v.isConnected) return;
   const ctx = (location.hash.split("?")[1] || "");
   const st = tsState(); save();
   let list = zkList(d, ctx); if (!list.length || !list.some(x => x.id === id)) list = d.items;
@@ -1885,14 +1976,15 @@ async function zkCounter(v, id) {
   card.addEventListener("pointerdown", e => { sx = e.clientX; sy = e.clientY; swiped = false; });
   card.addEventListener("pointerup", e => { const dx = e.clientX - sx, dy = e.clientY - sy; if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) { swiped = true; go(dx < 0 ? 1 : -1); } });
   card.onclick = () => { if (swiped) { swiped = false; return; } if (!list[k].h) return; card.classList.remove("flipping"); void card.offsetWidth; card.classList.add("flipping"); card.classList.toggle("flipped"); };
-  const onKey = e => { if (document.body.dataset.page !== "zikr") return document.removeEventListener("keydown", onKey); if (e.key === "ArrowLeft") go(-1); else if (e.key === "ArrowRight") go(1); };
+  const onKey = e => { if (!v.isConnected) return document.removeEventListener("keydown", onKey); if (e.key === "ArrowLeft") go(-1); else if (e.key === "ArrowRight") go(1); };
   document.addEventListener("keydown", onKey);
+  onRouteLeave(() => document.removeEventListener("keydown", onKey));
 
   let goalT = 0;
   const showGoal = (t1, t2) => {
     goalEl.innerHTML = `<span class="g-ic">${icon("check")}</span><b>${esc(t1)}</b><p>${esc(t2)}</p>`;
     goalEl.classList.add("show"); clearTimeout(goalT);
-    goalT = setTimeout(() => goalEl.classList.remove("show"), 3500);
+    goalT = routeDelay(() => goalEl.classList.remove("show"), 3500);
   };
   goalEl.onclick = () => goalEl.classList.remove("show");
   btn.onclick = () => {
@@ -1907,7 +1999,7 @@ async function zkCounter(v, id) {
     else if (n === g) {
       const nxt = list[k + 1];
       // утренние/вечерние и тасбих после намаза — сами переходят к следующему
-      if (nxt && (ctx === "morning" || ctx === "evening" || (TS_AFTER.includes(x.id) && TS_AFTER.includes(nxt.id)))) setTimeout(() => { if (document.body.dataset.page === "zikr" && list[k] === x) go(1); }, 500);
+      if (nxt && (ctx === "morning" || ctx === "evening" || (TS_AFTER.includes(x.id) && TS_AFTER.includes(nxt.id)))) routeDelay(() => { if (document.body.dataset.page === "zikr" && list[k] === x) go(1); }, 500);
       else if ((ctx === "morning" || ctx === "evening") && !nxt) showGoal(ctx === "morning" ? LX("Утренние азкары прочитаны", "Таңғы зікірлер оқылды", "Sabah ezkârı tamam") : LX("Вечерние азкары прочитаны", "Кешкі зікірлер оқылды", "Akşam ezkârı tamam"), LX("Да примет Аллах!", "Аллаһ қабыл етсін!", "Allah kabul etsin!"));
     }
   };
@@ -2033,17 +2125,20 @@ async function dyRows(city, need) {
   }
   return c;
 }
+const hasCityCoords = city => city.lat != null && city.lng != null && String(city.lat).trim() !== "" && String(city.lng).trim() !== "" && Number.isFinite(+city.lat) && Number.isFinite(+city.lng) && Math.abs(+city.lat) <= 90 && Math.abs(+city.lng) <= 180;
 async function timesFor(city, date) {
   if (city.src === "dy") {
-    try { const rows = await dyRows(city, ymd(date)); const r = rows.find(x => x[0] === ymd(date)); if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; } } catch (e) {}
+    try { const rows = await dyRows(city, ymd(date)); const r = rows.find(x => x[0] === ymd(date)); if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return { ...o, source: "dy" }; } } catch (e) {}
   }
   if (city.src === "dumk") {
     let rows = null; try { rows = await dumkYear(city, date.getFullYear()); } catch (e) {}
     const r = rows && rows.find(x => x[0] === ymd(date));
-    if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; }
-    return calcTimes(date, +city.lat, +city.lng, cityOff(city, date), 15, 15); // как у ДУМК, если на эту дату расписания ещё нет
+    if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return { ...o, source: "dumk" }; }
+    if (!hasCityCoords(city)) throw new Error("missing city coordinates");
+    return { source: "calc", ...calcTimes(date, +city.lat, +city.lng, cityOff(city, date), 15, 15) }; // как у ДУМК, если на эту дату расписания ещё нет
   }
-  return calcTimes(date, +city.lat, +city.lng, cityOff(city, date));
+  if (!hasCityCoords(city)) throw new Error("missing city coordinates");
+  return { source: "calc", ...calcTimes(date, +city.lat, +city.lng, cityOff(city, date)) };
 }
 const tMin = s => { const m = /^(\d+):(\d+)/.exec(s || ""); return m ? +m[1] * 60 + +m[2] : null; };
 // сейчас по часовому поясу города (у ДУМК — UTC+5), чтобы сравнивать с его расписанием
@@ -2157,7 +2252,7 @@ function cityPicker(onPick) {
   function close() { bg.remove(); document.removeEventListener("keydown", onKey); }
   x.onclick = close; bg.onclick = e => { if (e.target === bg) close(); };
   document.addEventListener("keydown", onKey);
-  document.body.append(bg); setTimeout(() => inp.focus(), 50);
+  document.body.append(bg); onRouteLeave(close); routeDelay(() => inp.focus(), 50);
 }
 // дата по хиджре: число и год — из календаря Умм аль-Кура, названия месяцев — свои для каждого языка
 const HIJRI_M = { ru: ["мухаррама", "сафара", "раби аль-авваля", "раби ас-сани", "джумада аль-уля", "джумада ас-сания", "раджаба", "шаабана", "рамадана", "шавваля", "зуль-када", "зуль-хиджа"],
@@ -2207,7 +2302,7 @@ async function nzRamadan(v) {
   let rows = null, calc = false;
   try { if (c.src === "dumk") rows = await dumkYear(c, R[0][0].getFullYear()); else if (c.src === "dy") rows = await dyRows(c, ymd(R[0][0])); } catch (e) {}
   const T0 = R.map(([d]) => { const r = rows && rows.find(x => x[0] === ymd(d)); if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; }
-    calc = true; return c.src === "dumk" ? calcTimes(d, +c.lat, +c.lng, cityOff(c, d), 15, 15) : calcTimes(d, +c.lat, +c.lng, cityOff(c, d)); });
+    calc = true; if (!hasCityCoords(c)) return Object.fromEntries(PT_KEYS.map(k => [k, "—"])); return c.src === "dumk" ? calcTimes(d, +c.lat, +c.lng, cityOff(c, d), 15, 15) : calcTimes(d, +c.lat, +c.lng, cityOff(c, d)); });
   loading.remove();
   const wd = new Intl.DateTimeFormat(S.lang === "kk" ? "ru" : S.lang, { weekday: "short" }), dm = new Intl.DateTimeFormat(S.lang === "kk" ? "ru" : S.lang, { day: "numeric", month: "short" });
   const td = ymd(new Date());
@@ -2236,7 +2331,7 @@ async function nzTimes(v) {
       return;
     }
     const c = S.city, now = cityNow(c);
-    let t; try { t = await timesFor(c, now); } catch (e) { box.append(h("div", { class: "box warn" }, LX("Не удалось загрузить расписание. Проверьте интернет.", "Кестені жүктеу мүмкін болмады.", "Vakitler yüklenemedi. İnterneti kontrol edin.")), h("button", { class: "btn ghost", onclick: () => cityPicker(draw) }, LX("Сменить город", "Қаланы ауыстыру", "Şehri değiştir"))); return; }
+    let t; try { t = await timesFor(c, now); } catch (e) { box.append(h("div", { class: "box warn" }, hasCityCoords(c) ? LX("Не удалось загрузить расписание. Проверьте интернет.", "Кестені жүктеу мүмкін болмады.", "Vakitler yüklenemedi. İnterneti kontrol edin.") : LX("Расписание недоступно, координаты города не найдены. Выберите город заново.", "Кесте қолжетімсіз, қала координаттары табылмады. Қаланы қайта таңдаңыз.", "Vakitler alınamadı, şehrin koordinatları bulunamadı. Şehri yeniden seçin.")), h("button", { class: "btn ghost", onclick: () => cityPicker(draw) }, LX("Сменить город", "Қаланы ауыстыру", "Şehri değiştir"))); return; }
     const n = await nextPrayer(c).catch(() => null);
     const hijri = hijriStr(now);
     const dateS = new Intl.DateTimeFormat(LX("ru-RU", "kk-KZ", "tr-TR"), { weekday: "long", day: "numeric", month: "long" }).format(now);
@@ -2245,11 +2340,12 @@ async function nzTimes(v) {
       h("div", { class: "pt-h" }, h("div", {}, h("b", {}, c.title + (c.sub ? ", " + c.sub : "")), h("small", {}, dateS + (hijri ? " · " + hijri : ""))),
         h("button", { class: "pill", type: "button", onclick: () => cityPicker(draw) }, LX("Сменить", "Ауыстыру", "Değiştir"))),
       h("ol", { class: "pt-list" }, PT_KEYS.map(k => h("li", { class: (n && n.today && n.k === k ? "next" : "") + (k === "sunrise" ? " sun" : ""), html: `<span>${esc(ptName(k))}</span><b class="num">${esc(t[k])}</b>${n && n.today && n.k === k ? `<small>${esc(fmtLeft(n.left))}</small>` : ""}` }))),
-      h("p", { class: "muted small pt-src" }, (c.src === "dumk" ? (LX("Официальное расписание ДУМК (muftyat.kz).", "ҚМДБ ресми кестесі (muftyat.kz).", "DUMK'un resmî vakitleri (muftyat.kz)."))
-        : c.src === "dy" ? (LX("Официальное расписание Diyanet (Турция). Фаджр — время имсака.", "Diyanet ресми кестесі (Түркия). Таң — имсак уақыты.", "Diyanet'in resmî vakitleri. Sabah — imsak vakti."))
-        : (LX("Расчёт по солнцу: фаджр 18°, иша 17°, аср по ханафитскому мазхабу. Уточняйте у местной мечети.", "Күн бойынша есеп: таң 18°, құптан 17°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз.", "Güneşe göre hesap: sabah 18°, yatsı 17°, ikindi Hanefi'ye göre. Yerel camiye danışın.")))
+      h("p", { class: "muted small pt-src" }, (t.source === "dumk" ? (LX("Официальное расписание ДУМК (muftyat.kz).", "ҚМДБ ресми кестесі (muftyat.kz).", "DUMK'un resmî vakitleri (muftyat.kz)."))
+        : t.source === "dy" ? (LX("Официальное расписание Diyanet (Турция). Фаджр — время имсака.", "Diyanet ресми кестесі (Түркия). Таң — имсак уақыты.", "Diyanet'in resmî vakitleri. Sabah — imsak vakti."))
+        : (LX(`Расчёт по солнцу: фаджр ${c.src === "dumk" ? 15 : 18}°, иша ${c.src === "dumk" ? 15 : 17}°, аср по ханафитскому мазхабу. Уточняйте у местной мечети.`, `Күн бойынша есеп: таң ${c.src === "dumk" ? 15 : 18}°, құптан ${c.src === "dumk" ? 15 : 17}°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз.`, `Güneşe göre hesap: sabah ${c.src === "dumk" ? 15 : 18}°, yatsı ${c.src === "dumk" ? 15 : 17}°, ikindi Hanefi'ye göre. Yerel camiye danışın.`)))
         + (foreignTz ? (LX(" Время указано местное для этого города.", " Уақыт осы қаланың жергілікті уақытымен.", " Saatler bu şehrin yerel saatidir.")) : "")));
-    box.append(...[card, ramadanRow(), c.lat != null ? qiblaCard(+c.lat, +c.lng) : null, remindCard("prayer")].filter(Boolean));
+    if (t.source === "calc" && c.src !== "calc") card.append(h("p", { class: "box warn" }, LX("Официальное расписание недоступно. Показано расчётное время — уточните его у местной мечети.", "Ресми кесте қолжетімсіз. Есептелген уақыт көрсетілді — жергілікті мешіттен нақтылаңыз.", "Resmî vakitler alınamadı. Hesaplanan saatler gösteriliyor; yerel camiden teyit edin.")));
+    box.append(...[card, ramadanRow(), hasCityCoords(c) ? qiblaCard(+c.lat, +c.lng) : null, remindCard("prayer")].filter(Boolean));
   };
   draw();
 }
@@ -2596,11 +2692,16 @@ function pagePlacement(v) {
       const card = h("div", { class: "ex pl-q" }, h("div", { class: "q" }, mdEl(q.q)));
       if (q.prompt) card.append(h("div", { class: "prompt" }, q.prompt));
       if (q.promptHTML) card.append(h("div", { class: "prompt", style: "font-size:40px", html: q.promptHTML }));
-      if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); card.append(lb); setTimeout(() => playURL(wordURL(q.listen), lb), 250); }
-      const answer = i => { const R = res[bi]; R.n++; done++;
+      if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); card.append(lb); routeDelay(() => playURL(wordURL(q.listen), lb), 250); }
+      let answered = false;
+      const answer = i => {
+        if (answered || !v.isConnected) return;
+        answered = true;
+        card.querySelectorAll("button").forEach(button => button.disabled = true);
+        const R = res[bi]; R.n++; done++;
         if (i === -1) R.s++; else if (i === q.answer) { R.r++; R.t.push(Date.now() - t0); } else R.w++;
         [...opts.children].forEach((b, j) => b.classList.toggle("picked", j === i)); opts.classList.add("locked");
-        setTimeout(step, 260); };
+        routeDelay(step, 260); };
       const opts = h("div", { class: "opts" }, q.options.map((o, i) => { const b = h("button", { class: "opt" + (o.ar ? " ar-o" : ""), type: "button" }); if (o.ar) b.textContent = o.ar; else b.innerHTML = md(o.t).replace(/^<p>|<\/p>$/g, ""); b.onclick = () => answer(i); return b; }));
       card.append(opts, h("button", { class: "btn ghost pl-idk", type: "button", onclick: () => answer(-1) }, LX("Не знаю", "Білмеймін", "Bilmiyorum")));
       box.append(card);
@@ -2660,12 +2761,12 @@ function pageTrainer(v, id) {
       box.append(h("div", { class: "tprog", style: "display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted);margin-bottom:6px" }, h("span", {}, `${T("question")} ${i + 1} / ${N}`), h("span", { class: "num" }, `${ok} ✓`)),
         h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${i / N * 100}%` })));
       const el = exEl(q, "tr", null, { noTag: true, single: true, onDone: good => {
-        buzz(good); S.tr.n++; if (good) { S.tr.ok++; ok++; addXP(2, el); } save(); i++; setTimeout(step, good ? 450 : 1400);
+        buzz(good); S.tr.n++; if (good) { S.tr.ok++; ok++; addXP(2, el); } save(); i++; routeDelay(step, good ? 450 : 1400);
       } });
       if (q.hint) { const hbox = h("div", { class: "hint-box", hidden: true, html: q.hint }), hb = h("button", { class: "hint-b", type: "button", html: icon("bulb") + `<span>${esc(LX("Подсказка", "Кеңес", "İpucu"))}</span>` });
         hb.onclick = () => { hbox.hidden = false; hb.disabled = true; requestAnimationFrame(() => hbox.classList.add("in")); }; el.querySelector(".q").append(hb); el.querySelector(".q").after(hbox); }
       if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
-      if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); el.querySelector(".q").after(lb); setTimeout(() => playURL(wordURL(q.listen), lb), 250); }
+      if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); el.querySelector(".q").after(lb); routeDelay(() => playURL(wordURL(q.listen), lb), 250); }
       box.append(el);
     };
     step();
@@ -2740,7 +2841,7 @@ function pageExam(v, m) {
       const tr = qs[i], q = tr.make();
       box.append(h("div", { class: "tprog", style: "display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted);margin-bottom:6px" }, h("span", {}, `${T("question")} ${i + 1} / ${qs.length}`), h("span", { class: "num" }, `✓ ${ok}`)),
         h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${i / qs.length * 100}%` })));
-      const el = exEl(q, "tr", null, { noTag: true, single: true, onDone: good => { buzz(good); if (good) ok++; else miss[tr.id] = (miss[tr.id] || 0) + 1; i++; hb.disabled = true; setTimeout(step, good ? 550 : 1600); } });
+      const el = exEl(q, "tr", null, { noTag: true, single: true, onDone: good => { buzz(good); if (good) ok++; else miss[tr.id] = (miss[tr.id] || 0) + 1; i++; hb.disabled = true; routeDelay(step, good ? 550 : 1600); } });
       // подсказка: теория из уроков, раскрывается под вопросом
       const hbox = h("div", { class: "hint-box", hidden: true, html: q.hint || "" });
       const hb = h("button", { class: "hint-b", type: "button", disabled: !q.hint || !hints ? "" : null,
@@ -2749,7 +2850,7 @@ function pageExam(v, m) {
       el.querySelector(".q").append(hb);
       el.querySelector(".q").after(hbox);
       if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
-      if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); el.querySelector(".q").after(lb); setTimeout(() => playURL(wordURL(q.listen), lb), 250); }
+      if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); el.querySelector(".q").after(lb); routeDelay(() => playURL(wordURL(q.listen), lb), 250); }
       box.append(el);
     };
     step();
@@ -2816,7 +2917,7 @@ function pageMe(v) {
   const memN = CORE.suras.filter(s => suraMemorized(s.n)).length, st = streak(), dc = doneCount();
   wrap.append(h("div", { class: "me-stats" },
     h("a", { href: "#/course", html: `<b class="num">${dc}</b><small>${esc(LX(plRu(dc, "урок", "урока", "уроков"), "сабақ", "ders"))}</small>` }),
-    h("div", { class: "warm", html: `<b class="num">${st}</b><small>${esc(T("streak"))}</small>` }),
+    h("div", { class: "warm", html: `<b class="num">${st}</b><small>${esc(streakLabel(st))}</small>` }),
     h("a", { href: "#/practice", html: `<b class="num">${memN}</b><small>${esc(LX(plRu(memN, "сура наизусть", "суры наизусть", "сур наизусть"), "сүре жатқа", "sure ezber"))}</small>` })));
   // награды
   const got = BADGES.filter(b => S.badges[b[0]]).length;
@@ -2899,6 +3000,7 @@ function mergeState(a, b) { // объединяем прогресс двух у
   const union = (x = {}, y = {}) => Object.assign({}, y, x);
   m.days = maxMap(a.days, b.days); m.tests = maxMap(a.tests, b.tests);
   m.lessons = union(a.lessons, b.lessons); m.ex = union(a.ex, b.ex); m.badges = union(a.badges, b.badges);
+  m.hifzAwarded = union(a.hifzAwarded, b.hifzAwarded); m.hifzBonus = union(a.hifzBonus, b.hifzBonus);
   m.hifz = {}; for (const k of new Set([...Object.keys(a.hifz || {}), ...Object.keys(b.hifz || {})])) m.hifz[k] = union((a.hifz || {})[k], (b.hifz || {})[k]);
   m.tr = { n: Math.max(a.tr?.n || 0, b.tr?.n || 0), ok: Math.max(a.tr?.ok || 0, b.tr?.ok || 0) };
   { const sum = x => x && x.t ? Object.values(x.t).reduce((p, q) => p + (+q || 0), 0) : 0; m.tsb = sum(a.tsb) >= sum(b.tsb) ? a.tsb : b.tsb; }
