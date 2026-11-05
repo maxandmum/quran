@@ -1,0 +1,16 @@
+# Browser regression checklist
+
+Run a local static server, e.g. `python3 -m http.server 8765`, from the repository. Use a new guest browser profile; never clear a learner's existing progress for testing.
+
+- Lesson 1: finish disabled initially; answer one question; reload; 25% and completed-card status remain. Complete the other three; finish enables and awards completion once.
+- Reopen a previously completed lesson: its completion remains. Tracing and control tests count toward the displayed total without exceeding 100%.
+- Placement: double click “Не знаю” and answer choices; question 1 must advance to 2 only. Complete the first section normally and check the result count. Leave before transition; no delayed action/audio on another page.
+- Sura 112 hifz: mark/unmark/re-mark and reload. The mark is reversible; the same verse and full-sura bonus never award XP twice. Previously saved marks survive the update.
+- Sura words: focus using Tab and activate with Enter and Space; verify audio/meaning and visible focus. Hidden words must have action labels rather than reveal the answer in their label.
+- Zikr: enter/leave a counter several times; on the list, arrows must not change the URL. In the active counter arrows still navigate.
+- Navigate quickly from a loading tajweed/sura/lesson page to another page; late data must not mix with the current page or steal focus.
+- Offline: save a short sura, verify actual playback after disabling network and reloading, with the same language/reader. Fail one audio request: no “saved” state. Change reader/language: old copy must not be advertised as the new selection. Old cached copies may be revalidated by downloading again.
+- Prayer times: official API success has official source; simulate API failure and verify calculated-source notice. Missing coordinates must show an unavailable state, never a schedule calculated from null.
+- TR lesson/course: clearly show the available material languages and working RU/KK buttons. Turkish lesson translations are still pending; do not mark them as completed.
+- Check mobile widths 320/390 and desktop 1280; light/dark, reader player, bookmarks, namaz and course navigation. No console errors.
+- Update a previously installed PWA: app.js/app.css and service worker all use version 22; missing offline JSON must fail as data, never return index.html.

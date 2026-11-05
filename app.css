@@ -1586,3 +1586,10 @@ button,.tile,.glass,.nz-row,.zk-item,.sitem,.rv-card,.ram-card,.mod,.tr-card{-we
 .slist>.sitem{content-visibility:auto;contain-intrinsic-size:auto 72px}
 .path>li{content-visibility:auto;contain-intrinsic-size:auto 70px}
 @media (display-mode:standalone){html,body{overscroll-behavior-y:none}}
+
+/* Accessible word actions and lesson status. */
+.wd:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+.lesson-language{margin-bottom:18px}
+.lesson-language p{margin:8px 0}
+.lesson-language .row{margin-top:10px;flex-wrap:wrap}
+.done-bar button:disabled{opacity:.55;cursor:not-allowed}
