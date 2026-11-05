@@ -145,7 +145,7 @@ function backupHarness() {
 function backupFixture() {
   return { xp: 47, days: { '2026-11-05': 47 }, lessons: { 1: { done: true, at: '2026-11-05' } },
     ex: { 'e1.12': 1, 't2.5': 1, 'c1.16.0': 1 }, tests: { '30.68': 90 }, badges: { first: '2026-11-05' },
-    hifz: { 1: { 1: true } }, hifzAwarded: { '1:1': true }, hifzBonus: { 1: true }, tr: { n: 7, ok: 6 },
+    hifz: { 1: { 1: '2026-11-05' } }, hifzAwarded: { '1:1': true }, hifzBonus: { 1: true }, tr: { n: 7, ok: 6 },
     last: { s: 112, a: 2 }, bm: { '112:2': 1793894400000 },
     rv: { 'l:ب': { i: 2, due: '2026-11-12' }, 'r:qalqala': { i: -1, due: '2026-11-06' }, 'a:1:1': { i: 0, due: '2026-11-07' } },
     exams: { 1: { best: 20, passed: true, at: '2026-11-05', score: 20 }, 2: { best: 14, passed: false, at: null, score: undefined } },
@@ -155,12 +155,55 @@ function backupFixture() {
     lang: 'ru', theme: 'dark', city: { title: 'Private city', lat: 41 }, certName: 'Private name', off: { 1: { complete: true } } };
 }
 const plain = value => JSON.parse(JSON.stringify(value));
+function readingHarness() { return load(section('function readingAudioPreferences(', 'async function pageSura('), {}); }
+test('reading: inclusive ranges support per-ayah and whole-range repetition', () => {
+  const ctx = readingHarness();
+  assert.deepEqual(Array.from(ctx.readingPlaybackQueue(2, 3, 7, 3), x => x.ayah), [2, 2, 2, 3, 3, 3]);
+  assert.deepEqual(Array.from(ctx.readingPlaybackQueue(2, 3, 7, 3, 'range'), x => x.ayah), [2, 3, 2, 3, 2, 3]);
+  assert.deepEqual(Array.from(ctx.readingPlaybackQueue(7, 7, 7, 1), x => x.ayah), [7]);
+});
+test('reading: invalid ranges and unbounded repeat settings cannot create a playback queue', () => {
+  const ctx = readingHarness();
+  for (const args of [[0, 3, 7, 1], [3, 2, 7, 1], [1, 8, 7, 1], [1.5, 2, 7, 1], [NaN, 2, 7, 1], [1, 2, 7, 100], [1, 2, 7, 3, 'invalid']]) assert.equal(ctx.readingPlaybackQueue(...args), null);
+});
+test('reading: completion follows the configured queue exactly once', async () => {
+  const ctx = readingHarness(), played = [], marked = [], finished = [];
+  const controller = ctx.readingPlaybackController({ play: async n => { played.push(n); return true; }, onItem: x => marked.push(x.ayah), onFinish: ok => finished.push(ok) });
+  await controller.start(ctx.readingPlaybackQueue(2, 3, 4, 3, 'range'));
+  assert.deepEqual(played, [2, 3, 2, 3, 2, 3]); assert.deepEqual(marked, played); assert.deepEqual(finished, [true]);
+});
+test('reading: stopping or leaving a route prevents late audio completion from starting another ayah', async () => {
+  const ctx = readingHarness(), played = [], finished = []; let release;
+  const controller = ctx.readingPlaybackController({ play: n => { played.push(n); return new Promise(resolve => release = resolve); }, onItem() {}, onFinish: ok => finished.push(ok) });
+  const pending = controller.start(ctx.readingPlaybackQueue(1, 3, 4, 1));
+  controller.cancel(); release(true); await pending;
+  assert.deepEqual(played, [1]); assert.deepEqual(finished, []);
+});
+test('reading: failed or rejected audio stops the queue and reports an interrupted run', async () => {
+  const ctx = readingHarness();
+  for (const rejects of [false, true]) {
+    let attempts = 0; const finished = [];
+    const controller = ctx.readingPlaybackController({ play: async () => { attempts++; if (rejects) throw Error('audio'); return false; }, onItem() {}, onFinish: ok => finished.push(ok) });
+    await controller.start(ctx.readingPlaybackQueue(1, 3, 4, 3));
+    assert.equal(attempts, 1); assert.deepEqual(finished, [false]);
+  }
+});
+test('reading: read and hifz defaults differ while invalid saved preferences fall back safely', () => {
+  const ctx = readingHarness();
+  assert.equal(ctx.readingAudioPreferences(undefined, false).repeats, 1);
+  assert.equal(ctx.readingAudioPreferences(undefined, true).repeats, 3);
+  assert.deepEqual(plain(ctx.readingAudioPreferences({ rate: 99, repeats: -1, mode: '<script>' }, false)), { rate: 1, repeats: 1, mode: 'ayah' });
+  assert.deepEqual(plain(ctx.readingAudioPreferences({ rate: 0.75, repeats: 5, mode: 'range' }, true)), { rate: 0.75, repeats: 5, mode: 'range' });
+});
 test('backup: export/import preserves learning, review, bookmarks and award history without device or personal data', () => {
   const ctx = backupHarness(), backup = ctx.makeProgressBackup(backupFixture());
   const parsed = ctx.parseProgressBackup(JSON.stringify(backup));
   assert.deepEqual(plain(parsed), plain(backup));
   assert.equal(parsed.progress.rv['l:ب'].due, '2026-11-12');
   assert.equal(parsed.progress.hifzAwarded['1:1'], true);
+  assert.equal(parsed.progress.hifz[1][1], '2026-11-05');
+  const legacy = plain(backup); legacy.progress.hifz[1][1] = true;
+  assert.equal(ctx.parseProgressBackup(JSON.stringify(legacy)).progress.hifz[1][1], true);
   assert.equal(parsed.progress.exams[2].score, undefined);
   for (const key of ['city', 'certName', 'off', 'lang', 'theme']) assert.equal(Object.hasOwn(parsed.progress, key), false);
 });
@@ -175,7 +218,7 @@ test('backup: wrong files, future versions, invalid dates, scores and verse refe
   assert.throws(() => ctx.parseProgressBackup('{}'));
   for (const mutate of [x => x.version = 2, x => x.progress.days = { '2026-02-31': 20 }, x => x.progress.xp = -1,
     x => x.progress.lessons[111] = { done: true }, x => x.progress.last = { s: 112, a: 99 }, x => x.progress.tests['30.68'] = 101,
-    x => x.progress.tr.ok = 100, x => x.progress.off = { 1: { complete: true } }, x => x.progress.hifz[1][99] = true]) {
+    x => x.progress.hifz[1][1] = '2026-02-31', x => x.progress.tr.ok = 100, x => x.progress.off = { 1: { complete: true } }, x => x.progress.hifz[1][99] = true]) {
     const changed = plain(valid); mutate(changed); assert.throws(() => ctx.parseProgressBackup(JSON.stringify(changed)));
   }
 });
