@@ -427,13 +427,21 @@ const readerOf = rid => READERS.find(r => r.v.some(v => v[0] === rid)) || READER
 const LRECITERS = READERS.flatMap(r => r.v.map(([id, st]) => [id, ...[0, 1, 2].map(i => (r.n[i] || r.n[1]) + (r.v.length > 1 ? " — " + (STYLE[st][i] || STYLE[st][1]).split(" — ")[0].toLowerCase() : ""))]));
 const recName = id => { const r = LRECITERS.find(x => x[0] === id) || LRECITERS[0]; return S.lang === "kk" ? r[1] : (S.lang === "tr" && r[3]) || r[2]; };
 const initials = n => String(n).replace(/(^|\s)(әл|аль|аш|әш|ад|әд|ас|el|eş|ed|es)-/gi, "$1").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
-// лицо — в центр круга: object-position выбирает кадр, затем увеличение и сдвиг точки лица к центру (без пустых краёв)
-const faceStyle = r => {
-  const [x, y, z] = r.f || [50, 30, 1], lim = (z - 1) * 50, cl = v => Math.max(-lim, Math.min(lim, v));
-  const tx = cl(-z * (x - 50)).toFixed(1), ty = cl(-z * (y - 50)).toFixed(1);
-  return `object-position:${x}% ${y}%;transform:translate(${tx}%,${ty}%) scale(${z})`;
+// Each real portrait is framed within the same 4:5 canvas. Scaling is
+// anchored explicitly so a head cannot be shifted out of the frame.
+const PORTRAIT_FRAME = {
+  afasy: [50, 0, 1, 50, 0], minshawi: [52, 0, 1.15, 52, 15],
+  husary: [50, 30, 1, 50, 0], basit: [60, 20, 1.9, 69, 48],
+  ghamdi: [50, 0, 1, 50, 0], maher: [50, 0, 1.15, 50, 10],
+  shuraim: [50, 0, 2, 50, 0], dosari: [44, 0, 1.15, 45, 10],
+  qatami: [50, 0, 1.3, 50, 10], ajmi: [52, 0, 1, 50, 0],
+  sudais: [50, 0, 1.55, 50, 4]
 };
-const readerAva = (r, cls = "") => r.img ? `<span class="rava ${cls}" data-i="${esc(initials(S.lang === "tr" ? r.n[2] : r.n[1]))}"><img src="${r.img[0]}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="${faceStyle(r)}" onerror="this.parentNode.classList.add('mono');this.parentNode.textContent=this.parentNode.dataset.i"></span>` : `<span class="rava mono ${cls}">${esc(initials(S.lang === "tr" ? r.n[2] : r.n[1]))}</span>`;
+const faceStyle = r => {
+  const [x, y, z, ox, oy] = PORTRAIT_FRAME[r.id] || [50, 0, 1, 50, 0];
+  return `object-position:${x}% ${y}%;transform:scale(${z});transform-origin:${ox}% ${oy}%`;
+};
+const readerAva = (r, cls = "") => r.img ? `<span class="rava ${cls}" data-reader="${esc(r.id)}" data-i="${esc(initials(S.lang === "tr" ? r.n[2] : r.n[1]))}"><img src="${r.img[0]}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="${faceStyle(r)}" onerror="this.parentNode.classList.add('mono');this.parentNode.textContent=this.parentNode.dataset.i"></span>` : `<span class="rava mono ${cls}">${esc(initials(S.lang === "tr" ? r.n[2] : r.n[1]))}</span>`;
 const fmtT = t => { if (!isFinite(t)) return "0:00"; t = Math.floor(t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0"); };
 let LP = null; // { a: Audio, bar: Element }
 function listenPlay(s, rec) {
@@ -548,6 +556,92 @@ const NAV = [["#/", "today", "sun"], ["#/course", "learn", "learn"], ["#/suras",
 // знак Iqra: восьмиконечная звезда, внутри алиф с фатхой
 const MARK = `<svg class="mark" viewBox="0 0 120 120" aria-hidden="true"><g fill="none" stroke="var(--primary)" stroke-width="6" stroke-linejoin="round"><rect x="20" y="20" width="80" height="80" rx="6"/><rect x="20" y="20" width="80" height="80" rx="6" transform="rotate(45 60 60)"/></g><rect x="56" y="47" width="8" height="30" rx="4" fill="var(--primary)"/><rect x="51.5" y="37.5" width="17" height="5" rx="2.5" fill="var(--brass)" transform="rotate(-18 60 40)"/></svg>`;
 const brandEl = () => h("a", { class: "brand", href: "#/", "aria-label": "Iqra — " + T("brandSub"), html: MARK + '<span class="wm">iqra<i>.</i></span>' });
+/* Project information, FAQ and source credits. RU / KK / TR. */
+const FT = values => LX(...values);
+const FAQ_ITEMS = [
+  { q: ["Можно начать без знания арабского?", "Араб тілін білмей бастауға бола ма?", "Arapça bilmeden başlayabilir miyim?"],
+    a: ["Да. Начните с первого модуля: направление письма, буквы и их формы. Если вы уже немного читаете, входной тест поможет выбрать подходящий модуль.", "Иә. Бірінші модульден бастаңыз: жазу бағыты, әріптер және олардың түрлері. Аздап оқи алсаңыз, кіріс тесті лайықты модульді таңдауға көмектеседі.", "Evet. Yazı yönü, harfler ve harf şekilleriyle başlayan ilk modülden başlayın. Biraz okuyabiliyorsanız seviye testi uygun modülü seçmenize yardımcı olur."], link: ["#/course", ["Открыть курс", "Курсты ашу", "Kursu aç"]] },
+  { q: ["Нужна ли регистрация?", "Тіркелу керек пе?", "Kayıt olmam gerekiyor mu?"],
+    a: ["Можно заниматься без регистрации. Сейчас прогресс сохраняется в браузере на этом устройстве; автоматического переноса на другой телефон или компьютер нет.", "Тіркелмей оқуға болады. Қазір прогресс осы құрылғының браузерінде сақталады; басқа телефонға не компьютерге автоматты түрде көшірілмейді.", "Kayıt olmadan çalışabilirsiniz. İlerleme şu anda bu cihazın tarayıcısında saklanır; başka bir telefona veya bilgisayara otomatik aktarılmaz."] },
+  { q: ["Где хранится мой прогресс?", "Прогресім қайда сақталады?", "İlerlemem nerede saklanıyor?"],
+    a: ["В браузере, которым вы пользуетесь. Возвращайтесь с того же устройства и браузера. Очистка данных сайта или приватный режим могут привести к потере прогресса.", "Сіз пайдаланатын браузерде. Сол құрылғы мен браузер арқылы оралыңыз. Сайт деректерін тазалау немесе жеке режим прогрестің жоғалуына әкелуі мүмкін.", "Kullandığınız tarayıcıda saklanır. Aynı cihaz ve tarayıcıyla geri dönün. Site verilerini temizlemek veya gizli gezinme modu ilerlemenin kaybolmasına neden olabilir."], link: ["#/me", ["Мой профиль", "Менің профилім", "Profilim"]] },
+  { q: ["Что работает без интернета?", "Интернетсіз не жұмыс істейді?", "İnternetsiz neler kullanılabilir?"],
+    a: ["Откройте суру и нажмите «Скачать для офлайна». Дождитесь завершения: сохранятся текст, перевод и аудио выбранного чтеца. После смены языка или чтеца нужна новая копия. Пословное аудио требует интернета.", "Сүрені ашып, «Офлайнға жүктеу» батырмасын басыңыз. Аяқталуын күтіңіз: мәтін, аударма және таңдалған қаридың аудиосы сақталады. Тілді не қариды ауыстырсаңыз, жаңа көшірме керек. Жеке сөздердің аудиосына интернет қажет.", "Bir sure açıp «Çevrimdışı için indir» düğmesine dokunun ve tamamlanmasını bekleyin. Metin, meal ve seçilen kurranın sesi kaydedilir. Dil veya kurra değişirse yeni bir kopya indirin. Kelime sesleri internet gerektirir."], link: ["#/suras", ["Выбрать суру", "Сүрені таңдау", "Sure seç"]] },
+  { q: ["Сколько времени заниматься?", "Қанша уақыт оқу керек?", "Ne kadar çalışmalıyım?"],
+    a: ["Начните с 20 минут в день: прочитайте объяснение, послушайте примеры и выполните задания. Повторяйте вслух и возвращайтесь к трудным местам. Темп можно подстроить под себя.", "Күніне 20 минуттан бастаңыз: түсіндірмені оқып, мысалдарды тыңдап, тапсырмаларды орындаңыз. Дауыстап қайталап, қиын жерлерге қайта оралыңыз. Қарқынды өзіңізге бейімдеуге болады.", "Günde 20 dakikayla başlayın: açıklamayı okuyun, örnekleri dinleyin ve alıştırmaları yapın. Sesli tekrar edin, zorlandığınız yerlere dönün. Temponuzu kendinize göre ayarlayın."] },
+  { q: ["Какого чтеца выбрать для начала?", "Бастау үшін қай қариды таңдау керек?", "Başlangıç için hangi kurrayı seçmeliyim?"],
+    a: ["В плеере аятов есть обучающие записи Хусари и Миншави с повторением за детьми. Послушайте оба варианта и выберите удобный темп. Для заучивания можно включить повтор аятов и изменить скорость.", "Аяттар ойнатқышында Хусаридің үйретуші жазбасы және Миншауидің балалармен қайталау жазбасы бар. Екеуін тыңдап, қолайлы қарқынды таңдаңыз. Жаттау үшін аяттарды қайталауды қосып, жылдамдықты өзгертуге болады.", "Ayet oynatıcısında Husarî'nin öğretici kaydı ve Minşâvî'nin çocuklarla tekrarlı kaydı vardır. İkisini de dinleyip uygun tempoyu seçin. Ezber için ayet tekrarını açabilir ve hızı değiştirebilirsiniz."], link: ["#/listen", ["Все чтецы", "Барлық қарилар", "Tüm kurralar"]] },
+  { q: ["Заменяет ли курс преподавателя?", "Курс ұстазды алмастыра ма?", "Kurs bir hocanın yerini tutar mı?"],
+    a: ["Курс помогает изучать буквы, чтение и правила таджвида. Тесты проверяют ответы, но не произношение. Махраджи и правильность чтения по возможности проверяйте с преподавателем. Для понимания смысла обращайтесь к надёжному тафсиру.", "Курс әріптерді, оқуды және тәжуид ережелерін үйренуге көмектеседі. Тесттер жауаптарды тексереді, бірақ айтылымды бағаламайды. Махраж бен оқудың дұрыстығын мүмкіндігінше ұстазға тексертіңіз. Мағынаны түсіну үшін сенімді тәпсірге жүгініңіз.", "Kurs harfleri, okumayı ve tecvid kurallarını öğrenmeye yardımcı olur. Testler cevapları kontrol eder; telaffuzu değerlendirmez. Mahreçleri ve okuyuşunuzu mümkünse bir hocaya kontrol ettirin. Anlam için güvenilir bir tefsire başvurun."] },
+  { q: ["Как сообщить о неточности?", "Қате туралы қалай хабарлауға болады?", "Bir hatayı nasıl bildirebilirim?"],
+    a: ["Откройте обращение в GitHub проекта. Укажите номер урока или суры и аята, что вы ожидали увидеть и что произошло. Если можете, приложите снимок экрана. Для отправки обращения нужен аккаунт GitHub.", "Жобаның GitHub парағында хабарлама ашыңыз. Сабақтың немесе сүре мен аяттың нөмірін, не күткеніңізді және не болғанын жазыңыз. Мүмкін болса, экран суретін тіркеңіз. Хабарлама жіберу үшін GitHub аккаунты керек.", "Projenin GitHub sayfasında bir hata kaydı açın. Ders numarasını veya sure ve ayeti, beklediğiniz sonucu ve ne olduğunu yazın. Mümkünse ekran görüntüsü ekleyin. Göndermek için GitHub hesabı gerekir."], link: ["https://github.com/maxandmum/quran/issues/new", ["Сообщить об ошибке ↗", "Қате туралы хабарлау ↗", "Hata bildir ↗"]] }
+];
+function infoLink(href, text, cls = "") {
+  return h("a", { href, class: cls || null, ...(href.startsWith("https:") ? { target: "_blank", rel: "noopener noreferrer" } : {}) }, text);
+}
+function faqList(items = FAQ_ITEMS) {
+  return h("div", { class: "info-faq-list" }, items.map(item => h("details", { class: "info-faq-item" },
+    h("summary", {}, FT(item.q), h("span", { class: "faq-plus", "aria-hidden": "true" }, "+")),
+    h("div", { class: "info-faq-answer" }, h("p", {}, FT(item.a)), item.link ? infoLink(item.link[0], FT(item.link[1])) : null))));
+}
+function siteFooter() {
+  const links = (title, entries) => h("nav", { class: "footer-col", "aria-label": FT(title) }, h("h2", {}, FT(title)), entries.map(([href, text]) => infoLink(href, FT(text))));
+  const faq = h("section", { class: "footer-faq", "aria-label": FT(["Частые вопросы", "Жиі қойылатын сұрақтар", "Sık sorulan sorular"]) },
+    h("div", { class: "footer-faq-intro" }, h("span", { class: "info-kicker" }, "FAQ"),
+      h("h2", {}, FT(["Вопросы перед первым уроком", "Алғашқы сабақ алдындағы сұрақтар", "İlk dersten önce sorular"])),
+      h("p", {}, FT(["Как начать, где сохраняется прогресс и как заниматься самостоятельно.", "Қалай бастау, прогресс қайда сақталады және өз бетімен қалай оқу керек.", "Nasıl başlayacağınız, ilerlemenin nerede saklandığı ve kendi başınıza nasıl çalışacağınız."])),
+      infoLink("#/faq", FT(["Все вопросы и ответы", "Барлық сұрақтар мен жауаптар", "Tüm sorular ve cevaplar"]) + " →")),
+    faqList([FAQ_ITEMS[0], FAQ_ITEMS[2], FAQ_ITEMS[6]]));
+  return h("footer", { class: "site" }, faq,
+    h("div", { class: "footer-grid" },
+      h("div", { class: "footer-brand" }, brandEl(), h("p", {}, FT(["От первой арабской буквы до чтения Корана с таджвидом. Учитесь в своём темпе, слушайте и повторяйте.", "Алғашқы араб әрпінен Құранды тәжуидпен оқуға дейін. Өз қарқыныңызбен оқып, тыңдап, қайталаңыз.", "İlk Arap harfinden tecvidli Kur'an okumaya. Kendi temponuzda öğrenin, dinleyin ve tekrar edin."]))),
+      links(["Обучение", "Оқу", "Öğrenme"], [["#/course", ["Карта курса", "Курс картасы", "Kurs haritası"]], ["#/practice", ["Практика", "Жаттығу", "Pratik"]], ["#/suras", ["Читать Коран", "Құран оқу", "Kur'an oku"]], ["#/listen", ["Чтецы", "Қарилар", "Kurralar"]]]),
+      links(["О проекте", "Жоба туралы", "Proje"], [["#/about", ["Об Iqra", "Iqra туралы", "Iqra hakkında"]], ["#/sources", ["Источники материалов", "Материал дереккөздері", "İçerik kaynakları"]], ["#/sources/photos", ["Фото и лицензии", "Фото және лицензиялар", "Fotoğraflar ve lisanslar"]]]),
+      links(["Помощь", "Көмек", "Yardım"], [["#/faq", ["Частые вопросы", "Жиі қойылатын сұрақтар", "Sık sorulan sorular"]], ["https://github.com/maxandmum/quran/issues/new", ["Сообщить об ошибке ↗", "Қате туралы хабарлау ↗", "Hata bildir ↗"]], ["https://github.com/maxandmum/quran", ["GitHub проекта ↗", "Жобаның GitHub парағы ↗", "Projenin GitHub sayfası ↗"]]])),
+    h("div", { class: "footer-bottom" }, h("small", {}, `© ${new Date().getFullYear()} Iqra`),
+      h("p", {}, FT(["Курс помогает учиться читать. Произношение проверяйте с преподавателем.", "Курс оқуды үйренуге көмектеседі. Айтылымды ұстазға тексертіңіз.", "Kurs okumayı öğrenmeye yardımcı olur. Telaffuzunuzu bir hocaya kontrol ettirin."])),
+      infoLink("#/sources", FT(["Источники и благодарности", "Дереккөздер мен алғыс", "Kaynaklar ve teşekkürler"]))));
+}
+function infoHead(v, title, lead) {
+  const wrap = h("article", { class: "info-page read" });
+  wrap.append(h("header", { class: "info-head" }, h("span", { class: "info-kicker" }, "IQRA"), h("h1", {}, FT(title)), h("p", {}, FT(lead))));
+  v.append(wrap); return wrap;
+}
+function pageFAQ(v) {
+  const wrap = infoHead(v, ["Частые вопросы", "Жиі қойылатын сұрақтар", "Sık sorulan sorular"], ["Всё, что полезно знать перед началом занятий.", "Оқуды бастамас бұрын білуге пайдалы ақпарат.", "Çalışmaya başlamadan önce bilmeniz gerekenler."]);
+  wrap.append(faqList(), h("div", { class: "info-callout" }, h("h2", {}, FT(["Не нашли ответ?", "Жауап табылмады ма?", "Cevabınızı bulamadınız mı?"])),
+    h("p", {}, FT(["Задайте вопрос в GitHub проекта — так он останется рядом с обсуждением сайта.", "Жобаның GitHub парағында сұрақ қойыңыз — ол сайт талқылауымен бірге сақталады.", "Projenin GitHub sayfasında soru sorun; böylece siteyle ilgili tartışmalarla birlikte kalır."])),
+    infoLink("https://github.com/maxandmum/quran/issues/new", FT(["Задать вопрос ↗", "Сұрақ қою ↗", "Soru sor ↗"]), "btn ghost")));
+}
+function pageAbout(v) {
+  const wrap = infoHead(v, ["Об Iqra", "Iqra туралы", "Iqra hakkında"], ["Чтение Корана начинается с первой буквы.", "Құран оқу алғашқы әріптен басталады.", "Kur'an okumak ilk harfle başlar."]);
+  wrap.append(h("p", { class: "info-lead" }, FT(["Iqra — учебный сайт для самостоятельного изучения арабского письма, правил чтения и таджвида. Здесь можно проходить уроки, слушать чтецов и закреплять материал практикой.", "Iqra — араб жазуын, оқу ережелерін және тәжуидті өз бетімен үйренуге арналған оқу сайты. Мұнда сабақ өтіп, қариларды тыңдап, материалды жаттығумен бекітуге болады.", "Iqra; Arap yazısını, okuma kurallarını ve tecvidi kendi başınıza öğrenmeniz için hazırlanmış bir eğitim sitesidir. Dersleri takip edebilir, kurraları dinleyebilir ve alıştırmalarla pekiştirebilirsiniz."])),
+    h("div", { class: "info-facts" }, [["110", ["уроков в четырёх модулях", "төрт модульдегі сабақ", "dört modülde ders"]], ["114", ["сур с аудио и переводом", "аудио және аудармасы бар сүре", "ses ve meal içeren sure"]], ["9", ["видов тренажёров", "жаттығу түрі", "alıştırma türü"]]].map(([n, label]) => h("div", {}, h("b", { class: "num" }, n), h("span", {}, FT(label))))),
+    h("section", { class: "info-section" }, h("h2", {}, FT(["Как устроено обучение", "Оқу қалай ұйымдастырылған", "Nasıl öğrenilir"])),
+      h("ol", { class: "info-steps" }, [["Изучите объяснение", "Түсіндірмені оқыңыз", "Açıklamayı okuyun"], ["Послушайте и повторите вслух", "Тыңдап, дауыстап қайталаңыз", "Dinleyin ve sesli tekrar edin"], ["Выполните задания", "Тапсырмаларды орындаңыз", "Alıştırmaları yapın"], ["Вернитесь к повторению", "Қайталауға оралыңыз", "Tekrara dönün"]].map(t => h("li", {}, FT(t))))),
+    h("section", { class: "info-section" }, h("h2", {}, FT(["Языки и сохранение прогресса", "Тілдер және прогресті сақтау", "Diller ve ilerleme"])),
+      h("p", {}, FT(["Уроки доступны на русском и казахском. Турецкий интерфейс и переведённые разделы доступны, полный перевод уроков ещё готовится. Прогресс хранится в браузере на вашем устройстве.", "Сабақтар орыс және қазақ тілдерінде қолжетімді. Түрікше интерфейс пен аударылған бөлімдер бар, сабақтардың толық аудармасы әлі дайындалуда. Прогресс құрылғыңыздың браузерінде сақталады.", "Dersler Rusça ve Kazakça sunulmaktadır. Türkçe arayüz ve çevrilmiş bölümler kullanılabilir; derslerin tam Türkçe çevirisi henüz hazır değildir. İlerleme cihazınızın tarayıcısında saklanır."]))),
+    h("aside", { class: "info-callout" }, h("h2", {}, FT(["Учитесь и проверяйте чтение", "Оқып, оқуыңызды тексертіңіз", "Öğrenin ve okuyuşunuzu kontrol ettirin"])), h("p", {}, T("footer2"))),
+    h("div", { class: "row" }, infoLink("#/course", FT(["Перейти к курсу", "Курсқа өту", "Kursa git"]), "btn"), infoLink("#/sources", FT(["Наши источники", "Біздің дереккөздер", "Kaynaklarımız"]), "btn ghost")));
+}
+function pageSources(v, section) {
+  const wrap = infoHead(v, ["Источники и благодарности", "Дереккөздер мен алғыс", "Kaynaklar ve teşekkürler"], ["Откуда берутся тексты, переводы, аудио и фотографии на сайте.", "Сайттағы мәтін, аударма, аудио және фотолардың дереккөздері.", "Sitedeki metinlerin, meallerin, seslerin ve fotoğrafların kaynakları."]);
+  const sourceCard = (title, text, links) => h("section", { class: "info-source-card" }, h("h2", {}, FT(title)), h("p", {}, FT(text)), h("div", { class: "info-source-links" }, links.map(([url, label]) => infoLink(url, label + " ↗"))));
+  wrap.append(h("div", { class: "info-source-grid" },
+    sourceCard(["Текст Корана", "Құран мәтіні", "Kur'an metni"], ["Усманское письмо, риваят Хафс. Текст — Tanzil; файлы данных — Quran API. Цвета таджвида помогают заметить правила при чтении.", "Османдық жазу, Хафс риуаяты. Мәтін — Tanzil; деректер файлдары — Quran API. Тәжуид түстері оқуда ережелерді байқауға көмектеседі.", "Osmanî yazı, Hafs rivayeti. Metin Tanzil'den, veri dosyaları Quran API'den alınmıştır. Tecvid renkleri okurken kuralları fark etmeye yardımcı olur."], [["https://tanzil.net", "Tanzil"], ["https://github.com/fawazahmed0/quran-api", "Quran API"]]),
+    sourceCard(["Переводы смыслов", "Мағына аудармалары", "Mealler"], ["Русский — Эльмир Кулиев. Қазақша — Халифа Алтай. Türkçe — Diyanet İşleri Başkanlığı. Перевод помогает понять смысл и не заменяет арабский текст.", "Орысша — Эльмир Кулиев. Қазақша — Халифа Алтай. Түрікше — Diyanet İşleri Başkanlığı. Аударма мағынаны түсінуге көмектеседі және араб мәтінін алмастырмайды.", "Rusça: Elmir Kuliyev. Kazakça: Halife Altay. Türkçe: Diyanet İşleri Başkanlığı. Meal anlamayı kolaylaştırır; Arapça metnin yerini tutmaz."], [["https://alquran.cloud", "AlQuran Cloud"]]),
+    sourceCard(["Голоса чтецов", "Қарилардың дауыстары", "Kurraların sesleri"], ["Аудио аятов — EveryAyah. Пословное аудио — Quran.com. Полные записи сур — mp3quran.net.", "Аяттардың аудиосы — EveryAyah. Жеке сөздердің аудиосы — Quran.com. Сүрелердің толық жазбалары — mp3quran.net.", "Ayet sesleri EveryAyah, kelime sesleri Quran.com, tam sure kayıtları mp3quran.net kaynaklıdır."], [["https://everyayah.com", "EveryAyah"], ["https://quran.com", "Quran.com"], ["https://mp3quran.net", "mp3quran.net"]]),
+    sourceCard(["Дуа и азкары", "Дұға және зікірлер", "Dualar ve zikirler"], ["Используются материалы «Хиснуль-муслим». Источники хадисов указаны рядом с соответствующими текстами.", "«Хисну-л-муслим» материалдары пайдаланылады. Хадис дереккөздері тиісті мәтіндердің жанында көрсетілген.", "Hısnü'l-Müslim içeriklerinden yararlanılmıştır. Hadis kaynakları ilgili metinlerin yanında belirtilmiştir."], [["https://www.hisnmuslim.com", "Hisn al-Muslim"]])));
+  const photos = h("section", { class: "info-section", id: "photo-credits" }, h("h2", {}, FT(["Фото чтецов и лицензии", "Қарилардың фотолары және лицензиялар", "Kurra fotoğrafları ve lisanslar"])),
+    h("p", { class: "muted" }, FT(["Реальные фотографии из Wikimedia Commons. На сайте применены кадрирование и единое чёрно-белое оформление; исходники и условия использования доступны по ссылкам ниже.", "Wikimedia Commons мұрағатынан алынған нақты фотосуреттер. Сайтта кадрлау және бірыңғай ақ-қара өңдеу қолданылған; түпнұсқалар мен пайдалану шарттары төмендегі сілтемелерде.", "Wikimedia Commons'taki gerçek fotoğraflar kullanılmıştır. Sitede kadrajlama ve ortak siyah-beyaz görünüm uygulanır. Orijinaller ve kullanım koşulları aşağıdaki bağlantılardadır."])),
+    h("div", { class: "photo-credits-list" }, READERS.filter(r => r.img).map(r => h("article", { class: "photo-credit" },
+      h("div", { html: readerAva(r, "sm") }), h("div", {}, h("h3", {}, L({ ru: r.n[1], kk: r.n[0], tr: r.n[2] })),
+        h("p", {}, r.img[1] || FT(["Автор не установлен", "Авторы белгісіз", "Fotoğrafçı bilinmiyor"])),
+        infoLink(r.img[3], r.img[2] + " · Wikimedia Commons ↗"))))));
+  wrap.append(photos, h("aside", { class: "info-callout" }, h("p", {}, T("footer2"))));
+  if (section === "photos") routeDelay(() => photos.scrollIntoView({ block: "start" }), 0);
+}
+
 function shell() {
   document.body.innerHTML = "";
   const langSeg = h("div", { class: "lang", role: "group", "aria-label": T("language") },
@@ -559,10 +653,7 @@ function shell() {
   const top = h("header", { class: "top" }, brandEl(), h("a", { class: "chip", href: "#/me", id: "topstats", "aria-label": T("streak") }));
   const tabbar = h("nav", { class: "tabbar", "aria-label": T("menu") }, NAV.map(([href, k, ic]) => h("a", { href, "data-k": k, "aria-label": T(k), html: icon(ic) + `<span>${esc(T(k))}</span>` })));
   const main = h("main", { id: "view", tabindex: "-1" });
-  const ru = S.lang === "ru";
-  const credits = h("details", { class: "credits" }, h("summary", {}, LX("Фото чтецов: авторы и лицензии", "Қарилардың суреттері: авторлары мен лицензиялары", "Kurra fotoğrafları: sahipleri ve lisanslar")),
-    h("ul", {}, READERS.filter(r => r.img).map(r => h("li", { html: `${esc(L({ kk: r.n[0], ru: r.n[1], tr: r.n[2] }))} — ${r.img[1] ? esc(r.img[1]) + ", " : ""}<a href="${r.img[3]}" target="_blank" rel="noopener">${esc(r.img[2])}, Wikimedia Commons</a>` }))));
-  const foot = h("footer", { class: "site" }, h("p", {}, T("footer")), h("p", { style: "margin-top:6px" }, T("footer2")), credits);
+  const foot = siteFooter();
   document.body.append(side, top, main, foot, tabbar, toasts);
   document.documentElement.lang = LX("ru", "kk", "tr");
   document.title = LX("Iqra — учимся читать Коран с нуля", "Iqra — Құранды нөлден оқып үйрену", "Iqra — Kur'an okumayı sıfırdan öğreniyoruz");
@@ -651,6 +742,9 @@ async function route() {
     else if (p0 === "review") { markNav("learn"); await pageReview(view); }
     else if (p0 === "placement") { markNav("learn"); pagePlacement(view); }
     else if (p0 === "practice") { markNav("learn"); p1 ? pageTrainer(view, p1) : pagePractice(view); }
+    else if (p0 === "about") { markNav(""); pageAbout(view); }
+    else if (p0 === "faq") { markNav(""); pageFAQ(view); }
+    else if (p0 === "sources") { markNav(""); pageSources(view, p1); }
     else if (p0 === "me") { markNav("me"); pageMe(view); }
     else notFound(view);
   } catch (e) { console.error(e); notFound(view); }
@@ -1613,7 +1707,7 @@ function pageReaders(v) {
        <span class="rd-st">${r.v.map(([, st]) => `<i>${esc(L({ kk: STYLE[st][0], ru: STYLE[st][1], tr: STYLE[st][2] }).split(" — ")[0])}</i>`).join("")}</span></div><span class="go">${icon("arrow")}</span>` }));
   });
   v.append(g);
-  v.append(h("p", { class: "muted small", style: "margin-top:14px" }, LX("Аудио — mp3quran.net. Фото — Wikimedia Commons, под свободными лицензиями (авторы указаны на страницах чтецов).", "Аудио — mp3quran.net. Суреттер — Wikimedia Commons, еркін лицензиямен (авторлары қари беттерінде көрсетілген).", "Ses — mp3quran.net. Fotoğraflar — Wikimedia Commons, özgür lisanslarla.")));
+  v.append(h("p", { class: "muted small", style: "margin-top:14px" }, LX("Аудио — mp3quran.net. ", "Аудио — mp3quran.net. ", "Ses — mp3quran.net. "), infoLink("#/sources/photos", LX("Фото: источники и лицензии", "Фото: дереккөздер мен лицензиялар", "Fotoğraf kaynakları ve lisanslar"))));
 }
 function pageReader(v, id) {
   const r = READERS.find(x => x.id === id);
