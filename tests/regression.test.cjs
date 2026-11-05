@@ -133,6 +133,91 @@ class Element {
 const h = (...args) => new Element(...args);
 const L = value => typeof value === 'string' ? value : value?.ru || '';
 const ui = { h, L, LX: r => r, T: key => key, icon: () => '', esc: String, mdEl: x => h('p', {}, L(x)), mdInline: L, md: L };
+
+function backupHarness() {
+  return load(section('const BACKUP_FORMAT =', 'function profileLearningSummary('), {
+    KEY: 'test.progress', TextEncoder,
+    CORE: JSON.parse(fs.readFileSync(path.join(__dirname, '../data/core.json'))),
+    COURSE: JSON.parse(fs.readFileSync(path.join(__dirname, '../data/course.json'))),
+    BADGES: ['first', 'm1', 'm2', 'm3', 'm4', 's3', 's7', 's30', 't100', 'perfect', 'fatiha', 'hifz5'].map(k => [k])
+  });
+}
+function backupFixture() {
+  return { xp: 47, days: { '2026-11-05': 47 }, lessons: { 1: { done: true, at: '2026-11-05' } },
+    ex: { 'e1.12': 1, 't2.5': 1, 'c1.16.0': 1 }, tests: { '30.68': 90 }, badges: { first: '2026-11-05' },
+    hifz: { 1: { 1: true } }, hifzAwarded: { '1:1': true }, hifzBonus: { 1: true }, tr: { n: 7, ok: 6 },
+    last: { s: 112, a: 2 }, bm: { '112:2': 1793894400000 },
+    rv: { 'l:ب': { i: 2, due: '2026-11-12' }, 'r:qalqala': { i: -1, due: '2026-11-06' }, 'a:1:1': { i: 0, due: '2026-11-07' } },
+    exams: { 1: { best: 20, passed: true, at: '2026-11-05', score: 20 }, 2: { best: 14, passed: false, at: null, score: undefined } },
+    lessonSteps: { 2: 'practice' }, place: { lv: 2, at: '2026-11-05', sc: [90, 40, null, 0] }, placeFrom: 31, goal: 60,
+    tsb: { k: 1, day: '2026-11-05', d: { sub: 33 }, t: { sub: 99 }, vib: true, goal: '2026-11-05' },
+    zkFav: ['tawhid'], azk: { day: '2026-11-05', c: { ev_one: 'done' } }, duaG: 2,
+    lang: 'ru', theme: 'dark', city: { title: 'Private city', lat: 41 }, certName: 'Private name', off: { 1: { complete: true } } };
+}
+const plain = value => JSON.parse(JSON.stringify(value));
+test('backup: export/import preserves learning, review, bookmarks and award history without device or personal data', () => {
+  const ctx = backupHarness(), backup = ctx.makeProgressBackup(backupFixture());
+  const parsed = ctx.parseProgressBackup(JSON.stringify(backup));
+  assert.deepEqual(plain(parsed), plain(backup));
+  assert.equal(parsed.progress.rv['l:ب'].due, '2026-11-12');
+  assert.equal(parsed.progress.hifzAwarded['1:1'], true);
+  assert.equal(parsed.progress.exams[2].score, undefined);
+  for (const key of ['city', 'certName', 'off', 'lang', 'theme']) assert.equal(Object.hasOwn(parsed.progress, key), false);
+});
+test('backup: a beginner backup is valid and includes empty optional progress sections', () => {
+  const ctx = backupHarness();
+  const parsed = ctx.parseProgressBackup(JSON.stringify(ctx.makeProgressBackup({ xp: 0, lessons: {} })));
+  assert.equal(parsed.progress.xp, 0); assert.equal(Object.keys(parsed.progress.bm).length, 0);
+});
+test('backup: wrong files, future versions, invalid dates, scores and verse references are rejected', () => {
+  const ctx = backupHarness(), valid = plain(ctx.makeProgressBackup(backupFixture()));
+  assert.throws(() => ctx.parseProgressBackup('{bad'));
+  assert.throws(() => ctx.parseProgressBackup('{}'));
+  for (const mutate of [x => x.version = 2, x => x.progress.days = { '2026-02-31': 20 }, x => x.progress.xp = -1,
+    x => x.progress.lessons[111] = { done: true }, x => x.progress.last = { s: 112, a: 99 }, x => x.progress.tests['30.68'] = 101,
+    x => x.progress.tr.ok = 100, x => x.progress.off = { 1: { complete: true } }, x => x.progress.hifz[1][99] = true]) {
+    const changed = plain(valid); mutate(changed); assert.throws(() => ctx.parseProgressBackup(JSON.stringify(changed)));
+  }
+});
+test('backup: unsafe keys, oversized input and deeply nested input are rejected without prototype changes', () => {
+  const ctx = backupHarness(), valid = plain(ctx.makeProgressBackup(backupFixture()));
+  valid.progress.lessons = JSON.parse('{"__proto__":{"polluted":true}}');
+  assert.throws(() => ctx.parseProgressBackup(JSON.stringify(valid))); assert.equal({}.polluted, undefined);
+  assert.throws(() => ctx.parseProgressBackup('ب'.repeat(1024 * 1024 + 1)), e => e.code === 'size');
+  assert.throws(() => ctx.parseProgressBackup('['.repeat(10) + '0' + ']'.repeat(10)));
+});
+test('backup: preview parsing never mutates the current state or writes to storage', () => {
+  const ctx = backupHarness(), current = backupFixture(), before = JSON.stringify(current);
+  ctx.parseProgressBackup(JSON.stringify(ctx.makeProgressBackup({ xp: 0, lessons: {} })));
+  assert.equal(JSON.stringify(current), before);
+});
+test('backup: restore writes a recoverable previous copy and keeps device settings and audio caches', () => {
+  const ctx = backupHarness(), current = backupFixture(), incoming = ctx.makeProgressBackup({ xp: 20, lessons: { 2: { done: true, at: '2026-11-06' } } }).progress;
+  const values = new Map(), storage = { setItem: (k, v) => values.set(k, v) };
+  const next = ctx.restoreProgressBackup(storage, current, incoming);
+  assert.equal(next.xp, 20); assert.equal(next.lessons[1], undefined); assert.equal(next.lessons[2].done, true);
+  assert.equal(next.lang, current.lang); assert.deepEqual(next.city, current.city); assert.deepEqual(next.off, current.off);
+  assert.equal(current.xp, 47);
+  const previous = ctx.parseProgressBackup(values.get('iqra.progress-before-restore.v1'));
+  assert.equal(previous.progress.xp, 47); assert.equal(previous.progress.bm['112:2'], 1793894400000);
+  const undo = ctx.restoreProgressBackup(storage, next, previous.progress);
+  assert.deepEqual(plain(ctx.makeProgressBackup(undo).progress), plain(ctx.makeProgressBackup(current).progress));
+});
+test('backup: failed storage writes do not replace current progress', () => {
+  const ctx = backupHarness(), current = backupFixture(), original = JSON.stringify(current), incoming = ctx.makeProgressBackup({ xp: 0, lessons: {} }).progress;
+  for (const failAt of [1, 2]) {
+    let writes = 0; const values = new Map([['test.progress', original]]);
+    const storage = { setItem: (k, v) => { if (++writes === failAt) throw Error('quota'); values.set(k, v); } };
+    assert.throws(() => ctx.restoreProgressBackup(storage, current, incoming), /quota/);
+    assert.equal(values.get('test.progress'), original); assert.equal(JSON.stringify(current), original);
+  }
+});
+test('backup: restoring the same file twice does not add XP or discard prior reward flags', () => {
+  const ctx = backupHarness(), original = backupFixture(), incoming = ctx.makeProgressBackup(original).progress;
+  const storage = { setItem() {} }, next = ctx.restoreProgressBackup(storage, original, incoming);
+  const again = ctx.restoreProgressBackup(storage, next, incoming);
+  assert.equal(again.xp, 47); assert.equal(again.hifzAwarded['1:1'], true); assert.equal(again.hifzBonus[1], true);
+});
 test('placement: repeated unknown and option clicks score only one answer', () => {
   const timers = [], S = { lang: 'ru' }, v = h('main');
   const ctx = load(section('function pagePlacement(', '\nfunction pageTrainer('), {
