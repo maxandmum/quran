@@ -818,30 +818,35 @@ function menuFold(ic, title, text, body, open = false) {
 }
 async function pageHome(v) {
   const d = homeLearningState(), lesson = COURSE.lessons[d.n - 1], due = rvDue().length, mistakes = mistakeEntries(S).length;
-  v.append(pageHead(LX("Давай учиться", "Бірге үйренейік", "Birlikte öğrenelim"), LX("Начни с урока. Смотри, слушай и пробуй.", "Сабақтан баста. Қара, тыңда және орында.", "Dersle başla. Bak, dinle ve dene.")));
-  v.append(h("a", { class: "study-next simple-next", href: d.allDone ? "#/practice" : `#/lesson/${d.n}` },
-    h("div", { class: "study-next-top" }, h("span", { class: "study-eyebrow" }, d.allDone ? LX("Все уроки пройдены", "Барлық сабақ аяқталды", "Tüm dersler tamamlandı") : d.started ? LX("Твой следующий урок", "Келесі сабағың", "Sıradaki dersin") : LX("Начни здесь", "Осы жерден баста", "Buradan başla")), h("span", { class: "study-glyph", lang: "ar", "aria-hidden": "true" }, heroGlyph(lesson))),
-    h("h2", {}, d.allDone ? LX("Повторим изученное", "Үйренгенді қайталайық", "Öğrendiklerimizi tekrarlayalım") : L(lesson.title)),
-    h("p", {}, d.allDone ? LX("Выбери знакомые буквы или слова.", "Таныс әріптерді не сөздерді таңда.", "Bildiğin harfleri veya kelimeleri seç.") : LX(`Урок ${d.n} · можно заниматься понемногу`, `${d.n}-сабақ · аз-аздан оқуға болады`, `Ders ${d.n} · azar azar çalışabilirsin`)),
-    h("span", { class: "study-cta", html: icon("play") + esc(d.allDone ? LX("Повторить", "Қайталау", "Tekrar et") : d.started ? LX("Продолжить урок", "Сабақты жалғастыру", "Derse devam et") : LX("Начать первый урок", "Алғашқы сабақты бастау", "İlk derse başla")) })));
-  if (S.lang === "tr" && !d.allDone) v.append(h("p", { class: "muted small" }, "Ders içeriği Rusça ve Kazakça sunulmaktadır."));
-  v.append(menuGroup(LX("Ещё можно", "Тағы не істейміз", "Başka neler yapabilirsin"), null, h("div", { class: "menu-grid home-choices" },
-    menuCard("#/practice", "repeat", LX("Повторить", "Қайталау", "Tekrar et"), mistakes ? LX(`Есть задания для повторения: ${mistakes}`, `Қайталау тапсырмалары: ${mistakes}`, `Tekrar edilecek alıştırma: ${mistakes}`) : due ? LX(`Тебя ждут карточки: ${due}`, `Сені ${due} карточка күтуде`, `${due} kart seni bekliyor`) : LX("Задания с буквами и словами", "Әріптер мен сөздерді қайтала", "Harfleri ve kelimeleri çalış")),
-    menuCard("#/suras", "stand", LX("Коран", "Құран", "Kur'an"), LX("Читать, слушать и учить наизусть", "Оқу, тыңдау және жаттау", "Oku, dinle ve ezberle")),
-    menuCard("#/namaz", "mat", LX("Намаз и дуа", "Намаз бен дұға", "Namaz ve dua"), LX("Посмотри, как совершать намаз", "Намаз қалай оқылатынын көр", "Namazın nasıl kılındığını öğren")))));
-  const progress = h("div", { class: "simple-progress" },
-    h("div", { class: "simple-progress-line" }, h("span", {}, LX("Пройдено уроков", "Аяқталған сабақтар", "Tamamlanan dersler")), h("b", { class: "num" }, `${d.completed} / ${d.total}`)),
+  v.append(h("header", { class: "atelier-intro" }, h("span", { class: "atelier-kicker" }, "IQRA · " + LX("учиться каждый день", "күн сайын үйрену", "her gün öğren")),
+    h("h1", {}, LX("Учимся читать Коран", "Құран оқуды үйренеміз", "Kur'an okumayı öğreniyoruz")), h("p", {}, LX("От первой буквы — к уверенному чтению. В своём темпе.", "Алғашқы әріптен сенімді оқуға. Өз қарқыныңмен.", "İlk harften güvenle okumaya. Kendi hızında."))));
+  const lessonCard = h("a", { class: "atelier-lesson", href: d.allDone ? "#/practice" : `#/lesson/${d.n}` },
+    h("div", { class: "atelier-lesson-copy" }, h("span", { class: "atelier-eyebrow" }, d.allDone ? LX("Курс пройден", "Курс аяқталды", "Kurs tamamlandı") : d.started ? LX("Продолжим с этого места", "Осы жерден жалғастырайық", "Buradan devam edelim") : LX("Твой первый шаг", "Алғашқы қадамың", "İlk adımın")),
+      h("h2", {}, d.allDone ? LX("Сохраним навык чтения", "Оқу дағдысын сақтайық", "Okuma becerini koru") : L(lesson.title)),
+      h("p", {}, d.allDone ? LX("Вернись к знакомым буквам, словам и правилам.", "Таныс әріптерді, сөздер мен ережелерді қайтала.", "Bildiğin harfleri, kelimeleri ve kuralları tekrarla.") : LX("Посмотри объяснение. Послушай. Попробуй сам.", "Түсіндірмені қара. Тыңда. Өзің орында.", "Açıklamaya bak. Dinle. Kendin dene.")),
+      h("span", { class: "atelier-start", html: icon("play") + esc(d.allDone ? LX("Повторить", "Қайталау", "Tekrar et") : d.started ? LX("Продолжить урок", "Сабақты жалғастыру", "Derse devam et") : LX("Начать учиться", "Үйренуді бастау", "Öğrenmeye başla")) }),
+      h("small", { class: "atelier-lesson-number" }, LX(`Урок ${d.n} из ${d.total}`, `${d.total} сабақтың ${d.n}-і`, `${d.total} dersten ${d.n}. ders`))),
+    h("div", { class: "letter-arch", "aria-hidden": "true" }, h("span", { class: "letter-arch-orbit" }), h("span", { class: "letter-arch-glyph" + (heroGlyph(lesson).replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\s]/g, "").length > 1 ? " multi-letter" : ""), lang: "ar" }, heroGlyph(lesson)), h("span", { class: "letter-arch-caption" }, "اقرأ")));
+  const progress = h("aside", { class: "atelier-progress" }, h("div", { class: "atelier-progress-head" }, h("h2", {}, LX("Мой путь", "Менің жолым", "Yolculuğum")), h("a", { href: "#/me", "aria-label": LX("Открыть мой прогресс", "Прогресімді ашу", "İlerlememi aç"), html: icon("arrow") })),
+    h("div", { class: "atelier-progress-number" }, h("b", { class: "num" }, d.completed), h("span", {}, LX(`из ${d.total} уроков`, `${d.total} сабақтан`, `${d.total} dersten`))),
     h("progress", { class: "study-meter", max: d.total, value: d.completed, "aria-label": LX("Пройдено уроков", "Аяқталған сабақтар", "Tamamlanan dersler") }),
-    h("div", { class: "simple-progress-line" }, h("span", {}, LX("Очки за сегодня", "Бүгінгі ұпай", "Bugünkü puan")), h("b", { class: "num" }, `${d.points} / ${d.goal}`)),
-    h("progress", { class: "study-meter", max: d.goal, value: Math.min(d.points, d.goal), "aria-label": LX("Очки за сегодня", "Бүгінгі ұпай", "Bugünkü puan") }),
-    h("p", { class: "muted small" }, LX("Очки показывают твою практику. Урок завершён, когда выполнены все задания.", "Ұпай жаттығуыңды көрсетеді. Барлық тапсырма орындалғанда сабақ аяқталады.", "Puanlar çalışmanı gösterir. Tüm görevler bitince ders tamamlanır.")),
-    h("a", { class: "btn ghost", href: "#/me" }, LX("Мои успехи", "Жетістіктерім", "Başarılarım")));
-  v.append(menuFold("star", LX("Мои успехи", "Жетістіктерім", "Başarılarım"), LX(`Пройдено уроков: ${d.completed}`, `Аяқталған сабақ: ${d.completed}`, `Tamamlanan ders: ${d.completed}`), progress));
-  const daily = h("div", { class: "daily-group" }, ayahOfDay(),
-    menuCard("#/namaz/times", "clock", LX("Время намаза", "Намаз уақыты", "Namaz vakitleri"), LX("Посмотреть расписание", "Кестені көру", "Vakitlere bak")),
-    menuCard("#/zikr", "beads", LX("Зикр", "Зікір", "Zikir"), LX("Читать и считать зикры", "Зікір оқу және санау", "Zikir oku ve say")));
-  const ramadan = ramadanRow(); if (ramadan) daily.append(ramadan);
-  v.append(menuFold("sun", LX("На каждый день", "Күн сайын", "Her gün"), LX("Аят дня, время намаза и зикр", "Күн аяты, намаз уақыты мен зікір", "Günün ayeti, namaz vakitleri ve zikir"), daily));
+    h("p", {}, d.started ? LX("Каждый пройденный урок — ещё один шаг вперёд.", "Әр аяқталған сабақ — алға жасалған қадам.", "Bitirdiğin her ders ileriye bir adım.") : LX("Большой путь начинается с одной буквы.", "Үлкен жол бір әріптен басталады.", "Büyük yolculuk bir harfle başlar.")),
+    h("a", { class: "atelier-today", href: "#/me" }, h("span", { html: icon("flame"), "aria-hidden": "true" }), h("span", {}, LX("Сегодня", "Бүгін", "Bugün")), h("b", { class: "num" }, `${d.points} / ${d.goal}`), h("small", {}, LX("очков", "ұпай", "puan"))));
+  v.append(h("div", { class: "atelier-top" }, lessonCard, progress));
+  if (S.lang === "tr" && !d.allDone) v.append(h("p", { class: "muted small" }, "Ders içeriği Rusça ve Kazakça sunulmaktadır."));
+  const modules = h("ol", { class: "learning-rail", "aria-label": LX("Путь обучения", "Оқу жолы", "Öğrenme yolu") }, COURSE.modules.map((m, i) => h("li", {},
+    h("a", { class: d.module?.id === m.id ? "current" : "", href: `#/course#m${m.id}` }, h("span", { class: "rail-number" }, String(i + 1).padStart(2, "0")), h("span", {}, h("b", {}, L(m.title)), h("small", {}, LX(`Уроки ${m.from}–${m.to}`, `${m.from}–${m.to}-сабақтар`, `Dersler ${m.from}–${m.to}`))), h("i", { "aria-hidden": "true", html: icon("chev") })))));
+  v.append(modules);
+  const portal = (href, cls, art, title, sub, note) => h("a", { class: "home-portal " + cls, href },
+    h("div", { class: "portal-art", "aria-hidden": "true" }, art), h("div", { class: "portal-copy" }, h("h2", {}, title), h("p", {}, sub)),
+    h("div", { class: "portal-foot" }, h("span", {}, note), h("i", { html: icon("arrow"), "aria-hidden": "true" })));
+  v.append(h("div", { class: "home-portals" },
+    portal("#/practice", "portal-practice", h("span", { lang: "ar" }, "أ ب"), LX("Попробуй сам", "Өзің орында", "Kendin dene"), LX("Буквы, слова и маленькие открытия.", "Әріптер, сөздер және шағын жаңалықтар.", "Harfler, kelimeler ve küçük keşifler."), mistakes ? LX(`Повторить задания: ${mistakes}`, `Қайталау тапсырмалары: ${mistakes}`, `Tekrar edilecek: ${mistakes}`) : due ? LX(`Карточек на сегодня: ${due}`, `Бүгінгі карточкалар: ${due}`, `Bugünkü kartlar: ${due}`) : LX("Открыть практику", "Жаттығуды ашу", "Alıştırmaları aç")),
+    portal("#/suras", "portal-quran", h("span", { lang: "ar" }, "القرآن"), LX("Читай и слушай", "Оқы және тыңда", "Oku ve dinle"), LX("Коран рядом. Найди свою суру и продолжи.", "Құран жаныңда. Сүреңді тауып, жалғастыр.", "Kur'an yanında. Sureni bul ve devam et."), LX("Открыть Коран", "Құранды ашу", "Kur'an'ı aç")),
+    portal("#/namaz", "portal-namaz", h("span", { class: "portal-mat", html: icon("mat") }), LX("Время для намаза", "Намаз уақыты", "Namaz vakti"), LX("Движения, слова и дуа. Шаг за шагом.", "Қимылдар, сөздер және дұға. Қадам-қадаммен.", "Hareketler, sözler ve dualar. Adım adım."), LX("Как совершать намаз", "Намаз қалай оқылады", "Namaz nasıl kılınır"))));
+  v.append(h("section", { class: "home-daily" }, h("div", { class: "atelier-section-head" }, h("h2", {}, LX("Остановись на одном аяте", "Бір аятқа назар аудар", "Bir ayet üzerinde dur")), h("span", {}, LX("Почитай. Послушай. Повтори.", "Оқы. Тыңда. Қайтала.", "Oku. Dinle. Tekrar et."))), ayahOfDay()));
+  const dailyLinks = h("div", { class: "daily-inline" }, h("a", { href: "#/zikr", html: icon("beads") + esc(LX("Зикр на каждый день", "Күнделікті зікір", "Günlük zikir")) }), h("a", { href: "#/namaz/times", html: icon("clock") + esc(LX("Расписание намаза", "Намаз кестесі", "Namaz vakitleri")) }));
+  const ramadan = ramadanRow(); if (ramadan) dailyLinks.append(ramadan); v.append(dailyLinks);
 }
 
 
@@ -2238,20 +2243,34 @@ async function pageNamaz(v, sub) {
   if (sub === "duas") return nzDuas(v);
   if (sub === "ramadan") return nzRamadan(v);
   if (sub) return notFound(v);
-  v.append(pageHead(LX("Намаз и дуа", "Намаз бен дұға", "Namaz ve dua"), LX("Ханафитский мазхаб · выбери, что нужно сейчас", "Ханафи мазһабы · қазір керегін таңда", "Hanefi mezhebi · şimdi ihtiyacın olanı seç")));
-  v.append(menuGroup(LX("Учиться намазу", "Намазды үйрену", "Namazı öğren"), LX("Начни с пошаговой инструкции.", "Қадамдық нұсқаулықтан баста.", "Adım adım anlatımla başla."),
-    menuCard("#/namaz/how", "mat", LX("Как совершать намаз", "Намаз қалай оқылады", "Namaz nasıl kılınır"), LX("Движения и слова — по порядку", "Қимылдар мен сөздер — ретімен", "Hareketler ve sözler sırayla"), LX("Начни здесь", "Осы жерден баста", "Buradan başla")),
-    h("div", { class: "menu-grid" }, menuCard("#/namaz/read", "learn", LX("Что читать в намазе", "Намазда не оқылады", "Namazda ne okunur"), LX("Все нужные тексты с аудио", "Аудиосы бар қажетті мәтіндер", "Gerekli metinler ve sesleri")),
-      menuCard("#/namaz/prayers", "sun", LX("Пять намазов", "Бес уақыт намаз", "Beş vakit namaz"), LX("Сколько ракаатов совершать", "Неше рәкағат оқу керек", "Kaç rekât kılınır")))));
-  v.append(menuGroup(LX("Время намаза", "Намаз уақыты", "Namaz vakitleri"), null, nextPrayerCard()));
-  v.append(menuGroup(LX("После намаза", "Намаздан кейін", "Namazdan sonra"), null, h("div", { class: "menu-grid" },
-    menuCard("#/namaz/after", "stand", LX("Аят аль-Курси и дуа", "Аятул-Күрси мен дұға", "Âyetü'l-Kürsî ve dua"), LX("Что читать после намаза", "Намаздан кейін не оқылады", "Namazdan sonra ne okunur")),
-    menuCard("#/namaz/witr", "moon", LX("Витр и дуа «Кунут»", "Үтір мен «Құнут» дұғасы", "Vitir ve Kunut duası"), LX("Порядок и текст дуа", "Реті және дұға мәтіні", "Sırası ve dua metni")))));
-  v.append(menuGroup(LX("Дуа и зикр", "Дұға мен зікір", "Dua ve zikir"), null, h("div", { class: "menu-grid" },
-    menuCard("#/namaz/duas", "learn", LX("Дуа на каждый день", "Күнделікті дұғалар", "Günlük dualar"), LX("Перед едой, сном и выходом из дома", "Тамақ, ұйқы және үйден шығар алдында", "Yemekten, uykudan ve evden çıkmadan önce")),
-    menuCard("#/zikr", "beads", LX("Читать зикры", "Зікір оқу", "Zikir oku"), LX("Утром, вечером и в течение дня", "Таңертең, кешке және күндіз", "Sabah, akşam ve gün içinde")))));
-  const ramadan = ramadanRow(); if (ramadan) v.append(ramadan);
-  v.append(menuFold("bulb", LX("Об этом разделе", "Бұл бөлім туралы", "Bu bölüm hakkında"), LX("Пояснения к обучению намазу", "Намазды үйренуге түсіндірме", "Namaz öğrenimi hakkında"), mdEl(d.intro)));
+  v.append(pageHead(T("namaz"), LX("Ханафитский мазхаб · шаг за шагом", "Ханафи мазһабы · қадам-қадаммен", "Hanefi mezhebi · adım adım")), nextPrayerCard());
+  { const r = ramadanRow(); if (r) v.append(r); }
+  const poses = h("span", { class: "nz-poses" });
+  const drawP = () => { poses.innerHTML = ["qiyam", "ruku", "sujud", "julus"].map(k => `<span class="nz-pose"><span class="pz">${poseSVG(k)}</span><small>${esc(L({ kk: POSE_NAMES[k][0], ru: POSE_NAMES[k][1], tr: POSE_NAMES[k][2] }))}</small></span>`).join(""); };
+  drawP();
+  v.append(h("div", { class: "nz-hero" },
+    h("a", { class: "nz-hero-h", href: "#/namaz/how", html: `<span><b>${esc(LX("Как совершать намаз", "Намаз қалай оқылады", "Namaz nasıl kılınır"))}</b><small>${d.steps.length} ${esc(LX("шагов: что читать и когда", "қадам: не және қашан оқылады", "adım: ne ve ne zaman okunur"))}</small></span><span class="go">${icon("chev")}</span>` }),
+    genderSeg(drawP), h("a", { class: "nz-poses-a", href: "#/namaz/how", "aria-label": LX("Пошаговая инструкция", "Қадамдық нұсқаулық", "Adım adım anlatım") }, poses)));
+
+  const fardOf = p => (p.r.find(([k]) => k === "f") || [0, 0])[1];
+  v.append(shelf(LX("Пять намазов", "Бес уақыт намаз", "Beş vakit namaz"), LX("ракааты фарда", "парыз рәкағаттары", "farz rekâtları")),
+    h("div", { class: "nz-five" }, d.prayers.map(p => h("a", { href: "#/namaz/prayers", html: `<b class="num">${fardOf(p)}</b><small>${esc(prayerName(p))}</small>` }))));
+
+  const firstW = s => String(s).split(/\s+/)[0];
+  v.append(shelf(LX("Что читать в намазе", "Намазда не оқылады", "Namazda ne okunur"), LX("все тексты →", "барлық мәтін →", "tüm metinler →"), "#/namaz/read"),
+    h("div", { class: "nz-rlist" }, [[L(d.texts.sana.t), firstW(d.texts.sana.ar)], [LX("Аль-Фатиха", "Әл-Фатиха", "Fâtiha"), "ٱلْحَمْدُ"], [L(d.texts.tashahhud.t), firstW(d.texts.tashahhud.ar)]].map(([t, ar], i) =>
+      h("a", { href: "#/namaz/read", html: `<i>${i + 1}</i><b>${esc(t)}</b><span class="ar" lang="ar">${esc(ar)}</span>` }))));
+
+  // после намаза — Аят аль-Курси и витр; счётчик зикров живёт в одном месте — в разделе «Зикр»
+  v.append(shelf(LX("После намаза", "Намаздан кейін", "Namazdan sonra")),
+    h("div", { class: "nz-after" },
+      h("a", { class: "glass", href: "#/namaz/after", html: `<span class="t-ic ar" lang="ar">ٱللَّهُ</span><span><b>${esc(LX("Аят аль-Курси", "Аятул-Күрси", "Âyetü'l-Kürsî"))}</b><small>${esc(LX("истигфар и дуа", "истиғфар мен дұға", "istiğfar ve dua"))}</small></span>` }),
+      h("a", { class: "glass", href: "#/namaz/witr", html: `<span class="t-ic solid">${icon("moon")}</span><span><b>${esc(LX("Витр", "Үтір", "Vitir"))}</b><small>${esc(LX("и дуа «Кунут»", "және «Құнут» дұғасы", "ve Kunut duası"))}</small></span>` })));
+  v.append(shelf(LX("Зикр и дуа", "Зікір мен дұға", "Zikir ve dua")),
+    h("div", { class: "nz-after" },
+      h("a", { class: "glass", href: "#/zikr", html: `<span class="t-ic solid">${icon("beads")}</span><span><b>${esc(LX("Зикр", "Зікір", "Zikir"))}</b><small class="num">${esc(tsbTotal() ? fmtN(tsbTotal()) : LX("тасбих и азкары", "тәсбих пен зікірлер", "tesbih ve ezkâr"))}</small></span>` }),
+      h("a", { class: "glass", href: "#/namaz/duas", html: `<span class="t-ic solid">${icon("learn")}</span><span><b>${esc(LX("Дуа на каждый день", "Күнделікті дұғалар", "Her gün için dualar"))}</b><small>${esc(LX("Сон, дом, еда, мечеть", "Ұйқы, үй, тамақ, мешіт", "Uyku, ev, yemek, cami"))}</small></span>` })),
+    h("div", { class: "box tip nz-note" }, mdEl(d.intro)));
 }
 function nzHow(v, d) {
   const ru = S.lang === "ru";
@@ -3082,21 +3101,26 @@ function practiceGroups() {
   ];
 }
 function pagePractice(v) {
-  v.append(pageHead(LX("Повторить", "Қайталау", "Tekrar et"), LX("Выбери одну тему и попробуй выполнить задания.", "Бір тақырыпты таңдап, тапсырмаларды орында.", "Bir konu seç ve alıştırmaları dene."), learnTabs("practice")));
-  const recall = menuGroup(LX("Вспомнить пройденное", "Үйренгенді еске түсіру", "Öğrendiklerini hatırla"), null, rvCard(), mistakesCard());
-  const hasRecall = rvPool().length > 0 || mistakeEntries(S).length > 0;
-  if (hasRecall) v.append(recall);
-  const trainers = menuGroup(LX("Выбрать тему", "Тақырып таңдау", "Konu seç"), LX("В каждой тренировке — 10 заданий.", "Әр жаттығуда 10 тапсырма бар.", "Her çalışmada 10 alıştırma var."));
+  v.append(pageHead(LX("Попробуй сам", "Өзің орында", "Kendin dene"), LX("Выбери, что потренировать: буквы, слова или правила.", "Нені жаттықтыратыныңды таңда: әріптер, сөздер не ережелер.", "Çalışmak istediğini seç: harfler, kelimeler veya kurallar."), learnTabs("practice")));
+  const due = rvDue().length, mistakes = mistakeEntries(S).length;
+  if (due || mistakes) v.append(h("div", { class: "practice-recall" },
+    due ? h("a", { href: "#/review" }, h("span", { html: icon("repeat"), "aria-hidden": "true" }), h("b", {}, LX("Вспомнить пройденное", "Үйренгенді еске түсіру", "Öğrendiklerini hatırla")), h("strong", { class: "num" }, due), h("span", { html: icon("chev"), "aria-hidden": "true" })) : null,
+    mistakes ? h("a", { href: "#/mistakes/train" }, h("span", { html: icon("target"), "aria-hidden": "true" }), h("b", {}, LX("Попробовать ещё раз", "Тағы бір рет орындау", "Bir daha dene")), h("strong", { class: "num" }, mistakes), h("span", { html: icon("chev"), "aria-hidden": "true" })) : null));
+  const samples = { letters: "ب", lookalike: "ب ت ث", forms: "بـ ـبـ ـب", harakat: "بَ بِ بُ", listen: "sound", read: "كَتَبَ", build: "ك ت ب", tajweed: "نْ", madd: "آ" };
   practiceGroups().forEach((group, i) => {
-    const grid = h("div", { class: "menu-grid trainer-choices" }, group.ids.map(id => {
+    const shelf = h("section", { class: "practice-shelf shelf-" + i },
+      h("header", { class: "practice-shelf-head" }, h("span", { class: "shelf-number", "aria-hidden": "true" }, String(i + 1).padStart(2, "0")), h("div", {}, h("h2", {}, group.title), h("p", {}, group.text))));
+    shelf.append(h("div", { class: "exercise-gallery count-" + group.ids.length }, group.ids.map(id => {
       const tr = TRAINERS.find(t => t.id === id);
-      return menuCard(`#/practice/${id}`, group.icon, L({ kk: tr.t[0], ru: tr.t[1], tr: tr.t[2] }), L({ kk: tr.d[0], ru: tr.d[1], tr: tr.d[2] }));
-    }));
-    trainers.append(menuFold(group.icon, group.title, group.text, grid, i === 0));
+      return h("a", { class: "exercise-tile tile-" + id, href: `#/practice/${id}` },
+        h("div", { class: "exercise-sample", "aria-hidden": "true" }, id === "listen" ? h("span", { html: icon("sound") }) : h("span", { lang: "ar" }, samples[id])),
+        h("div", { class: "exercise-copy" }, h("h3", {}, L({ kk: tr.t[0], ru: tr.t[1], tr: tr.t[2] })), h("p", {}, L({ kk: tr.d[0], ru: tr.d[1], tr: tr.d[2] }))),
+        h("span", { class: "exercise-open", "aria-hidden": "true", html: icon("arrow") }));
+    })));
+    v.append(shelf);
   });
-  v.append(trainers);
-  if (!hasRecall) v.append(menuFold("repeat", LX("Повторение уроков", "Сабақтарды қайталау", "Ders tekrarı"), LX("Карточки и задания, где нужна помощь", "Карточкалар мен көмек қажет тапсырмалар", "Kartlar ve yardım gereken alıştırmalar"), recall));
-  v.append(menuCard("#/suras/hifz", "stand", LX("Учить суру наизусть", "Сүрені жаттау", "Sure ezberle"), LX("Суры для заучивания находятся в разделе «Коран»", "Жаттайтын сүрелер «Құран» бөлімінде", "Ezberlenecek sureler Kur'an bölümünde")));
+  v.append(h("div", { class: "practice-end" }, h("p", {}, LX("Одна тренировка — 10 заданий. Выбирай то, что интересно сейчас.", "Бір жаттығу — 10 тапсырма. Қазір қызық болғанын таңда.", "Bir çalışma 10 alıştırma. Şimdi ilgini çekeni seç.")),
+    h("div", {}, h("a", { href: "#/mistakes" }, LX("Мои ошибки и повторение", "Қателерім мен қайталау", "Hatalarım ve tekrar")), h("a", { href: "#/suras/hifz" }, LX("Учить суру наизусть", "Сүрені жаттау", "Sure ezberle")))));
 }
 function pageHifz(v) {
   v.append(pageHead(LX("Учить наизусть", "Жаттау", "Ezberle"), LX("Выбери суру. Слушай, повторяй и проверяй себя.", "Сүрені таңда. Тыңда, қайтала және өзіңді тексер.", "Bir sure seç. Dinle, tekrarla ve kendini kontrol et."), quranTabs("hifz")));
@@ -3653,9 +3677,8 @@ function pageMe(v) {
   [...BADGES].sort((a, b) => (!!S.badges[b[0]]) - (!!S.badges[a[0]])).forEach(([id, , nm, desc]) =>
     aw.append(h("div", { class: "award" + (S.badges[id] ? " on" : ""), html: `<span class="aw-ic">${S.badges[id] ? badgeIcon(id) : icon("lock")}</span><b>${esc(L({ kk: nm[0], ru: nm[1], tr: nm[2] }))}</b><small>${esc(L({ kk: desc[0], ru: desc[1], tr: desc[2] }))}</small>` })));
   [...aw.children].forEach((x, i) => { if (i >= 6) x.classList.add("far"); });
-  const awards = h("section", { class: "card" }, h("div", { class: "card-h" }, h("h2", {}, LX("Награды", "Марапаттар", "Ödüller")), h("span", { class: "muted small" }, `${got} ${LX("из", "/", "/")} ${BADGES.length}`)), aw,
-    h("button", { class: "pm-more", onclick: e => { aw.classList.add("all"); e.currentTarget.remove(); } }, LX("Все награды", "Барлық марапаттар", "Tüm ödüller")));
-  wrap.append(menuFold("star", LX("Мои награды", "Марапаттарым", "Ödüllerim"), LX(`Получено: ${got} из ${BADGES.length}`, `Алынды: ${got} / ${BADGES.length}`, `Kazanılan: ${got} / ${BADGES.length}`), awards));
+  wrap.append(h("section", { class: "card" }, h("div", { class: "card-h" }, h("h2", {}, LX("Награды", "Марапаттар", "Ödüller")), h("span", { class: "muted small" }, `${got} ${LX("из", "/", "/")} ${BADGES.length}`)), aw,
+    h("button", { class: "pm-more", onclick: e => { aw.classList.add("all"); e.currentTarget.remove(); } }, LX("Все награды", "Барлық марапаттар", "Tüm ödüller"))));
   // неделя и цель
   const days = S.lang === "ru" ? UI.dayNames[1] : S.lang === "tr" ? UI.dayTr : UI.dayNames[0];
   const wk = h("div", { class: "week" });
@@ -3667,12 +3690,12 @@ function pageMe(v) {
     wk.append(h("div", { class: k === today() ? "today" : "", html: `<i><b style="height:${Math.min(100, x / S.goal * 100)}%"></b></i>${days[i]}` }));
   }
   const goalSeg = h("div", { class: "seg" }, [[15, "goals"], [30, "goalm"], [60, "goalh"]].map(([g, k]) => h("button", { "aria-pressed": String(S.goal === g), onclick: () => { S.goal = g; save(); route(); } }, `${T(k)} · ${g}`)));
-  wrap.append(menuFold("clock", LX("Мои занятия", "Сабақтарым", "Çalışmalarım"), LX("Дни занятий и цель на день", "Оқу күндері мен күндік мақсат", "Çalışma günleri ve günlük hedef"), h("section", { class: "card stack" }, h("h2", {}, T("week")), wk, h("h3", {}, T("dailyGoal")), goalSeg)));
+  wrap.append(h("section", { class: "card stack" }, h("h2", {}, T("week")), wk, h("h3", {}, T("dailyGoal")), goalSeg));
   // напоминание и настройки — свёрнутыми пунктами
   const fold = (ic, title, sub, node) => { const d = h("details", { class: "acc-i me-f" }, h("summary", { html: `<i>${icon(ic)}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span>${icon("chev")}` }), node); return d; };
   const rc = remindCard("lesson"); rc.classList.add("bare");
   wrap.append(fold("bell", LX("Напоминание об уроке", "Сабақ туралы еске салу", "Ders hatırlatıcısı"), LX("Выбрать время напоминания", "Еске салу уақытын таңдау", "Hatırlatma saatini seç"), rc));
-  wrap.append(menuFold("download", LX("Сохранить или перенести прогресс", "Прогресті сақтау немесе көшіру", "İlerlemeyi kaydet veya taşı"), LX("Копия для другого телефона или компьютера", "Басқа телефонға не компьютерге көшірме", "Başka telefon veya bilgisayar için yedek"), progressBackupCard()));
+  wrap.append(menuFold("download", LX("Сохранить или перенести прогресс", "Прогресті сақтау немесе көшіру", "İlerlemeyi kaydet veya taşı"), LX("Копия для другого устройства", "Басқа құрылғыға көшірме", "Başka cihaz için yedek"), progressBackupCard()));
   // настройки
   const themeSeg = h("div", { class: "seg" }, [["light", "light"], ["dark", "dark"], ["system", "system"]].map(([th, k]) => h("button", { "aria-pressed": String((S.theme || "light") === th), onclick: () => { S.theme = th; save(); applyTheme(); shell(); route(); } }, T(k))));
   const langSeg = h("div", { class: "seg" }, [["kk", "Қазақша"], ["ru", "Русский"], ["tr", "Türkçe"]].map(([l, t]) => h("button", { "aria-pressed": String(S.lang === l), onclick: () => setLang(l) }, t)));
@@ -3684,7 +3707,7 @@ function pageMe(v) {
     h("div", { class: "setrow" }, h("span", {}, T("theme")), themeSeg),
     arzRow(),
     h("p", { class: "muted small" }, AUTH.user ? T("synced") : T("savedHere")),
-    menuFold("alert", LX("Для взрослых: удалить прогресс", "Ересектерге: прогресті өшіру", "Yetişkinler için: ilerlemeyi sil"), LX("Потребуется подтверждение", "Растау қажет", "Onay gerekir"), h("div", {}, h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = false }, T("resetAll")), confirmBox)))));
+    menuFold("alert", LX("Удаление прогресса", "Прогресті өшіру", "İlerlemeyi sil"), LX("Потребуется подтверждение", "Растау қажет", "Onay gerekir"), h("div", {}, h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = false }, T("resetAll")), confirmBox)))));
   v.append(wrap);
 }
 

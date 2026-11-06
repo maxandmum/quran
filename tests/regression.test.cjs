@@ -529,22 +529,37 @@ test('organization: memorization selector preserves all short surahs and priorit
   assert.equal(links.length, CORE.suras.filter(s => s.n === 1 || s.n >= 93 && s.c <= 11).length);
   assert.ok(v.all().some(x => x.tag === 'a' && x.attrs.href === '#/suras'));
 });
-test('organization: home has one next lesson action, three destinations and closed secondary groups', async () => {
+test('design: home preserves next lesson and progress with open destinations', async () => {
   for (const [n, completed, allDone] of [[1, 0, false], [2, 1, false], [110, 110, true]]) {
     const c = load(menuHelpers() + section('async function pageHome(', '/* ═════════════ карта курса'), {
-      ...ui, S: { lang: 'ru' }, COURSE: { lessons: Array.from({ length: 110 }, (_, i) => ({ n: i + 1, title: `Lesson ${i + 1}` })) },
+      ...ui, S: { lang: 'ru' }, COURSE: { lessons: Array.from({ length: 110 }, (_, i) => ({ n: i + 1, title: `Lesson ${i + 1}` })), modules: [{ id: 1, title: 'Alphabet', from: 1, to: 30 }] },
       homeLearningState: () => ({ n, completed, allDone, started: completed > 0, total: 110, points: 12, goal: 30 }),
       rvDue: () => [], mistakeEntries: () => [], heroGlyph: () => 'ا',
       pageHead: (title, sub) => h('header', {}, h('h1', {}, title), h('p', {}, sub)),
       ayahOfDay: () => h('div', {}, 'Daily ayah'), ramadanRow: () => null
     });
     const v = h('main'); await c.pageHome(v);
-    const primary = v.all().filter(x => x.className === 'study-next simple-next');
+    const primary = v.all().filter(x => x.className === 'atelier-lesson');
     assert.equal(primary.length, 1); assert.equal(primary[0].attrs.href, allDone ? '#/practice' : `#/lesson/${n}`);
-    const choices = v.all().find(x => x.className === 'menu-grid home-choices');
+    const choices = v.all().find(x => x.className === 'home-portals');
     assert.deepEqual(choices.children.map(x => x.attrs.href), ['#/practice', '#/suras', '#/namaz']);
     const folds = v.all().filter(x => x.tag === 'details');
-    assert.equal(folds.length, 2); assert.ok(folds.every(x => x.attrs.open === null));
-    assert.match(v.textContent, new RegExp(`${completed} / 110`));
+    assert.equal(folds.length, 0);
+    assert.ok(v.all().some(x => x.tag === 'progress' && x.attrs.max === 110 && x.attrs.value === completed));
+  }
+});
+test('design: all nine exercise choices stay open and recall only appears when available', () => {
+  const ids = ['letters', 'lookalike', 'forms', 'harakat', 'listen', 'read', 'build', 'tajweed', 'madd'];
+  for (const hasRecall of [false, true]) {
+    const c = load(section('function practiceGroups()', 'function pageHifz('), {
+      ...ui, S: {}, TRAINERS: ids.map(id => ({ id, t: [id, id, id], d: ['description', 'description', 'description'] })),
+      rvDue: () => hasRecall ? ['a', 'b'] : [], mistakeEntries: () => hasRecall ? ['x'] : [],
+      pageHead: title => h('h1', {}, title), learnTabs: () => null
+    });
+    const v = h('main'); c.pagePractice(v);
+    assert.equal(v.all().filter(x => x.tag === 'details').length, 0);
+    assert.deepEqual(v.all().filter(x => x.tag === 'a' && /^#\/practice\//.test(x.attrs.href)).map(x => x.attrs.href).sort(), ids.map(id => '#/practice/' + id).sort());
+    assert.equal(v.all().some(x => x.tag === 'a' && x.attrs.href === '#/review'), hasRecall);
+    assert.equal(v.all().some(x => x.tag === 'a' && x.attrs.href === '#/mistakes/train'), hasRecall);
   }
 });
