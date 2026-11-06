@@ -1887,7 +1887,7 @@ async function pageSura(v, n, hifz, goto) {
   try { d = await loadSura(n); } catch (e) { loading.textContent = T("audioErr"); return; }
   if (!v.isConnected) return;
   loading.remove();
-  const wrap = h("div", { class: "read reader-view" });
+  const wrap = h("div", { class: "read reader-view " + (hifz ? "memorization-view" : "reading-book") });
   wrap.append(h("div", { class: "crumbs", html: `<a href="${hifz ? "#/suras/hifz" : "#/suras"}">${esc(T("suras"))}</a><span>·</span><span>${s.n}</span>` }),
     h("div", { class: "shead" },
       h("div", {}, h("h1", {}, L(s.name)), h("p", { class: "muted" }, `${ayatN(s.c)} · ${T(s.p === "m" ? "mecca" : "medina")}`, isOff(n) ? h("span", { class: "off-pill", html: icon("download") + esc(LX("офлайн", "офлайн", "çevrimdışı")) }) : null)),
