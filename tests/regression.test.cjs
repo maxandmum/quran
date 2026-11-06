@@ -294,7 +294,7 @@ test('lesson: restored completion includes exercises, tracing and tests and gate
   await ctx.pageLesson(v, 1);
   const practice = v.all().find(x => x.attrs.id === 'lesson-1-practice');
   assert.equal(practice.hidden, false);
-  v.all().find(x => x.tag === 'button' && x.textContent === '1Разбор').onclick();
+  v.all().find(x => x.tag === 'button' && x.textContent === '1Объяснение').onclick();
   assert.equal(S.lessonSteps[1], 'theory');
   const finish = v.all().find(x => x.className.includes('lesson-finish'));
   assert.equal(finish.disabled, true);
@@ -500,4 +500,51 @@ test('mistakes: quiz questions are tracked under original lesson/block/question 
   const el = c.testEl({ items: [{}, {}], pass: 70 }, '30.68', { n: 30 });
   answer(el, 'testStart'); answer(el, 'answer'); el.all().find(x => x.className === 'btn test-next').onclick();
   assert.deepEqual(refs, ['q:30:68:0', 'q:30:68:1']);
+});
+
+const menuHelpers = () => section('function menuCard(', 'async function pageHome(');
+test('organization: all nine existing trainers belong to exactly one labelled group', () => {
+  const c = load(section('function practiceGroups()', 'function pagePractice('), ui);
+  const ids = c.practiceGroups().flatMap(g => Array.from(g.ids));
+  const actual = Array.from(section('const TRAINERS =', 'function practiceGroups()').matchAll(/\{ id: "([a-z]+)"/g), m => m[1]);
+  assert.deepEqual([...ids].sort(), actual.sort()); assert.equal(new Set(ids).size, ids.length);
+  assert.equal(c.practiceGroups().length, 3);
+});
+test('organization: Quran memorization route reaches its selector and unknown modes remain 404', () => {
+  let opened = 0, missing = 0;
+  const c = load(section('function pageSuras(', 'function ayahBlock('), { pageHifz: () => opened++, notFound: () => missing++ });
+  c.pageSuras({}, 'hifz'); c.pageSuras({}, 'unknown');
+  assert.equal(opened, 1); assert.equal(missing, 1);
+});
+test('organization: memorization selector preserves all short surahs and prioritizes started ones', () => {
+  const CORE = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/core.json')));
+  const c = load(menuHelpers() + section('function pageHifz(', '/* ═════════════ повторение:'), {
+    ...ui, S: { hifz: { 112: { 1: '2026-11-06' } } }, CORE,
+    pageHead: title => h('h1', {}, title), quranTabs: () => null,
+    suraItem: (s, href) => h('a', { href }, s.n)
+  });
+  const v = h('main'); c.pageHifz(v);
+  const links = v.all().filter(x => x.tag === 'a' && /#\/sura\/\d+\/hifz/.test(x.attrs.href));
+  assert.equal(links[0].attrs.href, '#/sura/112/hifz');
+  assert.equal(links.length, CORE.suras.filter(s => s.n === 1 || s.n >= 93 && s.c <= 11).length);
+  assert.ok(v.all().some(x => x.tag === 'a' && x.attrs.href === '#/suras'));
+});
+test('organization: home has one next lesson action, three destinations and closed secondary groups', async () => {
+  for (const [n, completed, allDone] of [[1, 0, false], [2, 1, false], [110, 110, true]]) {
+    const c = load(menuHelpers() + section('async function pageHome(', '/* ═════════════ карта курса'), {
+      ...ui, S: { lang: 'ru' }, COURSE: { lessons: Array.from({ length: 110 }, (_, i) => ({ n: i + 1, title: `Lesson ${i + 1}` })) },
+      homeLearningState: () => ({ n, completed, allDone, started: completed > 0, total: 110, points: 12, goal: 30 }),
+      rvDue: () => [], mistakeEntries: () => [], heroGlyph: () => 'ا',
+      pageHead: (title, sub) => h('header', {}, h('h1', {}, title), h('p', {}, sub)),
+      ayahOfDay: () => h('div', {}, 'Daily ayah'), ramadanRow: () => null
+    });
+    const v = h('main'); await c.pageHome(v);
+    const primary = v.all().filter(x => x.className === 'study-next simple-next');
+    assert.equal(primary.length, 1); assert.equal(primary[0].attrs.href, allDone ? '#/practice' : `#/lesson/${n}`);
+    const choices = v.all().find(x => x.className === 'menu-grid home-choices');
+    assert.deepEqual(choices.children.map(x => x.attrs.href), ['#/practice', '#/suras', '#/namaz']);
+    const folds = v.all().filter(x => x.tag === 'details');
+    assert.equal(folds.length, 2); assert.ok(folds.every(x => x.attrs.open === null));
+    assert.match(v.textContent, new RegExp(`${completed} / 110`));
+  }
 });
