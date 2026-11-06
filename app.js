@@ -3100,20 +3100,35 @@ function practiceGroups() {
     { title: LX("Правила чтения", "Оқу ережелері", "Okuma kuralları"), text: LX("Таджвид и долгие звуки", "Тәжуид пен созылыңқы дыбыстар", "Tecvid ve uzun sesler"), icon: "rule", ids: ["tajweed", "madd"] }
   ];
 }
+function exerciseArtwork(id) {
+  if (id === "lookalike") {
+    const bowl = '<path d="M5 30 C2 43 15 46 24 44 C37 42 45 39 45 26"/>';
+    const dots = ['<circle cx="24" cy="56" r="3"/>', '<circle cx="20" cy="19" r="3"/><circle cx="29" cy="19" r="3"/>', '<circle cx="20" cy="19" r="3"/><circle cx="29" cy="19" r="3"/><circle cx="24.5" cy="11" r="3"/>'];
+    return h("span", { class: "art-lookalike", html: '<svg viewBox="0 0 180 78" aria-hidden="true" focusable="false">' + dots.map((d, i) => `<g transform="translate(${125 - i * 57},5)"><g class="letter-bowl">${bowl}</g><g class="letter-dots">${d}</g></g>`).join("") + '</svg>' });
+  }
+  if (id === "forms") return h("span", { class: "art-forms" },
+    h("span", { class: "forms-joined", lang: "ar", dir: "rtl" }, "بـبـب"),
+    h("span", { class: "forms-sequence", dir: "rtl" }, ["بـ", "ـبـ", "ـب"].map(form => h("span", { lang: "ar" }, form))));
+  if (id === "build") return h("span", { class: "art-build" },
+    h("span", { class: "build-pieces", dir: "rtl" }, ["ك", "ت", "ب"].map(letter => h("span", { lang: "ar" }, letter))),
+    h("span", { class: "build-word", lang: "ar", dir: "rtl" }, "كَتَبَ"));
+  if (id === "listen") return h("span", { html: icon("sound") });
+  return h("span", { lang: "ar" }, { letters: "ب", harakat: "بَ بِ بُ", read: "كَتَبَ", tajweed: "نْ", madd: "آ" }[id] || "");
+}
+
 function pagePractice(v) {
   v.append(pageHead(LX("Попробуй сам", "Өзің орында", "Kendin dene"), LX("Выбери, что потренировать: буквы, слова или правила.", "Нені жаттықтыратыныңды таңда: әріптер, сөздер не ережелер.", "Çalışmak istediğini seç: harfler, kelimeler veya kurallar."), learnTabs("practice")));
   const due = rvDue().length, mistakes = mistakeEntries(S).length;
   if (due || mistakes) v.append(h("div", { class: "practice-recall" },
     due ? h("a", { href: "#/review" }, h("span", { html: icon("repeat"), "aria-hidden": "true" }), h("b", {}, LX("Вспомнить пройденное", "Үйренгенді еске түсіру", "Öğrendiklerini hatırla")), h("strong", { class: "num" }, due), h("span", { html: icon("chev"), "aria-hidden": "true" })) : null,
     mistakes ? h("a", { href: "#/mistakes/train" }, h("span", { html: icon("target"), "aria-hidden": "true" }), h("b", {}, LX("Попробовать ещё раз", "Тағы бір рет орындау", "Bir daha dene")), h("strong", { class: "num" }, mistakes), h("span", { html: icon("chev"), "aria-hidden": "true" })) : null));
-  const samples = { letters: "ب", lookalike: "ب ت ث", forms: "بـ ـبـ ـب", harakat: "بَ بِ بُ", listen: "sound", read: "كَتَبَ", build: "ك ت ب", tajweed: "نْ", madd: "آ" };
   practiceGroups().forEach((group, i) => {
     const shelf = h("section", { class: "practice-shelf shelf-" + i },
       h("header", { class: "practice-shelf-head" }, h("span", { class: "shelf-number", "aria-hidden": "true" }, String(i + 1).padStart(2, "0")), h("div", {}, h("h2", {}, group.title), h("p", {}, group.text))));
     shelf.append(h("div", { class: "exercise-gallery count-" + group.ids.length }, group.ids.map(id => {
       const tr = TRAINERS.find(t => t.id === id);
       return h("a", { class: "exercise-tile tile-" + id, href: `#/practice/${id}` },
-        h("div", { class: "exercise-sample", "aria-hidden": "true" }, id === "listen" ? h("span", { html: icon("sound") }) : h("span", { lang: "ar" }, samples[id])),
+        h("div", { class: "exercise-sample", "aria-hidden": "true" }, exerciseArtwork(id)),
         h("div", { class: "exercise-copy" }, h("h3", {}, L({ kk: tr.t[0], ru: tr.t[1], tr: tr.t[2] })), h("p", {}, L({ kk: tr.d[0], ru: tr.d[1], tr: tr.d[2] }))),
         h("span", { class: "exercise-open", "aria-hidden": "true", html: icon("arrow") }));
     })));
