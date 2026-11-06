@@ -6,7 +6,7 @@
 const KEY = "qoqu.v1";
 const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const blank = () => ({ lang: null, theme: null, xp: 0, days: {}, lessons: {}, ex: {}, tests: {},
-  badges: {}, hifz: {}, hifzAwarded: {}, hifzBonus: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true, tl: true },
+  badges: {}, mistakes: {}, hifz: {}, hifzAwarded: {}, hifzBonus: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true, tl: true },
   last: null, listen: { r: "mishary-alafasy/r1", s: 1 }, tsb: { k: 0, day: "", d: {}, t: {}, vib: true }, nzg: "m", at: 0 });
 let S = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch (e) {}
@@ -731,7 +731,7 @@ async function route() {
   window.scrollTo(0, 0);
     if (!p0) { markNav("today"); await pageHome(view); }
     else if (p0 === "course") { markNav("learn"); pageCourse(view); }
-    else if (p0 === "lesson") { markNav("learn"); await pageLesson(view, +p1); }
+    else if (p0 === "lesson") { markNav("learn"); await pageLesson(view, +p1, p2); }
     else if (p0 === "ref") { markNav("learn"); await pageRef(view, p1, p2); }
     else if (p0 === "suras") { markNav("suras"); pageSuras(view); }
     else if (p0 === "sura") { markNav("suras"); await pageSura(view, +p1, p2 === "hifz", /^\d+$/.test(p2 || "") ? +p2 : 0); }
@@ -742,6 +742,7 @@ async function route() {
     else if (p0 === "zikr") { markNav("namaz"); await pageZikr(view, p1, p2); }
     else if (p0 === "bookmarks") { markNav("suras"); await pageBookmarks(view); }
     else if (p0 === "exam") { markNav("learn"); pageExam(view, +p1); }
+    else if (p0 === "mistakes") { markNav("learn"); await pageMistakes(view, p1, p2); }
     else if (p0 === "review") { markNav("learn"); await pageReview(view); }
     else if (p0 === "placement") { markNav("learn"); pagePlacement(view); }
     else if (p0 === "practice") { markNav("learn"); p1 ? pageTrainer(view, p1) : pagePractice(view); }
@@ -840,6 +841,7 @@ async function pageHome(v) {
     step("02", due ? "#/review" : "#/practice", LX("Повторение", "Қайталау", "Tekrar"), due ? LX(`${due} ${plRu(due, "карточка ждёт", "карточки ждут", "карточек ждут")} повторения`, `${due} карточка қайталауды күтуде`, `${due} kart tekrar bekliyor`) : pool ? LX("Карточки на сегодня повторены", "Бүгінгі карточкалар қайталанды", "Bugünkü kartlar tekrar edildi") : LX("После первых букв здесь появятся карточки", "Алғашқы әріптерден кейін карточкалар пайда болады", "İlk harflerden sonra burada kartlar görünecek"), due ? LX("Повторить карточки", "Карточкаларды қайталау", "Kartları tekrar et") : LX("Открыть тренажёры", "Жаттығуларды ашу", "Alıştırmaları aç"), pool > 0 && due === 0),
     step("03", readHref, LX("Чтение и слух", "Оқу және тыңдау", "Okuma ve dinleme"), lastS ? `${L(lastS.name)} · ${T("ayahN")} ${S.last.a}` : LX("Аль-Фатиха · слушайте и повторяйте", "Әл-Фатиха · тыңдап, қайталаңыз", "Fâtiha · dinleyin ve tekrar edin"), lastS ? T("contRead") : LX("Открыть суру", "Сүрені ашу", "Sureyi aç"))));
   v.append(plan);
+  if (mistakeEntries(S).length) v.append(mistakesCard());
 
   const mods = h("div", { class: "mods mini" }, COURSE.modules.map(Mo => {
     const tot = Mo.to - Mo.from + 1, done = modDoneN(Mo);
@@ -1036,7 +1038,7 @@ function focusLessonContent(el, progress = el.closest(".lesson-view")?.querySele
     window.scrollTo({ top: Math.max(0, window.scrollY + el.getBoundingClientRect().top - inset - progress.offsetHeight - 18), behavior: "instant" });
   }, 0);
 }
-async function pageLesson(v, n) {
+async function pageLesson(v, n, initialStep) {
   const meta = COURSE.lessons[n - 1];
   if (!meta || !meta.ready) return notFound(v);
   const okL = await allowLesson(n);
@@ -1064,7 +1066,7 @@ async function pageLesson(v, n) {
     practice: LX("Выполните задания. К объяснению можно вернуться в любой момент.", "Тапсырмаларды орындаңыз. Түсіндірмеге кез келген уақытта оралуға болады.", "Alıştırmaları yapın. İstediğiniz zaman açıklamaya dönebilirsiniz."),
     check: LX("Проверьте себя и завершите урок после всех заданий.", "Өзіңізді тексеріп, барлық тапсырмадан кейін сабақты аяқтаңыз.", "Kendinizi kontrol edin; tüm görevlerden sonra dersi tamamlayın.")
   };
-  let active = Math.max(0, steps.findIndex(s => s.id === S.lessonSteps?.[n]));
+  let active = Math.max(0, steps.findIndex(s => s.id === (initialStep || S.lessonSteps?.[n])));
   let refreshCompletion = () => {};
   const languageNote = lessonLanguageNotice(); if (languageNote) wrap.append(languageNote);
   wrap.append(h("header", { class: "lhead" }, h("div", { class: "crumbs", html: `<a href="#/course#m${M.id}">${esc(T("module"))} ${M.id} · ${esc(L(M.title))}</a><span>·</span><span>${esc(T("lesson"))} ${n} / ${COURSE.lessons.length}</span>` }),
@@ -1454,6 +1456,126 @@ function traceEl(ch, key, ctx) {
   return wrap;
 }
 
+/* Mistakes contain stable course references only; authored content stays in course data. */
+function recordMistake(state, id, correct, day) {
+  const records = state.mistakes || (state.mistakes = {}), old = records[id];
+  if (correct) {
+    if (!old || old.clean >= 2) return false;
+    old.clean++; return true;
+  }
+  records[id] = { misses: (old?.misses || 0) + 1, clean: 0, first: old?.first || day, last: day };
+  return true;
+}
+function mistakeEntries(state, solid = false) {
+  return Object.entries(state.mistakes || {}).filter(([, r]) => solid ? r.clean >= 2 : r.clean < 2)
+    .sort((a, b) => a[1].clean - b[1].clean || b[1].last.localeCompare(a[1].last) || a[0].localeCompare(b[0]));
+}
+function mistakesCard() {
+  const weak = mistakeEntries(S).length, solid = mistakeEntries(S, true).length;
+  return h("section", { class: "card mistake-card" },
+    h("div", { class: "mistake-card-icon", html: icon("target"), "aria-hidden": "true" }),
+    h("div", { class: "mistake-card-copy" }, h("h2", {}, LX("Работа над ошибками", "Қателермен жұмыс", "Hata çalışması")),
+      h("p", { class: "muted small" }, weak ? LX(`Что повторить: ${weak} · закреплено: ${solid}`, `Қайталау керек: ${weak} · бекітілді: ${solid}`, `Tekrar edilecek: ${weak} · pekiştirilen: ${solid}`) : LX("Здесь появятся задания, в которых вы ошиблись. Повторяйте их в своём темпе.", "Мұнда қате орындалған тапсырмалар пайда болады. Өз қарқыныңызбен қайталаңыз.", "Yanlış yaptığınız alıştırmalar burada görünecek. Kendi temponuzda tekrar edin."))),
+    h("div", { class: "mistake-card-actions" }, weak ? h("a", { class: "btn", href: "#/mistakes/train" }, LX("Короткая тренировка", "Қысқа жаттығу", "Kısa alıştırma")) : null,
+      h("a", { class: "btn ghost", href: "#/mistakes" }, LX("Все задания", "Барлық тапсырмалар", "Tüm alıştırmalar"))));
+}
+async function resolveMistake(id) {
+  if (id.startsWith("t:")) {
+    const tr = TRAINERS.find(t => t.id === id.slice(2));
+    if (!tr) return null;
+    const sec = ["tajweed", "madd"].includes(tr.id) ? "tajweed" : "alphabet";
+    return { id, title: L({ kk: tr.t[0], ru: tr.t[1], tr: tr.t[2] }),
+      source: LX("Тема тренажёра · новый вопрос при повторении", "Жаттығу тақырыбы · қайталауда жаңа сұрақ", "Alıştırma konusu · tekrarda yeni soru"),
+      href: "#/mistakes/explain/" + encodeURIComponent(id), reference: "#/ref/" + sec, make: () => tr.make() };
+  }
+  const m = /^(l|q):(\d+):(\d+)(?::(\d+))?$/.exec(id);
+  if (!m) return null;
+  const n = +m[2], meta = COURSE.lessons[n - 1], mod = moduleOf(n);
+  if (!meta || !mod) return null;
+  const lesson = (await loadModule(mod.id)).find(l => l.n === n), block = lesson?.blocks[+m[3]];
+  const question = m[1] === "q" ? (block?.type === "test" ? block.items[+m[4]] : null) : block?.type === "ex" ? block : null;
+  if (!question || !["mcq", "tap", "sort", "order"].includes(question.kind)) return null;
+  return { id, title: L(meta.title), source: LX(`Урок ${n} · задание ${+m[3] + 1}${m[4] === undefined ? "" : ` · вопрос ${+m[4] + 1}`}`, `Сабақ ${n} · тапсырма ${+m[3] + 1}`, `Ders ${n} · alıştırma ${+m[3] + 1}`),
+    question, href: `#/lesson/${n}/theory`, make: () => question };
+}
+async function pageMistakes(v, mode, only) {
+  const title = LX("Работа над ошибками", "Қателермен жұмыс", "Hata çalışması");
+  v.append(pageHead(title, LX("Два самостоятельных правильных ответа закрепляют задание. Новая ошибка возвращает его на повторение.", "Екі дербес дұрыс жауап тапсырманы бекітеді. Жаңа қате оны қайталауға қайтарады.", "İki bağımsız doğru yanıt alıştırmayı pekiştirir. Yeni hata onu tekrara geri getirir."), learnTabs("practice")));
+  if (mode === "train") return mistakeSession(v, only);
+  if (mode === "explain") {
+    const item = only && await resolveMistake(only);
+    if (!v.isConnected) return;
+    if (!item) return notFound(v);
+    const q = item.make(), theory = q.hint || esc(LX("Собирайте слово справа налево. Прослушайте запись, сравните каждую букву с алфавитом и повторите без подсказки.", "Сөзді оңнан солға құрастырыңыз. Жазбаны тыңдап, әр әріпті әліпбимен салыстырыңыз және көмексіз қайталаңыз.", "Kelimeyi sağdan sola kurun. Kaydı dinleyin, her harfi alfabeyle karşılaştırın ve ipucusuz tekrar edin."));
+    v.append(h("section", { class: "card read stack" }, h("h2", {}, item.title),
+      h("p", { class: "muted small" }, LX("Разбор темы на примерах. В тренировке будет новый вопрос.", "Тақырыпты мысалдармен талдау. Жаттығуда жаңа сұрақ болады.", "Konunun örneklerle açıklaması. Alıştırmada yeni soru olacak.")),
+      h("div", { class: "mistake-theory", html: theory }),
+      h("div", { class: "mistake-item-actions" }, h("a", { class: "btn ghost", href: item.reference || item.href }, LX("Справочник", "Анықтамалық", "Başvuru")),
+        h("a", { class: "btn", href: "#/mistakes/train/" + encodeURIComponent(item.id) }, LX("Повторить задание", "Тапсырманы қайталау", "Alıştırmayı tekrar et"))))); return;
+  }
+  const solid = mode === "solid", weak = mistakeEntries(S), strong = mistakeEntries(S, true), entries = solid ? strong : weak;
+  v.append(h("nav", { class: "tabs mistake-tabs", "aria-label": title },
+    [[false, LX("Что повторить", "Қайталау керек", "Tekrar edilecek"), weak.length], [true, LX("Закреплено", "Бекітілді", "Pekiştirilen"), strong.length]].map(([done, label, count]) =>
+      h("a", { class: "tog", href: done ? "#/mistakes/solid" : "#/mistakes", "aria-current": done === solid ? "page" : "false" }, `${label} · ${count}`))));
+  if (!entries.length) {
+    v.append(h("section", { class: "card stack mistake-empty" }, h("h2", {}, solid ? LX("Пока нет закреплённых заданий", "Бекітілген тапсырмалар әзірге жоқ", "Henüz pekiştirilen alıştırma yok") : LX("Список для повторения пуст", "Қайталау тізімі бос", "Tekrar listesi boş")),
+      h("p", { class: "muted" }, LX("Ошибки из уроков, проверок и тренажёров сохраняются автоматически с этого обновления. Старые ответы восстановить нельзя.", "Осы жаңартудан бастап сабақтардағы, тексерулердегі және жаттығулардағы қателер автоматты сақталады. Бұрынғы жауаптар қалпына келмейді.", "Bu güncellemeden itibaren ders, test ve alıştırma hataları otomatik kaydedilir. Eski yanıtlar geri getirilemez.")),
+      h("a", { class: "btn", href: "#/practice" }, T("trainers")))); return;
+  }
+  if (!solid) v.append(h("div", { class: "mistake-start" }, h("a", { class: "btn", href: "#/mistakes/train" }, LX(`Повторить: ${Math.min(5, entries.length)} ${plRu(Math.min(5, entries.length), "задание", "задания", "заданий")}`, `${Math.min(5, entries.length)} тапсырмаға дейін қайталау`, `En fazla ${Math.min(5, entries.length)} alıştırmayı tekrar et`)),
+    h("p", { class: "muted small" }, LX("Без новых очков и изменения результатов уроков.", "Жаңа ұпайсыз, сабақ нәтижелері өзгермейді.", "Yeni puan verilmez, ders sonuçları değişmez."))));
+  const list = h("div", { class: "mistake-list" }); v.append(list);
+  const resolved = await Promise.all(entries.map(async ([id, r]) => [await resolveMistake(id), r]));
+  if (!v.isConnected) return;
+  if (S.lang === "tr" && resolved.some(([item]) => item?.question)) list.before(h("p", { class: "small muted" }, "Ders içeriği Rusça ve Kazakça sunulmaktadır."));
+  let unavailable = 0;
+  for (const [item, r] of resolved) {
+    if (!item) { unavailable++; continue; }
+    list.append(h("article", { class: "card mistake-item" }, h("div", { class: "mistake-item-top" },
+      h("span", { class: "pill" }, solid ? LX("Закреплено", "Бекітілді", "Pekiştirildi") : LX(`Верно без подсказки: ${r.clean} / 2`, `Көмексіз дұрыс: ${r.clean} / 2`, `İpucusuz doğru: ${r.clean} / 2`)),
+      h("span", { class: "muted small" }, LX(`Попыток с ошибкой: ${r.misses}`, `Қате әрекеттер: ${r.misses}`, `Hatalı deneme: ${r.misses}`))),
+      h("h2", {}, item.title), h("p", { class: "muted small" }, item.source), item.question ? mdEl(item.question.q) : null,
+      h("div", { class: "mistake-item-actions" }, h("a", { class: "btn ghost", href: item.href }, LX("Открыть объяснение", "Түсіндірмені ашу", "Açıklamayı aç")),
+        h("a", { class: "btn", href: "#/mistakes/train/" + encodeURIComponent(item.id) }, LX("Повторить задание", "Тапсырманы қайталау", "Alıştırmayı tekrar et")))));
+  }
+  if (unavailable) list.append(h("p", { class: "muted" }, LX(`Недоступных заданий: ${unavailable}. Сохранённая ссылка больше не соответствует курсу.`, `Қолжетімсіз тапсырмалар: ${unavailable}. Сілтеме курсқа сәйкес емес.`, `Kullanılamayan alıştırma: ${unavailable}. Kaydedilen bağlantı artık dersle eşleşmiyor.`)));
+}
+async function mistakeSession(v, only) {
+  const ids = only ? (Object.hasOwn(S.mistakes || {}, only) ? [only] : []) : mistakeEntries(S).slice(0, 5).map(([id]) => id);
+  const items = (await Promise.all(ids.map(resolveMistake))).filter(Boolean);
+  if (!v.isConnected) return;
+  const box = h("section", { class: "read mistake-session", tabindex: "-1" }); v.append(box);
+  let i = 0, correct = 0;
+  const step = () => {
+    if (!v.isConnected) return;
+    stopAudio(); box.innerHTML = "";
+    if (i >= items.length) {
+      box.append(h("div", { class: "card stack result" }, h("h2", {}, items.length ? LX("Тренировка завершена", "Жаттығу аяқталды", "Alıştırma tamamlandı") : LX("Нет доступных заданий", "Қолжетімді тапсырма жоқ", "Kullanılabilir alıştırma yok")),
+        items.length ? h("p", { class: "big" }, `${correct} / ${items.length}`) : null,
+        h("p", { class: "muted" }, LX("Самостоятельные верные ответы учтены. К оставшимся заданиям можно вернуться позже.", "Дербес дұрыс жауаптар есептелді. Қалған тапсырмаларға кейін оралуға болады.", "Bağımsız doğru yanıtlar kaydedildi. Kalan alıştırmalara sonra dönebilirsiniz.")),
+        h("a", { class: "btn", href: "#/mistakes" }, LX("Мои задания", "Менің тапсырмаларым", "Alıştırmalarım")), h("a", { class: "btn ghost", href: "#/" }, T("home")))); return;
+    }
+    const item = items[i], q = item.make(); let answered = false;
+    box.append(h("div", { class: "tprog" }, h("span", {}, LX(`Задание ${i + 1} из ${items.length}`, `${items.length} тапсырманың ${i + 1}-і`, `${items.length} alıştırmadan ${i + 1}.`)), h("a", { href: "#/mistakes" }, LX("Завершить", "Аяқтау", "Bitir"))),
+      h("progress", { class: "study-meter", max: items.length, value: i, "aria-label": titleForMistakeProgress() }),
+      h("p", { class: "muted small" }, item.source));
+    if (item.question && S.lang === "tr") box.append(h("p", { class: "small muted" }, "Ders içeriği Rusça ve Kazakça sunulmaktadır."));
+    const status = h("p", { class: "small mistake-answer-status", role: "status", "aria-live": "polite" });
+    const next = h("button", { class: "btn", type: "button", hidden: "", onclick: () => { if (!answered) return; i++; step(); box.focus({ preventScroll: true }); box.scrollIntoView({ block: "start" }); } }, i + 1 === items.length ? LX("Результат", "Нәтиже", "Sonuç") : LX("Следующее задание", "Келесі тапсырма", "Sonraki alıştırma"));
+    const el = exEl(q, "mistake", null, { noTag: true, single: true, mistakeRef: item.id, onDone: good => {
+      if (answered) return; answered = true; if (good) correct++; next.hidden = false;
+      if (!good && q.hint) status.before(h("div", { class: "hint-box in", html: q.hint }));
+      const r = S.mistakes[item.id];
+      status.textContent = r.clean >= 2 ? LX("Закреплено: 2 / 2", "Бекітілді: 2 / 2", "Pekiştirildi: 2 / 2") : LX(`Верно без подсказки: ${r.clean} / 2. Продолжим в следующей тренировке.`, `Көмексіз дұрыс: ${r.clean} / 2. Келесі жаттығуда жалғастырамыз.`, `İpucusuz doğru: ${r.clean} / 2. Sonraki çalışmada devam edelim.`);
+    } });
+    if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", html: q.promptHTML }));
+    if (q.listen) { const b = h("button", { class: "btn ghost", type: "button", onclick: () => playURL(wordURL(q.listen), b), html: icon("sound") + esc(T("play")) }); el.querySelector(".q").after(b); }
+    box.append(el, status, h("div", { class: "mistake-item-actions" }, h("a", { class: "btn ghost", href: item.href }, LX("Открыть объяснение", "Түсіндірмені ашу", "Açıklamayı aç")), next));
+  };
+  step();
+}
+function titleForMistakeProgress() { return LX("Прогресс тренировки", "Жаттығу прогресі", "Alıştırma ilerlemesi"); }
+
 /* ───── упражнения ───── */
 let exCounter = 0;
 function exEl(b, key, ctx, opts = {}) {
@@ -1464,8 +1586,14 @@ function exEl(b, key, ctx, opts = {}) {
   head.append(mdEl(b.q));
   el.append(head);
   const fb = h("div", { class: "fb" + (restored ? " ok" : ""), role: "status", "aria-live": "polite" }, restored ? LX("Уже выполнено. Можно повторить.", "Орындалды. Қайталауға болады.", "Tamamlandı. Tekrar edebilirsiniz.") : "");
-  const done = (xp = 5) => { el.classList.add("solved"); if (ctx && ctx.onSolve) ctx.onSolve("e" + key, el, xp); if (opts.onDone) opts.onDone(true); };
-  const fail = () => { if (opts.onDone) opts.onDone(false); };
+  const mistakeRef = opts.mistakeRef || (ctx?.n && /^\d+\.\d+$/.test(key) ? "l:" + key.replace(".", ":") : null);
+  let hadMistake = false, settled = false, hinted = false;
+  el.mistakeHint = () => { hinted = true; };
+  const wrong = () => { if (!settled && !hadMistake) { hadMistake = true; if (mistakeRef) { recordMistake(S, mistakeRef, false, today()); save(); } } };
+  const done = (xp = 5) => { if (settled) return; settled = true;
+    if (mistakeRef && !hadMistake && !hinted && recordMistake(S, mistakeRef, true, today())) save();
+    el.classList.add("solved"); if (ctx && ctx.onSolve) ctx.onSolve("e" + key, el, xp); if (opts.onDone) opts.onDone(true); };
+  const fail = () => { if (settled) return; settled = true; if (opts.onDone) opts.onDone(false); };
   if (b.kind === "mcq") {
     if (b.prompt) el.append(h("div", { class: "prompt" }, b.prompt));
     const box = h("div", { class: "opts" });
@@ -1479,7 +1607,7 @@ function exEl(b, key, ctx, opts = {}) {
           over = true; btn.classList.add("right"); fb.className = "fb ok"; fb.innerHTML = esc(T("right")) + (b.explain ? " " + md(b.explain).replace(/<\/?p>/g, "") : "");
           done(tries ? 2 : 5);
         } else {
-          tries++; btn.classList.add("wrong"); fb.className = "fb bad"; fb.textContent = opts.single ? LX("Неверно. Правильный ответ выделен.", "Қате. Дұрыс жауап белгіленді.", "Yanlış. Doğru cevap işaretlendi.") : T("wrongTry");
+          wrong(); tries++; btn.classList.add("wrong"); fb.className = "fb bad"; fb.textContent = opts.single ? LX("Неверно. Правильный ответ выделен.", "Қате. Дұрыс жауап белгіленді.", "Yanlış. Doğru cevap işaretlendi.") : T("wrongTry");
           if (!opts.single) {
             if (b.explain) fb.append(h("div", { class: "fb-explain", html: md(b.explain) }));
             else {
@@ -1510,9 +1638,9 @@ function exEl(b, key, ctx, opts = {}) {
     b.grid.forEach(x => {
       const bt = h("button", { type: "button" }, x);
       bt.onclick = () => {
-        if (bt.classList.contains("hit")) return;
+        if (settled || bt.classList.contains("hit")) return;
         if (tg.includes(x)) { bt.classList.add("hit"); got++; cnt.textContent = `${T("found")}: ${got} / ${need}`; if (got === need) { fb.className = "fb ok"; fb.textContent = T("allFound"); done(); } }
-        else { bt.classList.add("miss"); setTimeout(() => bt.classList.remove("miss"), 500); }
+        else { wrong(); bt.classList.add("miss"); setTimeout(() => bt.classList.remove("miss"), 500); if (opts.single) { fb.className = "fb bad"; fb.textContent = T("wrongTry"); fail(); } }
       };
       g.append(bt);
     });
@@ -1527,12 +1655,12 @@ function exEl(b, key, ctx, opts = {}) {
     b.cats.forEach((c, ci) => {
       const bt = h("button", { class: "opt", type: "button" }, L(c));
       bt.onclick = () => {
-        if (i >= items.length) return;
+        if (settled || i >= items.length) return;
         if (items[i].cat === ci) {
           doneRow.append(h("span", { title: L(c) }, items[i].ar)); i++; fb.className = "fb"; fb.textContent = "";
           show();
           if (i >= items.length) { fb.className = "fb ok"; fb.textContent = T("right"); cats.hidden = true; done(errors ? 3 : 5); }
-        } else { errors++; bt.classList.add("wrong"); setTimeout(() => bt.classList.remove("wrong"), 400); fb.className = "fb bad"; fb.textContent = T("wrongTry"); if (opts.single) { i++; show(); if (i >= items.length) { cats.hidden = true; fail(); } } }
+        } else { wrong(); errors++; bt.classList.add("wrong"); setTimeout(() => bt.classList.remove("wrong"), 400); fb.className = "fb bad"; fb.textContent = T("wrongTry"); if (opts.single) { cats.hidden = true; fail(); } }
       };
       cats.append(bt);
     });
@@ -1555,11 +1683,11 @@ function exEl(b, key, ctx, opts = {}) {
     order.forEach(([p, i]) => {
       const bt = h("button", { type: "button" }, p);
       bt.onclick = () => {
-        bt.disabled = true; built.push(i); slots.append(h("span", {}, p));
+        if (settled) return; bt.disabled = true; built.push(i); slots.append(h("span", {}, p));
         if (built.length === b.pieces.length) {
           const ok = built.every((v, k) => b.pieces[v] === b.pieces[k]);
           if (ok) { slots.textContent = b.answer; fb.className = "fb ok"; fb.textContent = T("right"); pieces.hidden = true; done(); }
-          else { fb.className = "fb bad"; fb.textContent = T("wrongTry"); setTimeout(reset, 700); if (opts.single) fail(); }
+          else { wrong(); fb.className = "fb bad"; fb.textContent = T("wrongTry"); if (!opts.single) routeDelay(reset, 700); if (opts.single) fail(); }
         }
       };
       btns.push(bt); pieces.append(bt);
@@ -1599,7 +1727,7 @@ function testEl(b, key, ctx) {
       let answered = false;
       const next = h("button", { class: "btn test-next", type: "button", hidden: "", onclick: () => { if (!answered) return; i++; step(); focusLessonContent(box); } },
         i + 1 === b.items.length ? LX("Показать результат", "Нәтижені көрсету", "Sonucu göster") : LX("Следующий вопрос", "Келесі сұрақ", "Sonraki soru"));
-      box.append(exEl(it, key + "q" + i, null, { noTag: true, single: true, onDone: ok => {
+      box.append(exEl(it, key + "q" + i, null, { noTag: true, single: true, mistakeRef: ctx?.n ? "q:" + key.replace(".", ":") + ":" + i : null, onDone: ok => {
         if (answered) return;
         answered = true; if (ok) score++; next.hidden = false;
       } }), next);
@@ -2970,7 +3098,7 @@ const TRAINERS = [
         hint: `<p><b>${esc(LX("Естественный мадд", "Табиғи мадд", "Tabiî med"))}</b> — ${esc(LX("2 счёта: буква долготы, после неё нет хамзы и сукуна.", "2 харакат: созылу әрпінен кейін һәмза да, сукун да жоқ.", "2 hareke: med harfinden sonra hemze ya da cezm yok."))}</p><p><b>${esc(LX("Мадд с хамзой", "Һәмзалы мадд", "Hemzeli med"))}</b> — ${esc(LX("4–5 счётов: после буквы долготы хамза (в том же слове или в следующем).", "4–5 харакат: созылу әрпінен кейін һәмза (сол сөзде не келесі сөзде).", "4–5 hareke: med harfinden sonra hemze (aynı ya da sonraki kelimede)."))}</p><p><b>${esc(LX("Мадд лязим", "Ләзим мадд", "Med-i lâzım"))}</b> — ${esc(LX("6 счётов: после буквы долготы постоянный сукун или шадда.", "6 харакат: созылу әрпінен кейін тұрақты сукун не шадда.", "6 hareke: med harfinden sonra sabit cezm ya da şedde."))}</p>` }; } },
 ];
 function pagePractice(v) {
-  v.append(pageHead(T("learn"), null, learnTabs("practice")), rvCard());
+  v.append(pageHead(T("learn"), null, learnTabs("practice")), mistakesCard(), rvCard());
   v.append(h("div", { class: "section-h sm" }, h("h2", {}, T("trainers")), h("small", { class: "muted" }, LX("по 10 вопросов", "10 сұрақтан", "10'ar soru"))));
   v.append(h("div", { class: "trs mini" }, TRAINERS.map(t => h("a", { class: "tr-card", href: `#/practice/${t.id}`, title: L({ kk: t.d[0], ru: t.d[1], tr: t.d[2] }), html: `<span class="ic">${esc(t.ic)}</span><b>${esc(L({ kk: t.t[0], ru: t.t[1], tr: t.t[2] }))}</b>` }))));
   const hs = CORE.suras.filter(s => s.n === 1 || (s.n >= 93 && s.c <= 11));
@@ -3164,11 +3292,11 @@ function pageTrainer(v, id) {
       const q = tr.make();
       box.append(h("div", { class: "tprog", style: "display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted);margin-bottom:6px" }, h("span", {}, `${T("question")} ${i + 1} / ${N}`), h("span", { class: "num" }, `${ok} ✓`)),
         h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${i / N * 100}%` })));
-      const el = exEl(q, "tr", null, { noTag: true, single: true, onDone: good => {
+      const el = exEl(q, "tr", null, { noTag: true, single: true, mistakeRef: "t:" + tr.id, onDone: good => {
         buzz(good); S.tr.n++; if (good) { S.tr.ok++; ok++; addXP(2, el); } save(); i++; routeDelay(step, good ? 450 : 1400);
       } });
       if (q.hint) { const hbox = h("div", { class: "hint-box", hidden: true, html: q.hint }), hb = h("button", { class: "hint-b", type: "button", html: icon("bulb") + `<span>${esc(LX("Подсказка", "Кеңес", "İpucu"))}</span>` });
-        hb.onclick = () => { hbox.hidden = false; hb.disabled = true; requestAnimationFrame(() => hbox.classList.add("in")); }; el.querySelector(".q").append(hb); el.querySelector(".q").after(hbox); }
+        hb.onclick = () => { el.mistakeHint(); hbox.hidden = false; hb.disabled = true; requestAnimationFrame(() => hbox.classList.add("in")); }; el.querySelector(".q").append(hb); el.querySelector(".q").after(hbox); }
       if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
       if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); el.querySelector(".q").after(lb); routeDelay(() => playURL(wordURL(q.listen), lb), 250); }
       box.append(el);
@@ -3245,12 +3373,12 @@ function pageExam(v, m) {
       const tr = qs[i], q = tr.make();
       box.append(h("div", { class: "tprog", style: "display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted);margin-bottom:6px" }, h("span", {}, `${T("question")} ${i + 1} / ${qs.length}`), h("span", { class: "num" }, `✓ ${ok}`)),
         h("div", { class: "bar", style: "margin-bottom:12px" }, h("i", { style: `width:${i / qs.length * 100}%` })));
-      const el = exEl(q, "tr", null, { noTag: true, single: true, onDone: good => { buzz(good); if (good) ok++; else miss[tr.id] = (miss[tr.id] || 0) + 1; i++; hb.disabled = true; routeDelay(step, good ? 550 : 1600); } });
+      const el = exEl(q, "tr", null, { noTag: true, single: true, mistakeRef: "t:" + tr.id, onDone: good => { buzz(good); if (good) ok++; else miss[tr.id] = (miss[tr.id] || 0) + 1; i++; hb.disabled = true; routeDelay(step, good ? 550 : 1600); } });
       // подсказка: теория из уроков, раскрывается под вопросом
       const hbox = h("div", { class: "hint-box", hidden: true, html: q.hint || "" });
       const hb = h("button", { class: "hint-b", type: "button", disabled: !q.hint || !hints ? "" : null,
         html: icon("bulb") + `<span>${esc(LX("Подсказка", "Кеңес", "İpucu"))}</span><small class="num">${hints}</small>` });
-      hb.onclick = () => { if (!hints || !hbox.hidden) return; hints--; hbox.hidden = false; hb.disabled = true; hb.querySelector("small").textContent = hints; requestAnimationFrame(() => hbox.classList.add("in")); };
+      hb.onclick = () => { if (!hints || !hbox.hidden) return; el.mistakeHint(); hints--; hbox.hidden = false; hb.disabled = true; hb.querySelector("small").textContent = hints; requestAnimationFrame(() => hbox.classList.add("in")); };
       el.querySelector(".q").append(hb);
       el.querySelector(".q").after(hbox);
       if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
@@ -3322,7 +3450,7 @@ function backupMap(value, keyOK, item, limit = 12000) {
   return Object.fromEntries(entries.map(([k, v]) => { backupAssert(keyOK(k)); return [k, item(v)]; }));
 }
 function backupProgressDefaults() {
-  return { xp: 0, days: {}, lessons: {}, ex: {}, tests: {}, badges: {}, hifz: {}, hifzAwarded: {}, hifzBonus: {},
+  return { xp: 0, days: {}, lessons: {}, ex: {}, tests: {}, badges: {}, mistakes: {}, hifz: {}, hifzAwarded: {}, hifzBonus: {},
     tr: { n: 0, ok: 0 }, last: null, bm: {}, rv: {}, exams: {}, lessonSteps: {}, place: null, placeFrom: 1, goal: 30,
     tsb: { k: 0, day: "", d: {}, t: {}, vib: true }, zkFav: [], azk: { day: "", c: {} }, duaG: 0 };
 }
@@ -3336,6 +3464,14 @@ function validateBackupProgress(progress) {
   const counts = v => backupMap(v, smallKey, count, 2000);
   const fields = {
     xp: count,
+    mistakes: v => backupMap(v, k => {
+      if (/^t:(letters|lookalike|forms|harakat|listen|read|build|tajweed|madd)$/.test(k)) return true;
+      const m = /^(l|q):([1-9]\d{0,2}):(0|[1-9]\d{0,2})(?::(0|[1-9]\d{0,2}))?$/.exec(k);
+      return !!m && +m[2] <= COURSE.lessons.length && (m[1] === "q") === (m[4] !== undefined);
+    }, x => {
+      const r = backupRecord(x, { misses: n => backupInt(n, 1), clean: n => backupInt(n, 0, 2), first: backupDate, last: backupDate }, ["misses", "clean", "first", "last"]);
+      backupAssert(r.first <= r.last); return r;
+    }, 12000),
     days: v => backupMap(v, k => { try { backupDate(k); return true; } catch { return false; } }, count, 20000),
     lessons: v => backupMap(v, lessonKey, x => backupRecord(x, { done: backupBool, at: backupDate }, ["done"]), COURSE.lessons.length),
     ex: v => backupMap(v, k => taskKey(k, true), backupFlag),
@@ -3401,7 +3537,7 @@ function restoreProgressBackup(storage, current, progress) {
 }
 function backupSummary(progress) {
   return { lessons: COURSE.lessons.filter(l => progress.lessons[l.n]?.done).length,
-    bookmarks: Object.keys(progress.bm || {}).length, exams: Object.values(progress.exams || {}).filter(e => e.passed).length, xp: progress.xp };
+    bookmarks: Object.keys(progress.bm || {}).length, exams: Object.values(progress.exams || {}).filter(e => e.passed).length, mistakes: Object.keys(progress.mistakes || {}).length, xp: progress.xp };
 }
 
 
@@ -3414,6 +3550,7 @@ function profileLearningSummary() {
     h("p", { class: "profile-next" }, d.allDone ? LX("Продолжайте закреплять чтение практикой.", "Оқуды жаттығумен бекітуді жалғастырыңыз.", "Okumayı alıştırmalarla pekiştirmeye devam edin.") : `${T("lesson")} ${d.n} · ${L(COURSE.lessons[d.n - 1].title)}`),
     h("div", { class: "profile-summary-links" },
       h("a", { href: due ? "#/review" : "#/practice", html: icon("repeat") + esc(LX(`Повторение: ${due} ${plRu(due, "карточка", "карточки", "карточек")}`, `Қайталау: ${due} карточка`, `Tekrar: ${due} kart`)) }),
+      h("a", { href: "#/mistakes" }, LX(`Работа над ошибками: ${mistakeEntries(S).length}`, `Қателермен жұмыс: ${mistakeEntries(S).length}`, `Hata çalışması: ${mistakeEntries(S).length}`)),
       h("a", { href: "#/bookmarks", html: icon("bookmark") + esc(LX(`Закладки: ${bookmarks}`, `Бетбелгілер: ${bookmarks}`, `Yer imleri: ${bookmarks}`)) })),
     h("a", { class: "btn", href: d.allDone ? "#/practice" : `#/lesson/${d.n}` }, d.allDone ? LX("Открыть практику", "Жаттығуларды ашу", "Alıştırmaları aç") : T("cont")));
 }
@@ -3438,7 +3575,7 @@ function progressBackupCard() {
   const summaryList = (title, state) => {
     const data = backupSummary(state);
     return h("section", {}, h("h4", {}, title), h("dl", { class: "backup-summary" },
-      [[LX("Уроков", "Сабақ", "Ders"), data.lessons], [LX("Экзаменов сдано", "Тапсырылған емтихан", "Geçilen sınav"), data.exams], [LX("Закладок", "Бетбелгі", "Yer imi"), data.bookmarks], [LX("Очков", "Ұпай", "Puan"), data.xp]].map(([label, value]) => h("div", {}, h("dt", {}, label), h("dd", { class: "num" }, value)))));
+      [[LX("Уроков", "Сабақ", "Ders"), data.lessons], [LX("Экзаменов сдано", "Тапсырылған емтихан", "Geçilen sınav"), data.exams], [LX("Закладок", "Бетбелгі", "Yer imi"), data.bookmarks], [LX("Работа над ошибками", "Қателермен жұмыс", "Hata çalışması"), data.mistakes], [LX("Очков", "Ұпай", "Puan"), data.xp]].map(([label, value]) => h("div", {}, h("dt", {}, label), h("dd", { class: "num" }, value)))));
   };
   const prepare = (text, filename) => {
     const parsed = parseProgressBackup(text);
@@ -3473,7 +3610,7 @@ function progressBackupCard() {
     finally { if (token === request) { select.disabled = false; input.value = ""; } }
   };
   card.append(h("div", { class: "backup-actions" }, h("button", { class: "btn backup-export", type: "button", onclick: exportFile, html: icon("download") + esc(LX("Сохранить прогресс", "Прогресті сақтау", "İlerlemeyi yedekle")) }), select), input,
-    h("p", { class: "muted small backup-includes" }, LX("В копии: уроки, задания, результаты, повторение, закладки, заучивание и счётчики зикра. Аудио для офлайн-режима скачайте на новом устройстве.", "Көшірмеде: сабақтар, тапсырмалар, нәтижелер, қайталау, бетбелгілер, жаттау және зікір санауыштары. Офлайн аудионы жаңа құрылғыда қайта жүктеңіз.", "Yedek; dersler, görevler, sonuçlar, tekrarlar, yer imleri, ezber ve zikir sayaçlarını içerir. Çevrimdışı sesleri yeni cihazda yeniden indirin.")), status, preview);
+    h("p", { class: "muted small backup-includes" }, LX("В копии: уроки, задания, результаты, повторение и ошибки, закладки, заучивание и счётчики зикра. Аудио для офлайн-режима скачайте на новом устройстве.", "Көшірмеде: сабақтар, тапсырмалар, нәтижелер, қайталау және қателер, бетбелгілер, жаттау және зікір санауыштары. Офлайн аудионы жаңа құрылғыда қайта жүктеңіз.", "Yedek; dersler, görevler, sonuçlar, tekrarlar ve hatalar, yer imleri, ezber ve zikir sayaçlarını içerir. Çevrimdışı sesleri yeni cihazda yeniden indirin.")), status, preview);
   try { if (localStorage.getItem(BACKUP_PREVIOUS_KEY)) card.append(h("button", { class: "backup-undo", type: "button", onclick: () => {
     try { clearPreview(); prepare(localStorage.getItem(BACKUP_PREVIOUS_KEY), LX("Копия перед последним восстановлением", "Соңғы қалпына келтіру алдындағы көшірме", "Son geri yüklemeden önceki yedek")); }
     catch (e) { errorMessage(e); }
