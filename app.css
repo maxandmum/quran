@@ -1901,3 +1901,36 @@ body:not([data-page="home"]) .footer-faq{display:none}
 }
 @media(max-width:360px){.atelier-intro h1{font-size:25px}.atelier-lesson{grid-template-columns:minmax(0,1fr) 60px;gap:8px;padding:17px 15px}.atelier-lesson h2{font-size:20px}.atelier-start{font-size:12px;padding:11px}.letter-arch{height:155px}.letter-arch-glyph{font-size:65px}.letter-arch-glyph.multi-letter{font-size:30px}.atelier-today small{display:none}.atelier-progress-number span{font-size:9px}.home-portal{padding:18px}.exercise-sample .forms-joined[lang="ar"]{font-size:32px}.exercise-sample .forms-sequence [lang="ar"]{font-size:16px}.forms-sequence{gap:2px}.exercise-sample .build-pieces [lang="ar"]{font-size:22px;min-width:24px}.build-pieces{gap:4px}}
 .letter-dots{fill:var(--warm-ink)}@media(max-width:360px){.atelier-today small{display:inline;font-size:9px}}
+
+/* Opaque mobile chrome: content never tints the header while scrolling. */
+@media(max-width:899px){
+  .top{background:var(--bg);border-bottom:1px solid var(--line);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;isolation:isolate}
+  .top:before{content:"";position:absolute;inset:auto 0 100%;height:env(safe-area-inset-top,0px);background:var(--bg);pointer-events:none}
+  .top .chip,.top .chip.on{background:transparent;border:0;border-radius:0;height:44px;min-width:44px;padding:0 4px;gap:6px}
+  .top .chip svg{width:18px;height:18px}.top .chip .num{font-size:13px}
+}
+/* A continuous reading surface; memorization and teaching cards retain their layout. */
+.reading-book .ayahs{grid-template-columns:minmax(0,1fr);min-width:0;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-top:22px;overflow:clip}
+.reading-book .ay{min-width:0;background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:26px 28px;box-shadow:none;scroll-margin-top:154px}
+.reading-book .ay:last-child{border-bottom:0}.reading-book .ay.cur{background:var(--surface-2);box-shadow:inset 3px 0 var(--gold)}
+.reading-book .ay .at{line-height:2.3}.reading-book .ay-no{background:transparent;color:var(--warm-ink);border:1px solid var(--line);border-radius:50%;font-size:11px;min-width:27px;height:27px;margin-top:12px}
+.reading-book .ay .meta{margin-top:12px;gap:12px}.reading-book .ay .tr{line-height:1.7}.reading-book .ay .tl{font-size:15.5px;line-height:1.85;margin-top:14px}
+.reading-book .rl-b{border-color:transparent;border-radius:4px;background:transparent;font-size:11.5px;padding:4px 8px 4px 0;min-height:32px}.reading-book .rl-b:hover{background:var(--surface-2)}
+.reading-book .ay .pa{border-color:var(--line);background:transparent;width:42px;height:42px}
+.reading-book .reading-panel{background:var(--surface-2);border-radius:12px;border-color:var(--line)}
+.reading-book .reading-playbar{border-color:var(--line);box-shadow:0 3px 12px rgba(8,36,27,.04);border-radius:12px}
+body:not([data-page="namaz"]) .subtabs a[aria-current="page"]{box-shadow:inset 0 -2px var(--gold)}
+.learning-rail a.current .rail-number{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold-soft)}
+body:not([data-page="namaz"]) #view.vin{animation:none}
+@media(prefers-reduced-motion:no-preference){
+  body:not([data-page="namaz"]) .btn,body:not([data-page="namaz"]) .subtabs a,body:not([data-page="namaz"]) .reading-toggle{transition:background-color .14s ease,border-color .14s ease,box-shadow .14s ease,transform .12s ease}
+  body:not([data-page="namaz"]) .btn:active{transform:scale(.99)}
+  .reader-view .reading-fold[open]>.reading-fold-body{animation:readerReveal .14s ease}
+}
+@keyframes readerReveal{from{opacity:.92;transform:translateY(2px)}to{opacity:1;transform:none}}
+@media(max-width:700px){
+  .reading-book .ayahs{margin-top:18px;border-radius:6px}.reading-book .ay{padding:22px 17px;scroll-margin-top:154px}.reading-book .ay .at{line-height:2.25}.reading-book .ay .tl{font-size:15px;line-height:1.8}
+  .reading-book .ay .meta{gap:10px}.reading-book .reading-panel{border-radius:10px}.reading-book .reading-playbar{border-radius:10px}
+}
+.reading-book .ay .tl{font-size:17px;border-top:0;padding-top:0}.reading-book .ay .bmk:not([aria-pressed="true"]){background:transparent;border-color:var(--line)}.reading-book .ay .bmk[aria-pressed="true"]{background:var(--gold-soft);border-color:var(--gold);color:var(--warm-ink)}
+@media(max-width:700px){.reading-book .ay .tl{font-size:16px}}
