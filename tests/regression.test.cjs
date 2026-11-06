@@ -110,7 +110,8 @@ class Element {
   constructor(tag, attrs = {}, ...kids) {
     this.tag = tag; this.attrs = attrs; this.isConnected = true;
     this.children = []; this.style = {}; this.dataset = {}; this.className = attrs.class || '';
-    this.classList = { add() {}, remove() {}, toggle() {} };
+    const classes = new Set(this.className.split(" "));
+    this.classList = { add: x => classes.add(x), remove: x => classes.delete(x), contains: x => classes.has(x), toggle: x => classes.has(x) ? classes.delete(x) : classes.add(x) };
     if (attrs.style) for (const part of attrs.style.split(';')) { const [k, v] = part.split(':'); if (k) this.style[k] = v; }
     Object.assign(this, Object.fromEntries(Object.entries(attrs).filter(([key]) => key.startsWith('on'))));
     if (attrs.html) this.innerHTML = attrs.html;
@@ -408,4 +409,95 @@ test('router: late asynchronous rendering cannot append to the current page', as
   await context.route();
   release(); await first;
   assert.equal(current.textContent, 'current page');
+});
+
+function mistakeHarness(state = {}) {
+  const S = { ex: {}, ...state };
+  return load(section('function recordMistake(', '/* ───── контрольная'), {
+    ...ui, S, save() {}, today: () => '2026-11-06', shuffle: x => x,
+    setTimeout() {}, routeDelay() {}
+  });
+}
+const mistakeMCQ = { kind: 'mcq', q: 'Question', options: [{ t: 'A' }, { t: 'B' }], answer: 1, explain: 'Rule' };
+const answer = (box, label) => box.all().find(x => x.tag === 'button' && x.textContent === label).onclick();
+test('mistakes: retries count once and correction in the same attempt never reinforces', () => {
+  const c = mistakeHarness();
+  const el = c.exEl(mistakeMCQ, '1.0', { n: 1, onSolve() {} });
+  answer(el, 'A'); answer(el, 'A'); answer(el, 'B'); answer(el, 'B');
+  assert.deepEqual(plain(c.S.mistakes['l:1:0']), { misses: 1, clean: 0, first: '2026-11-06', last: '2026-11-06' });
+});
+test('mistakes: two later clean attempts reinforce, another error reopens the item', () => {
+  const c = mistakeHarness();
+  c.recordMistake(c.S, 't:letters', false, '2026-11-05');
+  for (let i = 1; i <= 2; i++) {
+    const el = c.exEl(mistakeMCQ, 'm', null, { mistakeRef: 't:letters' });
+    answer(el, 'B'); answer(el, 'B'); assert.equal(c.S.mistakes['t:letters'].clean, i);
+  }
+  assert.equal(c.mistakeEntries(c.S).length, 0); assert.equal(c.mistakeEntries(c.S, true).length, 1);
+  c.recordMistake(c.S, 't:letters', false, '2026-11-06');
+  assert.equal(c.S.mistakes['t:letters'].clean, 0); assert.equal(c.S.mistakes['t:letters'].misses, 2);
+  assert.equal(c.S.mistakes['t:letters'].first, '2026-11-05'); assert.equal(c.S.mistakes['t:letters'].last, '2026-11-06');
+});
+test('mistakes: unseen correct answers do not create records and hints cannot reinforce', () => {
+  const c = mistakeHarness();
+  answer(c.exEl(mistakeMCQ, 'm', null, { mistakeRef: 't:letters' }), 'B');
+  assert.deepEqual(plain(c.S.mistakes), {});
+  c.recordMistake(c.S, 't:letters', false, '2026-11-06');
+  const el = c.exEl(mistakeMCQ, 'm', null, { mistakeRef: 't:letters' });
+  el.mistakeHint(); answer(el, 'B'); assert.equal(c.S.mistakes['t:letters'].clean, 0);
+});
+test('mistakes: generated topic reviews preserve course scores and award no lesson XP', () => {
+  const c = mistakeHarness({ xp: 47, lessons: { 1: { done: true } }, tests: { '1.5': 70 }, tr: { n: 8, ok: 5 } });
+  const before = JSON.stringify({ xp: c.S.xp, lessons: c.S.lessons, tests: c.S.tests, tr: c.S.tr });
+  c.recordMistake(c.S, 't:letters', false, '2026-11-06');
+  answer(c.exEl(mistakeMCQ, 'm', null, { mistakeRef: 't:letters' }), 'B');
+  assert.equal(JSON.stringify({ xp: c.S.xp, lessons: c.S.lessons, tests: c.S.tests, tr: c.S.tr }), before);
+});
+test('mistakes: all trainer IDs match the backup schema, round-trip and old files default to empty', () => {
+  const c = backupHarness(), state = backupFixture();
+  const trainerIds = Array.from(section('const TRAINERS =', 'function pagePractice(').matchAll(/\{ id: "([a-z]+)"/g), m => m[1]);
+  state.mistakes = Object.fromEntries([...trainerIds.map(id => 't:' + id), 'l:1:0', 'q:30:68:2'].map(id => [id, { misses: 2, clean: 1, first: '2026-11-05', last: '2026-11-06' }]));
+  assert.equal(trainerIds.length, 9);
+  const backup = c.makeProgressBackup(state);
+  assert.deepEqual(plain(c.parseProgressBackup(JSON.stringify(backup)).progress.mistakes), state.mistakes);
+  delete backup.progress.mistakes;
+  assert.deepEqual(plain(c.parseProgressBackup(JSON.stringify(backup)).progress.mistakes), {});
+});
+test('mistakes: backup rejects fabricated payloads, invalid IDs, counters and dates', () => {
+  const c = backupHarness();
+  const r = { misses: 1, clean: 0, first: '2026-11-05', last: '2026-11-06' };
+  for (const [id, entry] of [['t:unknown', r], ['l:999:0', r], ['l:1:0:1', r], ['q:1:0', r], ['l:1:00', r],
+    ['t:letters', { ...r, clean: 3 }], ['t:letters', { ...r, misses: 0 }], ['t:letters', { ...r, last: '2026-02-31' }],
+    ['t:letters', { ...r, last: '2025-01-01' }], ['t:letters', { ...r, html: '<script>' }]]) {
+    assert.throws(() => c.makeProgressBackup({ xp: 0, lessons: {}, mistakes: { [id]: entry } }));
+  }
+});
+test('mistakes: missing original exercises and unknown trainers resolve safely', async () => {
+  const c = mistakeHarness(); c.COURSE = { lessons: [{ n: 1, title: 'Lesson' }] }; c.TRAINERS = [];
+  c.moduleOf = () => ({ id: 1 }); c.loadModule = async () => [{ n: 1, blocks: [] }];
+  for (const id of ['t:unknown', 'q:1:999:0', 'l:1:999', 'untrusted']) assert.equal(await c.resolveMistake(id), null);
+});
+test('mistakes: tap, sort and order errors end single-attempt reviews exactly once', () => {
+  for (const q of [
+    { kind: 'tap', q: 'Find', grid: ['A', 'B'], target: 'B' },
+    { kind: 'sort', q: 'Sort', cats: ['A', 'B'], items: [{ ar: 'X', cat: 1 }] },
+    { kind: 'order', q: 'Order', pieces: ['A', 'B'], answer: 'AB' }
+  ]) {
+    const c = mistakeHarness(); let callbacks = 0, good;
+    const el = c.exEl(q, 'm', null, { mistakeRef: 'l:1:0', single: true, onDone: ok => { callbacks++; good = ok; } });
+    if (q.kind === 'order') { answer(el, 'B'); answer(el, 'A'); } else answer(el, 'A');
+    answer(el, 'B'); answer(el, 'A');
+    assert.equal(callbacks, 1, q.kind); assert.equal(good, false, q.kind);
+    assert.equal(c.S.mistakes['l:1:0'].misses, 1); assert.equal(c.S.mistakes['l:1:0'].clean, 0);
+  }
+});
+test('mistakes: quiz questions are tracked under original lesson/block/question references', () => {
+  const refs = [];
+  const c = load(section('function testEl(', '/* ═════════════ аяты'), {
+    ...ui, S: { tests: {} }, save() {}, checkBadges() {}, focusLessonContent() {},
+    exEl: (q, key, unused, opts) => { refs.push(opts.mistakeRef); return h('button', { onclick: () => opts.onDone(false) }, 'answer'); }
+  });
+  const el = c.testEl({ items: [{}, {}], pass: 70 }, '30.68', { n: 30 });
+  answer(el, 'testStart'); answer(el, 'answer'); el.all().find(x => x.className === 'btn test-next').onclick();
+  assert.deepEqual(refs, ['q:30:68:0', 'q:30:68:1']);
 });
