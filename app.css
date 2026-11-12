@@ -1940,3 +1940,12 @@ body:not([data-page="home"]) .footer-faq{display:none}
 .qb-rot{transition:transform .1s linear;will-change:transform}.qb-status{min-height:3em}.qb .qb-location{font-size:12px}.qb [hidden]{display:none!important}
 @media(prefers-reduced-motion:reduce){.qb-rot{transition:none}}
 @media(max-width:360px){.bhead:has(>.home-ramadan){gap:8px}.bhead:has(>.home-ramadan) h1{font-size:21px}.me-f>summary{min-height:94px}.me-f>summary b{font-size:14px}}
+
+/* v36: quiet hadith typography and a clear end to the daily ayah. */
+.ts-back .ts-hadith-label{font:700 10px/1.4 var(--ui);letter-spacing:.13em;text-transform:uppercase;color:var(--primary);padding-bottom:2px}
+.ts-back .ts-d{font:400 12px/1.65 var(--ui);color:var(--muted)}
+.ts-back .ts-q{font:500 22px/1.6 var(--serif);letter-spacing:0;border-left:2px solid var(--primary);padding:2px 0 2px 16px;margin:5px 0 7px;text-align:left;color:var(--ink)}
+.ts-back .ts-src{font:600 11px/1.6 var(--ui);letter-spacing:.015em;color:var(--muted);padding-top:10px;border-top:1px solid var(--line);border-radius:0;background:none}
+body[data-page="home"] main{padding-bottom:24px}body[data-page="home"] .home-daily{margin-bottom:0}body[data-page="home"] footer.site{padding-top:32px}
+.ram-h{flex-wrap:wrap}.ram-h>.pill{margin-left:auto;min-height:44px;white-space:normal}.ram-empty .btn{align-self:flex-start}
+@media(max-width:360px){.ts-back .ts-q{font-size:20px;padding-left:12px}.ts-back .ts-d{font-size:11.5px}.ts-back{padding:20px 18px}}

@@ -682,8 +682,9 @@ const quranTabs = cur => {
   return nav;
 };
 const pageHead = (title, sub, extra) => h("header", { class: "phead" }, h("h1", {}, title), sub ? h("p", { class: "muted" }, sub) : null, extra || null);
-const backHead = (href, title, sub, extra) => {
-  const from = routeOrigin();
+const backHead = (href, title, sub, extra, exitSection) => {
+  const origin = routeOrigin();
+  const from = exitSection && origin?.startsWith("#/" + exitSection) ? null : origin;
   const back = h("a", { class: "iconbtn back", href: from || href, "aria-label": T("prev"), html: icon("back"), onclick: e => {
     if (from && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (!e.button || e.button === 0)) { e.preventDefault(); history.back(); }
   } });
@@ -724,6 +725,11 @@ function rememberRouteOrigin() {
 function routeOrigin() {
   const entry = history.state?.iqraNav;
   return entry?.hash === routeHash() && /^#\//.test(entry.from || "") && entry.from !== entry.hash ? entry.from : null;
+}
+function replaceRouteHash(hash) {
+  const from = routeOrigin();
+  history.replaceState({ ...(history.state || {}), iqraNav: { hash, from } }, "", hash);
+  ROUTE_HASH = hash;
 }
 let ROUTE_SEQ = 0;
 const ROUTE_CLEANUPS = [];
@@ -869,8 +875,7 @@ async function pageHome(v) {
     portal("#/suras", "portal-quran", h("span", { lang: "ar" }, "القرآن"), LX("Читай и слушай", "Оқы және тыңда", "Oku ve dinle"), LX("Коран рядом. Найди свою суру и продолжи.", "Құран жаныңда. Сүреңді тауып, жалғастыр.", "Kur'an yanında. Sureni bul ve devam et."), LX("Открыть Коран", "Құранды ашу", "Kur'an'ı aç")),
     portal("#/namaz", "portal-namaz", h("span", { class: "portal-mat", html: icon("mat") }), LX("Время для намаза", "Намаз уақыты", "Namaz vakti"), LX("Движения, слова и дуа. Шаг за шагом.", "Қимылдар, сөздер және дұға. Қадам-қадаммен.", "Hareketler, sözler ve dualar. Adım adım."), LX("Как совершать намаз?", "Намаз қалай оқылады?", "Namaz nasıl kılınır?"))));
   v.append(h("section", { class: "home-daily" }, h("div", { class: "atelier-section-head" }, h("h2", {}, LX("Остановись на одном аяте", "Бір аятқа назар аудар", "Bir ayet üzerinde dur")), h("span", {}, LX("Почитай. Послушай. Повтори.", "Оқы. Тыңда. Қайтала.", "Oku. Dinle. Tekrar et."))), ayahOfDay()));
-  const dailyLinks = h("div", { class: "daily-inline" }, h("a", { href: "#/zikr", html: icon("beads") + esc(LX("Зикр на каждый день", "Күнделікті зікір", "Günlük zikir")) }), h("a", { href: "#/namaz/times", html: icon("clock") + esc(LX("Расписание намаза", "Намаз кестесі", "Namaz vakitleri")) }));
-  v.append(dailyLinks);
+
 }
 
 
@@ -2443,12 +2448,20 @@ function haptic(times = 1) {
 }
 
 const ZK_TABS = [["", ["Барлық зікір", "Все зикры", "Tüm zikirler"]], ["fav", ["Таңдаулы", "Избранное", "Favoriler"]], ["morning", ["Таңғы зікірлер", "Утренние азкары", "Sabah ezkârı"]], ["evening", ["Кешкі зікірлер", "Вечерние азкары", "Akşam ezkârı"]]];
+function zikrExitHref() {
+  const from = routeOrigin(), saved = history.state?.iqraZikrExit;
+  const outside = hash => typeof hash === "string" && /^#\//.test(hash) && !/^#\/zikr(?:[/?]|$)/.test(hash);
+  const exit = outside(from) ? from : outside(saved) ? saved : "#/namaz";
+  history.replaceState({ ...(history.state || {}), iqraZikrExit: exit }, "");
+  return exit;
+}
+function hadithQuote(text) { return String(text || "").replace(/[«»„“”]/g, ""); }
 async function pageZikr(v, sub, id) {
   if (sub === "c") return zkCounter(v, id);
   const tab = ZK_TABS.some(([k]) => k === (sub || "")) ? (sub || "") : "";
   const d = await loadZD(), st = tsState(); save();
-  v.append(backHead("#/namaz", LX("Зикр", "Зікір", "Zikir"), LX("Поминание Аллаха — каждый день", "Аллаһты күн сайын еске алу", "Her gün Allah'ı anmak")));
-  const nav = h("nav", { class: "zk-tabs", role: "tablist" }, ZK_TABS.map(([k, t]) => h("a", { href: "#/zikr" + (k ? "/" + k : ""), role: "tab", "aria-selected": String(k === tab), class: k === tab ? "on" : "" }, L({ kk: t[0], ru: t[1], tr: t[2] }))));
+  v.append(backHead(zikrExitHref(), LX("Зикр", "Зікір", "Zikir"), LX("Поминание Аллаха — каждый день", "Аллаһты күн сайын еске алу", "Her gün Allah'ı anmak"), null, "zikr"));
+  const nav = h("nav", { class: "zk-tabs", role: "tablist" }, ZK_TABS.map(([k, t]) => h("a", { href: "#/zikr" + (k ? "/" + k : ""), role: "tab", "aria-selected": String(k === tab), class: k === tab ? "on" : "", onclick: e => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button > 0) return; e.preventDefault(); replaceRouteHash("#/zikr" + (k ? "/" + k : "")); route(); } }, L({ kk: t[0], ru: t[1], tr: t[2] }))));
   v.append(nav);
   const list = zkList(d, tab);
   if (tab === "morning" || tab === "evening") {
@@ -2502,7 +2515,7 @@ async function zkCounter(v, id) {
     front.classList.toggle("long", long);
     front.innerHTML = `<span class="ts-ar${x.ar.length > 30 ? " long" : ""}" lang="ar">${esc(x.ar)}</span><span class="ts-tl">${esc(L(x.tl))}</span><span class="ts-m">${esc(L(x.m))}</span>` +
       (x.h ? `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите — хадис и источник", "Басыңыз — хадис пен дереккөз", "Dokunun — hadis ve kaynak"))}</span>` : "");
-    back.innerHTML = x.h ? `<span class="ts-d">${esc(L(x.h.by))}</span><span class="ts-q">${esc(L(x.h.q))}</span><span class="pill ts-src">${esc(L(x.h.s))}</span>` +
+    back.innerHTML = x.h ? `<span class="ts-hadith-label">${esc(LX("Хадис", "Хадис", "Hadis"))}</span><span class="ts-d">${esc(L(x.h.by))}</span><span class="ts-q">${esc(hadithQuote(L(x.h.q)))}</span><span class="ts-src">${esc(L(x.h.s))}</span>` +
       `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите, чтобы вернуться", "Қайту үшін басыңыз", "Geri dönmek için dokunun"))}</span>` : "";
     fav.innerHTML = ""; fav.append(favBtn(x.id));
     const src = x.au ? ayahURL(x.au.s, x.au.a) : x.hm ? hisnURL(x.hm) : null;
@@ -2520,7 +2533,7 @@ async function zkCounter(v, id) {
   const go = dir => {
     stopAudio();
     k = (k + dir + list.length) % list.length;
-    history.replaceState(null, "", `#/zikr/c/${list[k].id}${ctx ? "?" + ctx : ""}`);
+    replaceRouteHash(`#/zikr/c/${list[k].id}${ctx ? "?" + ctx : ""}`);
     card.classList.remove("flipped", "in-l", "in-r"); void card.offsetWidth; card.classList.add(dir > 0 ? "in-r" : "in-l");
     faces(); draw();
   };
@@ -2841,13 +2854,15 @@ function namazHeading(title, sub) {
 async function nzRamadan(v) {
   v.append(backHead("#/namaz", LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"), LX("Время намазов, сухур и ифтар по дням", "Намаз уақыттары, сәресі мен ауызашар", "Gün gün namaz vakitleri, sahur ve iftar")));
   const c = S.city;
-  if (!c) { v.append(h("div", { class: "card stack" }, h("p", {}, LX("Сначала выберите город — расписание считается для него.", "Алдымен қаланы таңдаңыз — кесте соған есептеледі.", "Önce şehir seçin — takvim ona göre hesaplanır.")), h("a", { class: "btn", href: "#/namaz/times" }, LX("Выбрать город", "Қаланы таңдау", "Şehir seç")))); return; }
+  const chooseCity = () => cityPicker(() => { if (v.isConnected) { v.replaceChildren(); nzRamadan(v); } });
+  if (!c) { v.append(h("section", { class: "card stack ram-empty" }, h("h2", {}, LX("Рамадан в вашем городе", "Қалаңыздағы Рамазан", "Şehrinizde Ramazan")), h("button", { class: "btn", type: "button", onclick: chooseCity, html: icon("pin") + esc(LX("Выбрать город", "Қаланы таңдау", "Şehir seç")) }))); return; }
   const R = ramadanDays();
   if (!R.length) { v.append(h("p", { class: "muted" }, LX("Ваш браузер не знает исламский календарь.", "Браузеріңіз ислам күнтізбесін білмейді.", "Tarayıcınız Hicri takvimi desteklemiyor."))); return; }
   const loading = h("div", { class: "loading" }, "…"); v.append(loading);
   // официальное расписание, если оно уже опубликовано на эти даты; иначе — расчёт
   let rows = null, calc = false;
   try { if (c.src === "dumk") rows = await dumkYear(c, R[0][0].getFullYear()); else if (c.src === "dy") rows = await dyRows(c, ymd(R[0][0])); } catch (e) {}
+  if (!v.isConnected) return;
   const T0 = R.map(([d]) => { const r = rows && rows.find(x => x[0] === ymd(d)); if (r) { const o = {}; PT_KEYS.forEach((k, i) => o[k] = r[i + 1]); return o; }
     calc = true; if (!hasCityCoords(c)) return Object.fromEntries(PT_KEYS.map(k => [k, "—"])); return c.src === "dumk" ? calcTimes(d, +c.lat, +c.lng, cityOff(c, d), 15, 15) : calcTimes(d, +c.lat, +c.lng, cityOff(c, d)); });
   loading.remove();
@@ -2858,7 +2873,7 @@ async function nzRamadan(v) {
   const body = R.map(([d, p], i) => { const t = T0[i], q = p.d === 27;
     return `<tr class="${ymd(d) === td ? "now" : ""}${q ? " qadr" : ""}"><td class="rd"><b class="num">${p.d}</b><small>${esc(dm.format(d))}<br>${esc(wd.format(d))}</small></td>${cols.map(([k, , cl]) => `<td class="num${cl ? " " + cl : ""}">${esc(t[k] || "")}</td>`).join("")}</tr>`; }).join("");
   const year = R[0][1].y;
-  v.append(h("div", { class: "ram-h" }, h("span", { class: "ar", lang: "ar" }, "رَمَضَان"), h("div", {}, h("b", {}, `${LX("Рамадан", "Рамазан", "Ramazan")} ${year}`), h("small", { class: "muted" }, `${c.title}${calc ? " · " + LX("расчёт", "есеп", "hesaplama") : ""}`))),
+  v.append(h("div", { class: "ram-h" }, h("span", { class: "ar", lang: "ar" }, "رَمَضَان"), h("div", {}, h("b", {}, `${LX("Рамадан", "Рамазан", "Ramazan")} ${year}`), h("small", { class: "muted" }, `${c.title}${calc ? " · " + LX("расчёт", "есеп", "hesaplama") : ""}`)), h("button", { class: "pill", type: "button", onclick: chooseCity }, LX("Сменить город", "Қаланы ауыстыру", "Şehri değiştir"))),
     h("div", { class: "rk-wrap ram-wrap", html: `<table class="ram"><thead><tr><th>${esc(LX("День", "Күн", "Gün"))}</th>${cols.map(([, n, cl]) => `<th class="${cl || ""}">${esc(n)}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table>` }),
     h("p", { class: "muted small", style: "margin-top:10px" }, (calc ? LX("Официальное расписание на эти дни ещё не опубликовано — время рассчитано по координатам и может отличаться на 1–3 минуты. Ближе к Рамадану сверьтесь с мечетью. ", "Бұл күндерге ресми кесте әлі жарияланбаған — уақыт координаттар бойынша есептелді, 1–3 минутқа өзгеше болуы мүмкін. Рамазанға жақын мешітпен тексеріңіз. ", "Bu günlerin resmî takvimi henüz yayımlanmadı — vakitler koordinatlara göre hesaplandı, 1–3 dakika farklı olabilir. Ramazan yaklaşınca camiden teyit edin. ") : "") +
       LX("Сухур заканчивается с началом утреннего намаза (имсак), ифтар — с наступлением магриба. 27-я ночь отмечена: возможно, это Ночь предопределения.", "Сәресі таң намазының уақыты кіргенде аяқталады, ауызашар — ақшам уақытымен. 27-түн белгіленген: Қадір түні болуы мүмкін.", "Sahur imsak vaktinde biter, iftar akşam vaktiyle açılır. 27. gece işaretlendi: Kadir gecesi olabilir.")));
@@ -2874,7 +2889,7 @@ async function nzTimes(v) {
     box.innerHTML = "";
     if (!S.city) {
       box.append(h("section", { class: "card stack pt-empty" }, h("h2", {}, LX("Ваш город", "Қалаңыз", "Şehriniz")),
-        h("p", { class: "muted" }, LX("Казахстан — официальное расписание ДУМК, Турция — Diyanet. Россия и другие страны — расчёт по солнцу.", "Қазақстан — ҚМДБ ресми кестесі, Түркия — Diyanet. Ресей және басқа елдер — күн бойынша есеп.", "Kazakistan — DUMK'un resmî vakitleri. Türkiye — Diyanet. Rusya ve diğer ülkeler — güneşe göre hesap.")),
+
         h("button", { class: "btn", type: "button", onclick: () => cityPicker(draw), html: icon("pin") + esc(LX("Выбрать город", "Қаланы таңдау", "Şehir seç")) })));
       return;
     }
@@ -2994,7 +3009,8 @@ function compassTracker({ onHeading, onState, target = window, orientation = win
   };
 }
 function qiblaCard(lat, lng) {
-  let q = qiblaDeg(lat, lng), latestHeading = null, precise = false, disposed = false, compassState = "idle";
+  const q = qiblaDeg(lat, lng), precise = S.city?.id === "geo";
+  let latestHeading = null, disposed = false, compassState = "idle";
   const dial = h("div", { class: "qb-dial", html:
     `<svg viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="2"/>` +
     [0, 90, 180, 270].map((a, i) => `<text x="${100 + 78 * Math.sin(a * Math.PI / 180)}" y="${104 - 78 * Math.cos(a * Math.PI / 180)}" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor" opacity="${i ? .45 : .9}">${LX(["С", "В", "Ю", "З"], ["С", "Ш", "О", "Б"], ["K", "D", "G", "B"])[i]}</text>`).join("") +
@@ -3033,16 +3049,7 @@ function qiblaCard(lat, lng) {
     rot.classList.toggle("ok", flat && !(event.webkitCompassAccuracy > 20) && Math.abs(compassDelta(latestHeading, q)) < 5);
   }, onState: state => { if (!disposed && state !== compassState) showState(state); } });
   b.onclick = () => tracker.start();
-  const geo = h("button", { class: "btn ghost qb-location", type: "button", html: icon("pin") + esc(LX("Уточнить местоположение", "Орналасқан жерді нақтылау", "Konumu hassaslaştır")), onclick: () => {
-    if (!navigator.geolocation) return;
-    geo.disabled = true;
-    navigator.geolocation.getCurrentPosition(position => {
-      if (disposed || !rot.isConnected) return;
-      q = qiblaDeg(position.coords.latitude, position.coords.longitude); precise = true; updateBearing(); geo.disabled = false;
-      rot.classList.toggle("ok", compassState === "active" && latestHeading !== null && Math.abs(compassDelta(latestHeading, q)) < 5);
-    }, () => { if (!disposed) { geo.disabled = false; toast(LX("Местоположение не получено. Сохранено направление для выбранного города.", "Орын анықталмады. Таңдалған қала бағыты сақталды.", "Konum alınamadı. Seçilen şehrin yönü korunuyor.")); } }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
-  } });
-  const card = h("section", { class: "card qb" }, h("h2", {}, LX("Кибла", "Құбыла", "Kıble")), rot, bearing, st, b, navigator.geolocation ? geo : null,
+  const card = h("section", { class: "card qb" }, h("h2", {}, LX("Кибла", "Құбыла", "Kıble")), rot, bearing, st, b,
     h("p", { class: "muted small" }, LX("Геолокация задаёт точку, компас — поворот телефона. Точность зависит от датчиков и магнитных помех; держите телефон горизонтально вдали от металла.", "Геолокация орынды, компас телефон бұрылысын анықтайды. Дәлдік датчик пен магниттік кедергілерге тәуелді; телефонды металдан алыс, көлденең ұстаңыз.", "Konum yerinizi, pusula telefonun dönüşünü belirler. Doğruluk sensörlere ve manyetik parazite bağlıdır; telefonu yatay ve metalden uzakta tutun.")));
   card.stopCompass = () => { disposed = true; tracker.dispose(); };
   onRouteLeave(card.stopCompass);
