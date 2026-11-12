@@ -1902,35 +1902,30 @@ body:not([data-page="home"]) .footer-faq{display:none}
 @media(max-width:360px){.atelier-intro h1{font-size:25px}.atelier-lesson{grid-template-columns:minmax(0,1fr) 60px;gap:8px;padding:17px 15px}.atelier-lesson h2{font-size:20px}.atelier-start{font-size:12px;padding:11px}.letter-arch{height:155px}.letter-arch-glyph{font-size:65px}.letter-arch-glyph.multi-letter{font-size:30px}.atelier-today small{display:none}.atelier-progress-number span{font-size:9px}.home-portal{padding:18px}.exercise-sample .forms-joined[lang="ar"]{font-size:32px}.exercise-sample .forms-sequence [lang="ar"]{font-size:16px}.forms-sequence{gap:2px}.exercise-sample .build-pieces [lang="ar"]{font-size:22px;min-width:24px}.build-pieces{gap:4px}}
 .letter-dots{fill:var(--warm-ink)}@media(max-width:360px){.atelier-today small{display:inline;font-size:9px}}
 
-/* Opaque mobile chrome: content never tints the header while scrolling. */
-@media(max-width:899px){
-  .top{background:var(--bg);border-bottom:1px solid var(--line);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;isolation:isolate}
-  .top:before{content:"";position:absolute;inset:auto 0 100%;height:env(safe-area-inset-top,0px);background:var(--bg);pointer-events:none}
-  .top .chip,.top .chip.on{background:transparent;border:0;border-radius:0;height:44px;min-width:44px;padding:0 4px;gap:6px}
-  .top .chip svg{width:18px;height:18px}.top .chip .num{font-size:13px}
-}
-/* A continuous reading surface; memorization and teaching cards retain their layout. */
-.reading-book .ayahs{grid-template-columns:minmax(0,1fr);min-width:0;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-top:22px;overflow:clip}
-.reading-book .ay{min-width:0;background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:26px 28px;box-shadow:none;scroll-margin-top:154px}
-.reading-book .ay:last-child{border-bottom:0}.reading-book .ay.cur{background:var(--surface-2);box-shadow:inset 3px 0 var(--gold)}
-.reading-book .ay .at{line-height:2.3}.reading-book .ay-no{background:transparent;color:var(--warm-ink);border:1px solid var(--line);border-radius:50%;font-size:11px;min-width:27px;height:27px;margin-top:12px}
-.reading-book .ay .meta{margin-top:12px;gap:12px}.reading-book .ay .tr{line-height:1.7}.reading-book .ay .tl{font-size:15.5px;line-height:1.85;margin-top:14px}
-.reading-book .rl-b{border-color:transparent;border-radius:4px;background:transparent;font-size:11.5px;padding:4px 8px 4px 0;min-height:32px}.reading-book .rl-b:hover{background:var(--surface-2)}
-.reading-book .ay .pa{border-color:var(--line);background:transparent;width:42px;height:42px}
-.reading-book .reading-panel{background:var(--surface-2);border-radius:12px;border-color:var(--line)}
-.reading-book .reading-playbar{border-color:var(--line);box-shadow:0 3px 12px rgba(8,36,27,.04);border-radius:12px}
-body:not([data-page="namaz"]) .subtabs a[aria-current="page"]{box-shadow:inset 0 -2px var(--gold)}
-.learning-rail a.current .rail-number{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold-soft)}
-body:not([data-page="namaz"]) #view.vin{animation:none}
-@media(prefers-reduced-motion:no-preference){
-  body:not([data-page="namaz"]) .btn,body:not([data-page="namaz"]) .subtabs a,body:not([data-page="namaz"]) .reading-toggle{transition:background-color .14s ease,border-color .14s ease,box-shadow .14s ease,transform .12s ease}
-  body:not([data-page="namaz"]) .btn:active{transform:scale(.99)}
-  .reader-view .reading-fold[open]>.reading-fold-body{animation:readerReveal .14s ease}
-}
-@keyframes readerReveal{from{opacity:.92;transform:translateY(2px)}to{opacity:1;transform:none}}
-@media(max-width:700px){
-  .reading-book .ayahs{margin-top:18px;border-radius:6px}.reading-book .ay{padding:22px 17px;scroll-margin-top:154px}.reading-book .ay .at{line-height:2.25}.reading-book .ay .tl{font-size:15px;line-height:1.8}
-  .reading-book .ay .meta{gap:10px}.reading-book .reading-panel{border-radius:10px}.reading-book .reading-playbar{border-radius:10px}
-}
-.reading-book .ay .tl{font-size:17px;border-top:0;padding-top:0}.reading-book .ay .bmk:not([aria-pressed="true"]){background:transparent;border-color:var(--line)}.reading-book .ay .bmk[aria-pressed="true"]{background:var(--gold-soft);border-color:var(--gold);color:var(--warm-ink)}
-@media(max-width:700px){.reading-book .ay .tl{font-size:16px}}
+/* v34 — только согласованные точечные правки опубликованного оформления. */
+.quran-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;justify-self:stretch;max-width:none;overflow:visible;gap:4px;padding:4px;border-radius:16px}
+.quran-tabs a{display:flex;align-items:center;justify-content:center;min-width:0;min-height:46px;padding:10px 8px;text-align:center;white-space:normal;line-height:1.4;border-radius:12px}
+.reader-gallery{grid-template-columns:repeat(4,minmax(0,1fr));gap:22px 18px}
+.reader-gallery .reader{background:none;border-color:transparent;box-shadow:none;border-radius:14px;padding:12px 4px;align-items:center;gap:12px;overflow:visible}
+.reader-gallery .reader:hover{background:var(--surface-2);box-shadow:none;border-color:transparent}
+.reader-gallery .reader.cur{border-color:transparent}
+.reader-gallery .reader .rava{width:88px;height:88px;aspect-ratio:1;border-radius:50%;flex:none;box-shadow:0 0 0 3px var(--surface)}
+.reader-gallery .reader.cur .rava{box-shadow:0 0 0 3px var(--primary)}
+.reader-gallery .reader .rd-t{width:100%;padding:0;min-height:0;flex:none;text-align:center;min-width:0}
+.reader-gallery .reader .rd-t b{display:block;font-size:14px;line-height:1.5;font-weight:600;margin:0;overflow-wrap:break-word}
+.reader-gallery .reader .rd-t>small,.reader-gallery .reader .rd-st,.reader-gallery .reader .go{display:none}
+.rava.sm{width:44px;height:44px;aspect-ratio:1;border-radius:50%}
+.rd-head .rava.lg{width:112px;height:112px;aspect-ratio:1;border-radius:50%}
+.home-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.home-heading h1{flex:1;min-width:0;margin:0}
+.home-ramadan{display:flex;flex-direction:column;justify-content:center;align-items:center;flex:none;width:52px;height:52px;gap:3px;padding:5px 2px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--primary);text-decoration:none}
+.home-ramadan>span{display:flex}.home-ramadan svg{width:23px;height:23px}.home-ramadan small{font-size:9px;font-weight:600;line-height:1.2}
+.home-ramadan:hover{background:var(--surface-2)}.home-ramadan:focus-visible,.reader-gallery .reader:focus-visible{outline:3px solid var(--primary);outline-offset:4px}
+.atelier-intro>p{margin-top:12px}
+.aod{grid-template-columns:minmax(0,1fr);gap:14px;align-content:start;padding:18px 20px}
+.aod-h{min-height:38px;position:relative;z-index:1}
+.aod .aod-ar[lang="ar"]{zoom:1;font-size:calc(clamp(24px,5vw,30px) * var(--arz));line-height:2.4;display:flow-root;min-width:0;padding:.45em 0 .3em;overflow-wrap:break-word}
+.aod-tl{margin:0;line-height:1.8}
+.me-ava>svg{width:30px;height:30px}
+@media(max-width:700px){.reader-gallery{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 10px}.reader-gallery .reader .rava{width:72px;height:72px}.reader-gallery .reader .rd-t b{font-size:12px;line-height:1.45}.reader-gallery .reader{padding:10px 2px;gap:10px}.home-heading{gap:12px}.home-ramadan{width:48px;height:48px}.home-ramadan svg{width:21px;height:21px}}
+@media(max-width:520px){.quran-tabs{grid-template-columns:repeat(2,minmax(0,1fr));border-radius:14px}.quran-tabs a{font-size:13px;min-height:44px;padding:9px 7px}.aod{padding:16px;gap:12px}.rd-head .rava.lg{width:96px;height:96px}}

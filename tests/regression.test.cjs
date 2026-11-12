@@ -563,3 +563,14 @@ test('design: all nine exercise choices stay open and recall only appears when a
     assert.equal(v.all().some(x => x.tag === 'a' && x.attrs.href === '#/mistakes/train'), hasRecall);
   }
 });
+
+
+test('profile: initials follow the user name across scripts, spaces and combining marks', () => {
+  const h = load(section('function profileInitial(', 'function pageMe('), { S: { lang: 'ru' } });
+  assert.equal(h.profileInitial('  Boris Smith  '), 'B');
+  assert.equal(h.profileInitial('Иса'), 'И');
+  assert.equal(h.profileInitial('😀 ali'), 'A');
+  assert.equal(h.profileInitial('c\u0327agla', 'tr'), 'Ç');
+  assert.equal(h.profileInitial('isa', 'tr'), 'İ');
+  assert.equal(h.profileInitial(null), '?');
+});
