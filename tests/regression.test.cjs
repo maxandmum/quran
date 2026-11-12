@@ -674,3 +674,57 @@ test('Ramadan empty state: one city action opens the picker without routing to p
   assert.equal(buttons[0].textContent, 'Выбрать город'); buttons[0].onclick(); assert.equal(picks, 1);
   assert.equal(v.all().filter(x => x.tag === 'a' && x.attrs.href === '#/namaz/times').length, 0);
 });
+
+function normalizedArabic(text) {
+  return String(text).replace(/ٱ/g, 'ا').replace(/ﷺ/g, 'صلى الله عليه وسلم').normalize('NFKD').replace(/[^\u0621-\u064a]/g, '');
+}
+test('zikr audio: all ten recorded Hisn formulas match the source and retain all three localizations', () => {
+  const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/zikr.json')));
+  const refs = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/zikr-audio-reference.json')));
+  const recorded = data.items.filter(x => x.hm);
+  assert.equal(recorded.length, 10); assert.equal(refs.items.length, recorded.length);
+  for (const x of recorded) {
+    const ref = refs.items.find(r => r.id === x.id); assert.ok(ref, x.id);
+    assert.equal(x.hm, ref.hm, x.id); assert.equal(normalizedArabic(x.ar), normalizedArabic(ref.expected), x.id);
+    for (const lang of ['ru', 'kk', 'tr']) { assert.ok(x.tl[lang], x.id + ':' + lang); assert.ok(x.m[lang]); }
+  }
+});
+test('zikr audio: whole suras play every verse; Kursi remains one verse, invalid ranges cannot play', () => {
+  const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/zikr.json')));
+  const CORE = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/core.json')));
+  const c = load(section('function zikrAudioTracks(', 'const TS_AFTER ='), { suraBy: n => CORE.suras.find(s => s.n === n), ayahURL: (s, a) => s + ':' + a, hisnURL: n => 'hisn:' + n });
+  for (const [id, count] of [['fatiha', 7], ['ikhlas', 4], ['falaq', 5], ['nas', 6], ['kursi', 1]]) {
+    const x = data.items.find(x => x.id === id), tracks = c.zikrAudioTracks(x);
+    assert.equal(tracks.length, count, id); assert.equal(tracks[0], x.au.s + ':' + x.au.a);
+    assert.equal(tracks.at(-1), x.au.s + ':' + (x.au.to || x.au.a));
+  }
+  for (const au of [{ s: 1, a: 1, to: 8 }, { s: 1, a: 3, to: 2 }, { s: 1, a: 0 }, { s: 999, a: 1 }]) assert.equal(c.zikrAudioTracks({ au }).length, 0);
+  assert.equal(c.zikrAudioTracks({ hm: 98 })[0], 'hisn:98');
+});
+test('trainer hint: can open, close and reopen without disabling or counting help twice', () => {
+  const c = load(section('function bindHintToggle(', 'function pageTrainer('), {});
+  const button = h('button'), box = h('div'); box.hidden = true; let used = 0;
+  c.bindHintToggle(button, box, () => used++);
+  button.onclick(); assert.equal(box.hidden, false); assert.equal(button.attrs['aria-expanded'], 'true'); assert.equal(used, 1);
+  button.onclick(); assert.equal(box.hidden, true); assert.equal(button.attrs['aria-expanded'], 'false'); assert.equal(used, 1);
+  button.onclick(); assert.equal(box.hidden, false); assert.equal(used, 1); assert.ok(!button.disabled);
+});
+
+test('memorization transcription: Russian and Kazakh stay Cyrillic, Turkish stays Latin for every cached ayah', () => {
+  const S = { lang: 'ru' };
+  const c = load(section('const CYR_TR =', 'const LX =') + '\nthis.transcription = TLC;', { S, L: o => typeof o === 'string' ? o : o?.[S.lang] || o?.ru || o?.kk || '' });
+  for (const file of fs.readdirSync(path.join(__dirname, '../quran')).filter(x => /^\d{3}\.json$/.test(x))) {
+    const sura = JSON.parse(fs.readFileSync(path.join(__dirname, '../quran', file)));
+    for (const ayah of sura.ayat) for (const lang of ['ru', 'kk', 'tr']) {
+      S.lang = lang; const text = c.transcription(ayah.tr);
+      assert.ok(text.trim(), file + ':' + ayah.n + ':' + lang);
+      if (lang === 'tr') { assert.match(text, /[A-Za-z]/); assert.doesNotMatch(text, /\p{Script=Cyrillic}/u); }
+      else assert.match(text, /\p{Script=Cyrillic}/u);
+    }
+  }
+});
+test('memorization transcription: a fresh memorization preference is enabled independently of reading', () => {
+  const c = load(section('const blank =', 'let S = blank();') + '\nthis.defaults = blank;', {});
+  const state = c.defaults(); state.view.tr = false;
+  assert.equal(state.view.hifzTr, true); assert.equal(state.view.tr, false);
+});
