@@ -639,3 +639,38 @@ test('navigation: origins survive rerender, reload state and browser back, with 
   const reloaded = load(section('let ROUTE_HASH =', 'let ROUTE_SEQ ='), { location, history }); reloaded.rememberRouteOrigin(); assert.equal(reloaded.routeOrigin(), '#/');
   location.hash = '#/namaz/times'; history.state = null; c.rememberRouteOrigin(); assert.equal(c.routeOrigin(), '#/namaz/ramadan');
 });
+
+test('zikr tabs: replacement keeps the outer entry and never stacks filter visits', () => {
+  const location = { hash: '#/' }; let writes = 0;
+  const history = { state: null, replaceState(state, title, hash) { this.state = state; if (hash) location.hash = hash; writes++; } };
+  const c = load(section('let ROUTE_HASH =', 'let ROUTE_SEQ =') + section('function zikrExitHref()', 'function hadithQuote('), { location, history });
+  c.rememberRouteOrigin(); location.hash = '#/zikr'; history.state = null; c.rememberRouteOrigin();
+  assert.equal(c.zikrExitHref(), '#/');
+  for (const tab of ['fav', 'morning', 'evening']) {
+    c.replaceRouteHash('#/zikr/' + tab); c.rememberRouteOrigin();
+    assert.equal(c.routeOrigin(), '#/'); assert.equal(c.zikrExitHref(), '#/');
+  }
+  const saved = structuredClone(history.state);
+  const reload = load(section('let ROUTE_HASH =', 'let ROUTE_SEQ =') + section('function zikrExitHref()', 'function hadithQuote('), { location, history });
+  reload.rememberRouteOrigin(); assert.equal(reload.zikrExitHref(), '#/');
+  history.state = { ...saved, iqraNav: { hash: location.hash, from: '#/zikr/c/tawhid?evening' } };
+  assert.equal(c.zikrExitHref(), '#/');
+  assert.ok(writes > 0);
+});
+test('section back: zikr filters cannot override exit while Ramadan retains its real origin', () => {
+  for (const [origin, sectionName, expected, pops] of [['#/zikr/fav', 'zikr', '#/namaz', 0], ['#/', 'zikr', '#/', 1], ['#/', undefined, '#/', 1]]) {
+    let back = 0;
+    const c = load(section('const backHead =', 'const fmtN =') + '\nthis.makeBack = backHead;', { h, routeOrigin: () => origin, T: x => x, icon: () => '', history: { back() { back++; } } });
+    const header = c.makeBack('#/namaz', 'Zikr', null, null, sectionName), link = header.children[0];
+    assert.equal(link.attrs.href, expected);
+    link.onclick({ preventDefault() {} }); assert.equal(back, pops);
+  }
+});
+test('Ramadan empty state: one city action opens the picker without routing to prayer times', async () => {
+  let picks = 0;
+  const c = load(section('async function nzRamadan(', 'async function nzTimes('), { h, S: { city: null }, backHead: () => h('header'), LX: x => x, esc: x => x, icon: () => '', cityPicker: () => picks++ });
+  const v = h('main'); await c.nzRamadan(v);
+  const buttons = v.all().filter(x => x.tag === 'button'); assert.equal(buttons.length, 1);
+  assert.equal(buttons[0].textContent, 'Выбрать город'); buttons[0].onclick(); assert.equal(picks, 1);
+  assert.equal(v.all().filter(x => x.tag === 'a' && x.attrs.href === '#/namaz/times').length, 0);
+});
