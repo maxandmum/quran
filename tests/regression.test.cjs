@@ -398,7 +398,7 @@ test('router: late asynchronous rendering cannot append to the current page', as
   prepare(current);
   const location = { hash: '#/ref' };
   const context = load(section('let ROUTE_SEQ =', '\nfunction notFound('), {
-    h, location, document: { querySelectorAll: () => [], body: { dataset: {} } },
+    h, location, rememberRouteOrigin() {}, document: { querySelectorAll: () => [], body: { dataset: {} } },
     $: () => current, window: { scrollTo() {} }, ASK_DISMISS: null, RTIP: null, stopAudio() {}, onListenChange: null,
     markNav() {}, pageRef: async view => { await new Promise(resolve => { release = resolve; }); view.append('old page'); },
     pageMe: view => view.append('current page'), notFound: () => assert.fail('unexpected route failure'),
@@ -533,7 +533,7 @@ test('design: home preserves next lesson and progress with open destinations', a
   for (const [n, completed, allDone] of [[1, 0, false], [2, 1, false], [110, 110, true]]) {
     const c = load(menuHelpers() + section('async function pageHome(', '/* ═════════════ карта курса'), {
       ...ui, S: { lang: 'ru' }, COURSE: { lessons: Array.from({ length: 110 }, (_, i) => ({ n: i + 1, title: `Lesson ${i + 1}` })), modules: [{ id: 1, title: 'Alphabet', from: 1, to: 30 }] },
-      homeLearningState: () => ({ n, completed, allDone, started: completed > 0, total: 110, points: 12, goal: 30 }),
+      ramadanShortcut: () => h("a", { href: "#/namaz/ramadan" }), homeLearningState: () => ({ n, completed, allDone, started: completed > 0, total: 110, points: 12, goal: 30 }),
       rvDue: () => [], mistakeEntries: () => [], heroGlyph: () => 'ا',
       pageHead: (title, sub) => h('header', {}, h('h1', {}, title), h('p', {}, sub)),
       ayahOfDay: () => h('div', {}, 'Daily ayah'), ramadanRow: () => null
@@ -573,4 +573,69 @@ test('profile: initials follow the user name across scripts, spaces and combinin
   assert.equal(h.profileInitial('c\u0327agla', 'tr'), 'Ç');
   assert.equal(h.profileInitial('isa', 'tr'), 'İ');
   assert.equal(h.profileInitial(null), '?');
+});
+
+function compassHarness(Device = {}) {
+  const target = new EventTarget(), orientation = new EventTarget(); orientation.angle = 0;
+  const headings = [], states = [], timers = new Map(); let nextTimer = 0;
+  const c = load(section('const compassAngle =', 'function qiblaCard('), { window: {} });
+  const tracker = c.compassTracker({ target, orientation, Device,
+    onHeading: h => headings.push(h), onState: s => states.push(s),
+    setTimer: fn => { timers.set(++nextTimer, fn); return nextTimer; }, clearTimer: id => timers.delete(id)
+  });
+  const emit = (attrs, type = 'deviceorientation') => { const e = new Event(type); Object.assign(e, attrs); target.dispatchEvent(e); };
+  return { c, tracker, target, orientation, headings, states, timers, emit };
+}
+test('compass: relative, missing, invalid or uncalibrated data cannot supply north', () => {
+  const { c } = compassHarness();
+  for (const event of [{ alpha: 30, absolute: false }, { alpha: null, absolute: true }, { alpha: NaN, absolute: true }, { webkitCompassHeading: 20, webkitCompassAccuracy: -1 }]) assert.equal(c.compassHeading(event), null);
+  assert.equal(c.compassHeading({ webkitCompassHeading: 0, webkitCompassAccuracy: 5 }), 0);
+  assert.equal(c.compassHeading({ alpha: 90, absolute: true, beta: 0, gamma: 0 }), 270);
+  assert.equal(c.compassHeading({ type: 'deviceorientationabsolute', alpha: 90 }), 270);
+});
+test('compass: screen orientation and tilt preserve cardinal directions', () => {
+  const { c } = compassHarness();
+  assert.equal(c.compassHeading({ webkitCompassHeading: 350 }, 90), 80);
+  for (const beta of [0, 20, 35]) {
+    assert.ok(Math.abs(c.compassHeading({ absolute: true, alpha: 270, beta, gamma: 15 }) - 90) < 1e-8);
+  }
+  assert.equal(c.compassHeading({ absolute: true, alpha: 0, beta: 0, gamma: 0 }, 90), 90);
+  assert.equal(c.compassHeading({ absolute: true, alpha: 0, beta: 90, gamma: 0 }), null);
+});
+test('compass: requests absolute permission, rotates across north without a full spin and disposes listeners', async () => {
+  let asked;
+  const h = compassHarness({ requestPermission: async absolute => { asked = absolute; return 'granted'; } });
+  await h.tracker.start(); assert.equal(asked, true); assert.deepEqual(h.states, ['waiting']);
+  h.emit({ webkitCompassHeading: 359 }); h.emit({ webkitCompassHeading: 1 });
+  assert.deepEqual(h.headings, [359, 361]);
+  h.orientation.angle = 90; h.orientation.dispatchEvent(new Event('change')); assert.equal(h.headings.at(-1), 451);
+  h.tracker.dispose(); h.emit({ webkitCompassHeading: 30 });
+  assert.equal(h.headings.length, 3); assert.equal(h.timers.size, 0);
+});
+test('compass: denial, silent sensor and stale data are explicit, never a false working compass', async () => {
+  const denied = compassHarness({ requestPermission: async () => 'denied' }); await denied.tracker.start();
+  assert.equal(denied.states.at(-1), 'denied'); denied.emit({ webkitCompassHeading: 0 }); assert.equal(denied.headings.length, 0);
+  const h = compassHarness(); await h.tracker.start(); h.emit({ alpha: 20, absolute: false });
+  assert.equal(h.headings.length, 0); [...h.timers.values()][0](); assert.equal(h.states.at(-1), 'unavailable');
+  await h.tracker.start(); h.emit({ absolute: true, alpha: 10 });
+  assert.equal(h.states.at(-1), 'active'); [...h.timers.values()][0](); assert.equal(h.states.at(-1), 'stale');
+  h.emit({ absolute: true, alpha: 20 }); assert.equal(h.states.at(-1), 'active'); h.tracker.dispose();
+});
+test('compass: leaving while permission is pending cannot attach a sensor later', async () => {
+  let allow;
+  const h = compassHarness({ requestPermission: () => new Promise(resolve => { allow = resolve; }) });
+  const pending = h.tracker.start(); h.tracker.dispose(); allow('granted'); await pending;
+  h.emit({ webkitCompassHeading: 10 }); assert.equal(h.headings.length, 0); assert.equal(h.timers.size, 0);
+});
+test('navigation: origins survive rerender, reload state and browser back, with direct-link fallback', () => {
+  const location = { hash: '#/' }, history = { state: null, replaceState(value) { this.state = value; } };
+  const c = load(section('let ROUTE_HASH =', 'let ROUTE_SEQ ='), { location, history });
+  c.rememberRouteOrigin(); const home = structuredClone(history.state); assert.equal(c.routeOrigin(), null);
+  location.hash = '#/namaz/ramadan'; history.state = null; c.rememberRouteOrigin();
+  assert.equal(c.routeOrigin(), '#/'); const calendar = structuredClone(history.state);
+  c.rememberRouteOrigin(); assert.equal(c.routeOrigin(), '#/');
+  location.hash = '#/'; history.state = home; c.rememberRouteOrigin(); assert.equal(c.routeOrigin(), null);
+  location.hash = '#/namaz/ramadan'; history.state = calendar; c.rememberRouteOrigin(); assert.equal(c.routeOrigin(), '#/');
+  const reloaded = load(section('let ROUTE_HASH =', 'let ROUTE_SEQ ='), { location, history }); reloaded.rememberRouteOrigin(); assert.equal(reloaded.routeOrigin(), '#/');
+  location.hash = '#/namaz/times'; history.state = null; c.rememberRouteOrigin(); assert.equal(c.routeOrigin(), '#/namaz/ramadan');
 });

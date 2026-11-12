@@ -1929,3 +1929,14 @@ body:not([data-page="home"]) .footer-faq{display:none}
 .me-ava>svg{width:30px;height:30px}
 @media(max-width:700px){.reader-gallery{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 10px}.reader-gallery .reader .rava{width:72px;height:72px}.reader-gallery .reader .rd-t b{font-size:12px;line-height:1.45}.reader-gallery .reader{padding:10px 2px;gap:10px}.home-heading{gap:12px}.home-ramadan{width:48px;height:48px}.home-ramadan svg{width:21px;height:21px}}
 @media(max-width:520px){.quran-tabs{grid-template-columns:repeat(2,minmax(0,1fr));border-radius:14px}.quran-tabs a{font-size:13px;min-height:44px;padding:9px 7px}.aod{padding:16px;gap:12px}.rd-head .rava.lg{width:96px;height:96px}}
+
+/* v35: one reading settings block and consistent secondary profile rows. */
+.reading-settings{border:1px solid var(--line);border-radius:12px;background:var(--surface);margin:10px 0}
+.reading-settings[hidden]{display:none!important}.reading-settings>.reading-panel{border:0;border-radius:12px;margin:0}.reading-settings>.reader-word-hint{padding:0 16px}
+.reading-adjust{display:inline-flex;align-items:center;gap:6px;text-decoration:none}.reading-adjust svg{width:18px;height:18px}.reading-adjust[aria-expanded="true"]{text-decoration:underline}
+.reading-resume{padding:9px 12px;margin:8px 0;border-radius:12px}.reading-resume>div{display:flex;align-items:center;flex-wrap:wrap;gap:3px 8px}.reading-resume b{font-size:12px}.reading-resume small{font-size:11px}.reading-resume .btn{min-height:44px}
+.me-f>summary{min-height:80px;box-sizing:border-box}.me-f>summary b{font-size:15px;line-height:1.5}.me-f>summary small{font-size:12px}.me-f>.progress-backup{padding-top:0}
+.namaz-heading .home-heading h1{margin:0}.bhead>.home-ramadan{margin-left:auto}.bhead:has(>.home-ramadan){align-items:flex-start}
+.qb-rot{transition:transform .1s linear;will-change:transform}.qb-status{min-height:3em}.qb .qb-location{font-size:12px}.qb [hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){.qb-rot{transition:none}}
+@media(max-width:360px){.bhead:has(>.home-ramadan){gap:8px}.bhead:has(>.home-ramadan) h1{font-size:21px}.me-f>summary{min-height:94px}.me-f>summary b{font-size:14px}}

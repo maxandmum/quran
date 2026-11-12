@@ -682,8 +682,13 @@ const quranTabs = cur => {
   return nav;
 };
 const pageHead = (title, sub, extra) => h("header", { class: "phead" }, h("h1", {}, title), sub ? h("p", { class: "muted" }, sub) : null, extra || null);
-const backHead = (href, title, sub, extra) => h("header", { class: "bhead" }, h("a", { class: "iconbtn back", href, "aria-label": T("prev"), html: icon("back") }),
-  h("div", { class: "bh-t" }, h("h1", {}, title), sub ? h("p", { class: "muted small" }, sub) : null), extra || null);
+const backHead = (href, title, sub, extra) => {
+  const from = routeOrigin();
+  const back = h("a", { class: "iconbtn back", href: from || href, "aria-label": T("prev"), html: icon("back"), onclick: e => {
+    if (from && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (!e.button || e.button === 0)) { e.preventDefault(); history.back(); }
+  } });
+  return h("header", { class: "bhead" }, back, h("div", { class: "bh-t" }, h("h1", {}, title), sub ? h("p", { class: "muted small" }, sub) : null), extra || null);
+};
 const fmtN = n => Number(n || 0).toLocaleString(LX("ru-RU", "kk-KZ", "tr-TR"));
 
 /* ───── всплывающее напоминание о правиле таджвида ───── */
@@ -709,6 +714,17 @@ async function ruleTip(k, at) {
   RTIP = { k, el };
 }
 /* ═════════════ маршрутизация ═════════════ */
+let ROUTE_HASH = null;
+const routeHash = () => location.hash || "#/";
+function rememberRouteOrigin() {
+  const hash = routeHash(), state = history.state || {};
+  if (state.iqraNav?.hash !== hash) history.replaceState({ ...state, iqraNav: { hash, from: ROUTE_HASH } }, "");
+  ROUTE_HASH = hash;
+}
+function routeOrigin() {
+  const entry = history.state?.iqraNav;
+  return entry?.hash === routeHash() && /^#\//.test(entry.from || "") && entry.from !== entry.hash ? entry.from : null;
+}
 let ROUTE_SEQ = 0;
 const ROUTE_CLEANUPS = [];
 const onRouteLeave = cleanup => ROUTE_CLEANUPS.push(cleanup);
@@ -719,6 +735,7 @@ const routeDelay = (fn, ms) => {
   return timer;
 };
 async function route() {
+  rememberRouteOrigin();
   const seq = ++ROUTE_SEQ;
   ROUTE_CLEANUPS.splice(0).forEach(cleanup => cleanup());
   document.querySelectorAll(".wbw-tip").forEach(el => el.remove());
@@ -826,7 +843,7 @@ async function pageHome(v) {
   const d = homeLearningState(), lesson = COURSE.lessons[d.n - 1], due = rvDue().length, mistakes = mistakeEntries(S).length;
   v.append(h("header", { class: "atelier-intro" }, h("span", { class: "atelier-kicker" }, "IQRA · " + LX("учиться каждый день", "күн сайын үйрену", "her gün öğren")),
     h("div", { class: "home-heading" }, h("h1", {}, LX("Учимся читать Коран", "Құран оқуды үйренеміз", "Kur'an okumayı öğreniyoruz")),
-      h("a", { class: "home-ramadan", href: "#/namaz/ramadan", "aria-label": LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"), title: LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi") }, h("span", { "aria-hidden": "true", html: icon("calendar") }), h("small", {}, LX("Рамадан", "Рамазан", "Ramazan")))), h("p", {}, LX("От первой буквы — к уверенному чтению. В своём темпе.", "Алғашқы әріптен сенімді оқуға. Өз қарқыныңмен.", "İlk harften güvenle okumaya. Kendi hızında."))));
+      ramadanShortcut()), h("p", {}, LX("От первой буквы — к уверенному чтению. В своём темпе.", "Алғашқы әріптен сенімді оқуға. Өз қарқыныңмен.", "İlk harften güvenle okumaya. Kendi hızında."))));
   const lessonCard = h("a", { class: "atelier-lesson", href: d.allDone ? "#/practice" : `#/lesson/${d.n}` },
     h("div", { class: "atelier-lesson-copy" }, h("span", { class: "atelier-eyebrow" }, d.allDone ? LX("Курс пройден", "Курс аяқталды", "Kurs tamamlandı") : d.started ? LX("Продолжим с этого места", "Осы жерден жалғастырайық", "Buradan devam edelim") : LX("Твой первый шаг", "Алғашқы қадамың", "İlk adımın")),
       h("h2", {}, d.allDone ? LX("Сохраним навык чтения", "Оқу дағдысын сақтайық", "Okuma becerini koru") : L(lesson.title)),
@@ -1960,10 +1977,13 @@ async function pageSura(v, n, hifz, goto) {
   if (ruleKeys.length) panel.append(h("details", { class: "reading-fold reading-colors" }, h("summary", {}, h("span", {}, LX("Что означают цвета?", "Түстер нені білдіреді?", "Renkler ne anlama geliyor?")), h("i", { html: icon("chev") })),
     h("div", { class: "reading-fold-body reading-legend" }, h("p", { class: "muted small" }, LX("Правила этой суры. Нажмите на название для объяснения.", "Осы сүренің ережелері. Түсіндірме үшін атауын басыңыз.", "Bu suredeki kurallar. Açıklama için adına dokunun.")),
       ruleKeys.map(k => h("button", { class: "reading-rule", type: "button", style: `--rc:${RC(k)}`, onclick: e => ruleTip(k, e.currentTarget) }, h("i"), h("span", {}, h("b", {}, L(CORE.rules[k].name)), h("small", {}, L(CORE.rules[k].short))), h("span", { html: icon("chev") }))))));
-  wrap.append(panel);
+  const settings = h("section", { class: "reading-settings", id: "reading-settings", hidden: "", "aria-label": T("settings") }, panel);
   const playBtn = h("button", { class: "btn reading-play", type: "button" });
   const audioStatus = h("p", { class: "reading-audio-status", role: "status", "aria-live": "polite" });
-  const adjust = h("button", { class: "reading-adjust", type: "button", onclick: () => { audioFold.open = true; routeDelay(() => audioFold.scrollIntoView({ block: "start", behavior: "instant" }), 0); } }, LX("Настроить", "Баптау", "Ayarla"));
+  const openAudioSettings = () => { settings.hidden = false; adjust.setAttribute("aria-expanded", "true"); audioFold.open = true; };
+  const adjust = h("button", { class: "reading-adjust", type: "button", "aria-controls": "reading-settings", "aria-expanded": "false", onclick: () => {
+    settings.hidden = !settings.hidden; adjust.setAttribute("aria-expanded", String(!settings.hidden));
+  }, html: icon("gear") + esc(T("settings")) });
   const playBar = h("section", { class: "reading-playbar", "aria-label": LX("Прослушивание аятов", "Аяттарды тыңдау", "Ayetleri dinleme") }, h("div", { class: "reading-play-row" }, playBtn, adjust), audioStatus);
   const guideButtons = [], guideNote = h("p", { class: "hifz-guide-note" });
   const setGuide = i => {
@@ -1978,14 +1998,14 @@ async function pageSura(v, n, hifz, goto) {
     });
     playBar.append(guide, guideNote); setGuide(0);
   }
-  wrap.append(playBar);
-  if (!hifz && savedPlace && suraBy(savedPlace.s)) {
-    const same = savedPlace.s === n, target = suraBy(savedPlace.s);
+  wrap.append(playBar, settings);
+  if (!hifz && savedPlace?.s === n && savedPlace.a > 1 && suraBy(savedPlace.s)) {
+    const target = suraBy(savedPlace.s);
     const caption = `${L(target.name)} · ${T("ayahN")} ${savedPlace.a}`;
     wrap.insertBefore(h("div", { class: "reading-resume" }, h("div", {}, h("b", {}, T("contRead")), h("small", {}, caption)),
-      same ? h("button", { class: "btn", type: "button", onclick: () => { stopAll(); rangeFrom.value = savedPlace.a; if (+rangeTo.value < savedPlace.a) rangeTo.value = s.c; syncPlayer(); jumpTo(savedPlace.a); } }, LX("К аяту", "Аятқа", "Ayete git")) : h("a", { class: "btn", href: `#/sura/${savedPlace.s}/${savedPlace.a}` }, LX("Продолжить", "Жалғастыру", "Devam et"))), panel);
+      h("button", { class: "btn", type: "button", onclick: () => { stopAll(); rangeFrom.value = savedPlace.a; if (+rangeTo.value < savedPlace.a) rangeTo.value = s.c; syncPlayer(); jumpTo(savedPlace.a); } }, LX("К аяту", "Аятқа", "Ayete git"))), settings);
   }
-  if (!hifz) wrap.append(h("p", { class: "muted small reader-word-hint" }, T(WBW_SURAS.has(n) && WBW_D ? "tapWordWbw" : "tapWordNo")));
+  if (!hifz) settings.append(h("p", { class: "muted small reader-word-hint" }, T(WBW_SURAS.has(n) && WBW_D ? "tapWordWbw" : "tapWordNo")));
   const syncPlayer = () => {
     const queue = readingPlaybackQueue(+rangeFrom.value, +rangeTo.value, s.c, rep, repeatMode);
     const valid = !!queue;
@@ -2109,7 +2129,7 @@ async function pageSura(v, n, hifz, goto) {
   const startPlayback = (single, index = idx) => {
     if (!audioReady) return;
     const queue = single ? readingPlaybackQueue(index + 1, index + 1, s.c, rep) : readingPlaybackQueue(+rangeFrom.value, +rangeTo.value, s.c, rep, repeatMode);
-    if (!queue) { audioFold.open = true; syncPlayer(); return; }
+    if (!queue) { openAudioSettings(); syncPlayer(); return; }
     stopAll(); playing = true; lastPlayed = 0; syncPlayer(); controller.start(queue);
   };
   playBtn.onclick = () => playing ? stopAll(LX("Остановлено.", "Тоқтатылды.", "Durduruldu.")) : startPlayback(false);
@@ -2250,8 +2270,7 @@ async function pageNamaz(v, sub) {
   if (sub === "duas") return nzDuas(v);
   if (sub === "ramadan") return nzRamadan(v);
   if (sub) return notFound(v);
-  v.append(pageHead(T("namaz"), LX("Ханафитский мазхаб · шаг за шагом", "Ханафи мазһабы · қадам-қадаммен", "Hanefi mezhebi · adım adım")), nextPrayerCard());
-  { const r = ramadanRow(); if (r) v.append(r); }
+  v.append(namazHeading(T("namaz"), LX("Ханафитский мазхаб · шаг за шагом", "Ханафи мазһабы · қадам-қадаммен", "Hanefi mezhebi · adım adım")), nextPrayerCard());
   const poses = h("span", { class: "nz-poses" });
   const drawP = () => { poses.innerHTML = ["qiyam", "ruku", "sujud", "julus"].map(k => `<span class="nz-pose"><span class="pz">${poseSVG(k)}</span><small>${esc(L({ kk: POSE_NAMES[k][0], ru: POSE_NAMES[k][1], tr: POSE_NAMES[k][2] }))}</small></span>`).join(""); };
   drawP();
@@ -2813,21 +2832,14 @@ function ramadanDays() { // дни ближайшего (или текущего
   const out = []; for (let i = 0; i < 31; i++) { const x = new Date(d); x.setDate(d.getDate() + i); const p = hijriParts(x); if (!p || p.m !== 9) break; out.push([x, p]); }
   return out;
 }
-function ramadanRow() {
-  const R = ramadanDays(); if (!R.length) return null;
-  const now = new Date(), left = Math.ceil((R[0][0] - now) / 864e5), on = left <= 0;
-  const fmt = new Intl.DateTimeFormat(S.lang === "kk" ? "ru" : S.lang, { day: "numeric", month: "long" });
-  const day = on ? R.findIndex(([d]) => ymd(d) === ymd(now)) + 1 : 0;
-  const sub = on ? LX(`Идёт Рамадан · день ${day} из ${R.length}`, `Рамазан айы · ${R.length} күннің ${day}-і`, `Ramazan · ${day}. gün / ${R.length}`)
-    : LX(`Начнётся ${fmt.format(R[0][0])} · через ${left} ${plRu(left, "день", "дня", "дней")}`, `${fmt.format(R[0][0])} басталады · ${left} күннен кейін`, `${fmt.format(R[0][0])} başlıyor · ${left} gün sonra`);
-  const el = h("a", { class: "ram-card" + (on ? " on" : ""), href: "#/namaz/ramadan", html:
-    `<span class="ram-moon">${icon("moon")}</span><span class="ram-t"><b>${esc(LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"))} ${R[0][1].y}</b><small>${esc(sub)}</small><small class="ram-it"></small></span>${icon("chev")}` });
-  // во время Рамадана — сразу время сухура и ифтара на сегодня
-  if (on && S.city) timesFor(S.city, now).then(t => { const x = $(".ram-it", el); if (x) x.textContent = LX(`Сухур до ${t.fajr} · ифтар в ${t.maghrib}`, `Сәресі ${t.fajr} дейін · ауызашар ${t.maghrib}`, `İmsak ${t.fajr} · iftar ${t.maghrib}`); }).catch(() => {});
-  return el;
+function ramadanShortcut() {
+  return h("a", { class: "home-ramadan", href: "#/namaz/ramadan", "aria-label": LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"), title: LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi") }, h("span", { "aria-hidden": "true", html: icon("calendar") }), h("small", {}, LX("Рамадан", "Рамазан", "Ramazan")));
+}
+function namazHeading(title, sub) {
+  return h("header", { class: "phead namaz-heading" }, h("div", { class: "home-heading" }, h("h1", {}, title), ramadanShortcut()), sub ? h("p", { class: "muted" }, sub) : null);
 }
 async function nzRamadan(v) {
-  v.append(backHead("#/namaz/times", LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"), LX("Время намазов, сухур и ифтар по дням", "Намаз уақыттары, сәресі мен ауызашар", "Gün gün namaz vakitleri, sahur ve iftar")));
+  v.append(backHead("#/namaz", LX("Календарь Рамадана", "Рамазан күнтізбесі", "Ramazan imsakiyesi"), LX("Время намазов, сухур и ифтар по дням", "Намаз уақыттары, сәресі мен ауызашар", "Gün gün namaz vakitleri, sahur ve iftar")));
   const c = S.city;
   if (!c) { v.append(h("div", { class: "card stack" }, h("p", {}, LX("Сначала выберите город — расписание считается для него.", "Алдымен қаланы таңдаңыз — кесте соған есептеледі.", "Önce şehir seçin — takvim ona göre hesaplanır.")), h("a", { class: "btn", href: "#/namaz/times" }, LX("Выбрать город", "Қаланы таңдау", "Şehir seç")))); return; }
   const R = ramadanDays();
@@ -2854,10 +2866,11 @@ async function nzRamadan(v) {
 }
 async function nzTimes(v) {
   const ru = S.lang === "ru";
-  v.append(backHead("#/namaz", LX("Время намазов", "Намаз уақыттары", "Namaz vakitleri"), LX("И направление киблы", "Және құбыла бағыты", "Ve kıble yönü")));
+  v.append(backHead("#/namaz", LX("Время намазов", "Намаз уақыттары", "Namaz vakitleri"), LX("И направление киблы", "Және құбыла бағыты", "Ve kıble yönü"), ramadanShortcut()));
   const box = h("div", { class: "pt-wrap" });
   v.append(box);
   const draw = async () => {
+    box.querySelector(".qb")?.stopCompass();
     box.innerHTML = "";
     if (!S.city) {
       box.append(h("section", { class: "card stack pt-empty" }, h("h2", {}, LX("Ваш город", "Қалаңыз", "Şehriniz")),
@@ -2880,7 +2893,7 @@ async function nzTimes(v) {
         : (LX(`Расчёт по солнцу: фаджр ${c.src === "dumk" ? 15 : 18}°, иша ${c.src === "dumk" ? 15 : 17}°, аср по ханафитскому мазхабу. Уточняйте у местной мечети.`, `Күн бойынша есеп: таң ${c.src === "dumk" ? 15 : 18}°, құптан ${c.src === "dumk" ? 15 : 17}°, екінті ханафи бойынша. Жергілікті мешіттен нақтылаңыз.`, `Güneşe göre hesap: sabah ${c.src === "dumk" ? 15 : 18}°, yatsı ${c.src === "dumk" ? 15 : 17}°, ikindi Hanefi'ye göre. Yerel camiye danışın.`)))
         + (foreignTz ? (LX(" Время указано местное для этого города.", " Уақыт осы қаланың жергілікті уақытымен.", " Saatler bu şehrin yerel saatidir.")) : "")));
     if (t.source === "calc" && c.src !== "calc") card.append(h("p", { class: "box warn" }, LX("Официальное расписание недоступно. Показано расчётное время — уточните его у местной мечети.", "Ресми кесте қолжетімсіз. Есептелген уақыт көрсетілді — жергілікті мешіттен нақтылаңыз.", "Resmî vakitler alınamadı. Hesaplanan saatler gösteriliyor; yerel camiden teyit edin.")));
-    box.append(...[card, ramadanRow(), hasCityCoords(c) ? qiblaCard(+c.lat, +c.lng) : null, remindCard("prayer")].filter(Boolean));
+    box.append(...[card, hasCityCoords(c) ? qiblaCard(+c.lat, +c.lng) : null].filter(Boolean));
   };
   draw();
 }
@@ -2902,32 +2915,14 @@ function icsDownload(fname, events) {
   const a = h("a", { href: URL.createObjectURL(blob), download: fname }); document.body.append(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
 }
-async function prayerICS(city, days = 30) {
-  const ru = S.lang === "ru", ev = [], base = cityNow(city);
-  for (let i = 0; i < days; i++) {
-    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
-    const t = await timesFor(city, d);
-    for (const k of ["fajr", "dhuhr", "asr", "maghrib", "isha"]) {
-      const m = /^(\d+):(\d+)/.exec(t[k] || ""); if (!m) continue;
-      const start = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), +m[1], +m[2]) - cityOff(city, new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12))) * 3600e3);
-      ev.push({ uid: `${ymd(d)}-${k}-${city.id}`, utc: true, start, title: `${LX("Намаз", "Намаз", "Namaz")}: ${ptName(k)} ${t[k]}`, desc: city.title, dur: 15 });
-    }
-  }
-  icsDownload("iqra-namaz.ics", ev);
-}
 function lessonICS(hhmm) {
   const ru = S.lang === "ru", [hh, mm] = hhmm.split(":").map(Number), d = new Date(); d.setDate(d.getDate() + (d.getHours() * 60 + d.getMinutes() >= hh * 60 + mm ? 1 : 0));
   icsDownload("iqra-urok.ics", [{ uid: "daily-lesson", local: icsLocal(d.getFullYear(), d.getMonth() + 1, d.getDate(), hh, mm), rrule: "FREQ=DAILY",
     title: LX("Iqra: урок чтения Корана", "Iqra: Құран оқу сабағы", "Iqra: Kur'an okuma dersi"), desc: LX("10 минут в день — и серия не прервётся.", "Күніне 10 минут — сериясы үзілмейді.", "Günde 10 dakika — seri bozulmasın."), dur: 15 }]);
 }
-function remindCard(kind) {
+function remindCard() {
   const ru = S.lang === "ru";
   const how = h("p", { class: "muted small" }, LX("Скачается файл календаря. На iPhone нажмите «Добавить все», на Android откройте файл в Google Календаре. Напоминания сработают, даже если сайт закрыт.", "Күнтізбе файлы жүктеледі. iPhone-да «Барлығын қосу» басыңыз, Android-та файлды Google Күнтізбесінде ашыңыз. Сайт жабық болса да еске салады.", "Bir takvim dosyası inecek. iPhone'da «Tümünü ekle»ye dokunun, Android'de dosyayı Google Takvim'de açın. Site kapalı olsa da hatırlatır."));
-  if (kind === "prayer") {
-    const b = h("button", { class: "btn", type: "button", html: icon("bell") + esc(LX("Добавить намазы в календарь — 30 дней", "Намаздарды күнтізбеге қосу — 30 күн", "Namazları takvime ekle — 30 gün")) });
-    b.onclick = async () => { b.disabled = true; try { await prayerICS(S.city); } catch (e) { toast(LX("Не удалось составить расписание", "Кесте құру мүмкін болмады", "Vakit listesi oluşturulamadı")); } b.disabled = false; };
-    return h("section", { class: "card stack rem" }, h("h2", {}, LX("Напоминания о намазе", "Намаз туралы еске салу", "Namaz hatırlatmaları")), b, how, h("p", { class: "muted small" }, LX("Через месяц скачайте заново — расписание меняется.", "Бір айдан кейін қайта жүктеңіз — кесте өзгереді.", "Bir ay sonra yeniden indirin — vakitler değişir.")));
-  }
   const t = h("input", { type: "time", value: S.remT || "20:00", "aria-label": LX("Время напоминания", "Еске салу уақыты", "Hatırlatma saati") });
   t.onchange = () => { S.remT = t.value; save(); };
   const b = h("button", { class: "btn", type: "button", html: icon("bell") + esc(LX("Добавить в календарь", "Күнтізбеге қосу", "Takvime ekle")) });
@@ -2936,27 +2931,124 @@ function remindCard(kind) {
     h("div", { class: "setrow" }, h("span", {}, LX("Каждый день в", "Күн сайын сағат", "Her gün saat")), t), b, how);
 }
 
+// Absolute north only: relative gyroscope angles cannot locate Mecca.
+const compassAngle = value => ((value % 360) + 360) % 360;
+const compassDelta = (from, to) => ((to - from + 540) % 360) - 180;
+function compassHeading(event, screenAngle = 0) {
+  const finite = value => typeof value === "number" && Number.isFinite(value);
+  if (finite(event.webkitCompassHeading)) {
+    if (finite(event.webkitCompassAccuracy) && event.webkitCompassAccuracy < 0) return null;
+    return compassAngle(event.webkitCompassHeading + screenAngle);
+  }
+  if (!(event.absolute === true || event.type === "deviceorientationabsolute") || !finite(event.alpha)) return null;
+  // Project the screen's top edge onto the horizontal plane (Z-X-Y rotation).
+  const r = Math.PI / 180, a = event.alpha * r, b = (finite(event.beta) ? event.beta : 0) * r, g = (finite(event.gamma) ? event.gamma : 0) * r, t = screenAngle * r;
+  const x = (Math.cos(a) * Math.cos(g) - Math.sin(a) * Math.sin(b) * Math.sin(g)) * Math.sin(t) - Math.cos(b) * Math.sin(a) * Math.cos(t);
+  const y = (Math.sin(a) * Math.cos(g) + Math.cos(a) * Math.sin(b) * Math.sin(g)) * Math.sin(t) + Math.cos(a) * Math.cos(b) * Math.cos(t);
+  return Math.hypot(x, y) < 0.1 ? null : compassAngle(Math.atan2(x, y) / r);
+}
+function compassTracker({ onHeading, onState, target = window, orientation = window.screen?.orientation, Device = window.DeviceOrientationEvent, setTimer = setTimeout, clearTimer = clearTimeout }) {
+  let active = false, disposed = false, timer = null, last = null, unwrapped = null;
+  const screenAngle = () => Number(orientation?.angle ?? target.orientation) || 0;
+  const report = event => {
+    if (!active) return;
+    const heading = compassHeading(event, screenAngle());
+    if (heading === null) {
+      if (event.webkitCompassAccuracy < 0) onState("calibrate");
+      return;
+    }
+    last = event;
+    unwrapped = unwrapped === null ? heading : unwrapped + compassDelta(compassAngle(unwrapped), heading);
+    onHeading(unwrapped, event);
+    onState(event.webkitCompassAccuracy > 20 ? "calibrate" : "active");
+    clearTimer(timer);
+    timer = setTimer(() => { if (active) onState("stale"); }, 5000);
+  };
+  const rotate = () => { if (last) report(last); };
+  const stop = () => {
+    active = false; last = null; unwrapped = null; clearTimer(timer);
+    target.removeEventListener("deviceorientationabsolute", report);
+    target.removeEventListener("deviceorientation", report);
+    target.removeEventListener("orientationchange", rotate);
+    orientation?.removeEventListener("change", rotate);
+  };
+  return {
+    needsPermission: typeof Device?.requestPermission === "function",
+    async start() {
+      if (disposed) return;
+      stop();
+      if (!Device) { onState("unsupported"); return; }
+      onState("waiting");
+      try {
+        if (typeof Device.requestPermission === "function" && await Device.requestPermission(true) !== "granted") { if (!disposed) onState("denied"); return; }
+        if (disposed) return;
+        active = true;
+        target.addEventListener("deviceorientationabsolute", report);
+        target.addEventListener("deviceorientation", report);
+        target.addEventListener("orientationchange", rotate);
+        orientation?.addEventListener("change", rotate);
+        timer = setTimer(() => { if (active) { stop(); onState("unavailable"); } }, 7000);
+      } catch (error) { stop(); if (!disposed) onState("denied"); }
+    },
+    dispose() { disposed = true; stop(); }
+  };
+}
 function qiblaCard(lat, lng) {
-  const ru = S.lang === "ru";
-  const q = qiblaDeg(lat, lng);
+  let q = qiblaDeg(lat, lng), latestHeading = null, precise = false, disposed = false, compassState = "idle";
   const dial = h("div", { class: "qb-dial", html:
     `<svg viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="2"/>` +
     [0, 90, 180, 270].map((a, i) => `<text x="${100 + 78 * Math.sin(a * Math.PI / 180)}" y="${104 - 78 * Math.cos(a * Math.PI / 180)}" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor" opacity="${i ? .45 : .9}">${LX(["С", "В", "Ю", "З"], ["С", "Ш", "О", "Б"], ["K", "D", "G", "B"])[i]}</text>`).join("") +
     Array.from({ length: 72 }, (_, i) => { const a = i * 5 * Math.PI / 180, r1 = i % 6 ? 88 : 84; return `<line x1="${100 + r1 * Math.sin(a)}" y1="${100 - r1 * Math.cos(a)}" x2="${100 + 92 * Math.sin(a)}" y2="${100 - 92 * Math.cos(a)}" stroke="currentColor" stroke-opacity=".25"/>`; }).join("") +
     `<g class="qb-needle" transform="rotate(${q.toFixed(1)} 100 100)"><path d="M100 26 L109 100 L100 92 L91 100 Z" fill="var(--primary)"/><rect x="92" y="14" width="16" height="16" rx="3" fill="var(--ink)"/></g><circle cx="100" cy="100" r="5" fill="var(--primary)"/></svg>` });
   const rot = h("div", { class: "qb-rot" }, dial);
-  const st = h("p", { class: "muted small" }, LX(`Кибла — ${Math.round(q)}° от севера по часовой стрелке. Держите телефон горизонтально.`, `Құбыла — солтүстіктен сағат тілімен ${Math.round(q)}°. Телефонды көлденең ұстаңыз.`, `Kıble — kuzeyden saat yönünde ${Math.round(q)}°. Telefonu yatay tutun.`));
-  const b = h("button", { class: "btn", type: "button", html: icon("compass") + esc(LX("Включить компас", "Компасты қосу", "Pusulayı aç")) });
-  const onOri = e => { const head = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.absolute && e.alpha != null ? 360 - e.alpha : null);
-    if (head == null) return; rot.style.transform = `rotate(${-head}deg)`; const diff = Math.abs(((q - head + 540) % 360) - 180); rot.classList.toggle("ok", diff < 5); };
-  b.onclick = async () => {
-    try { if (typeof DeviceOrientationEvent !== "undefined" && DeviceOrientationEvent.requestPermission) { const p = await DeviceOrientationEvent.requestPermission(); if (p !== "granted") throw 0; }
-      window.addEventListener("deviceorientationabsolute", onOri); window.addEventListener("deviceorientation", onOri); b.hidden = true;
-      st.textContent = LX("Поворачивайтесь, пока зелёная стрелка не будет смотреть вверх.", "Жасыл тіл жоғары қарағанша бұрылыңыз.", "Yeşil ok yukarıyı gösterene kadar dönün.");
-    } catch (e) { toast(LX("Компас недоступен на этом устройстве", "Бұл құрылғыда компас жоқ", "Bu cihazda pusula yok")); }
+  const bearing = h("p", { class: "muted small qb-bearing" });
+  const updateBearing = () => {
+    bearing.textContent = LX(`Кибла — ${Math.round(q)}° от севера · ${precise ? "по вашему местоположению" : "для выбранного города"}.`, `Құбыла — солтүстіктен ${Math.round(q)}° · ${precise ? "орналасқан жеріңіз бойынша" : "таңдалған қала үшін"}.`, `Kıble — kuzeyden ${Math.round(q)}° · ${precise ? "konumunuza göre" : "seçilen şehir için"}.`);
+    dial.querySelector(".qb-needle").setAttribute("transform", `rotate(${q.toFixed(1)} 100 100)`);
   };
-  const isTouch = matchMedia("(pointer: coarse)").matches;
-  return h("section", { class: "card qb" }, h("h2", {}, LX("Кибла", "Құбыла", "Kıble")), rot, st, isTouch ? b : null);
+  const st = h("p", { class: "muted small qb-status", role: "status", "aria-live": "polite" });
+  const b = h("button", { class: "btn", type: "button", html: icon("compass") + esc(LX("Включить компас", "Компасты қосу", "Pusulayı aç")) });
+  const showState = state => {
+    compassState = state;
+    const messages = {
+      idle: ["Для поворота стрелки разрешите доступ к компасу телефона.", "Тілдің айналуы үшін телефон компасына рұқсат беріңіз.", "Okun dönmesi için telefonun pusulasına izin verin."],
+      waiting: ["Ждём направление от датчика телефона…", "Телефон датчигінің бағытын күтудеміз…", "Telefonun yön sensörü bekleniyor…"],
+      active: ["Поворачивайтесь: стрелка киблы должна смотреть вверх. Держите телефон горизонтально.", "Бұрылыңыз: құбыла тілі жоғары қарасын. Телефонды көлденең ұстаңыз.", "Dönün: kıble oku yukarıyı göstersin. Telefonu yatay tutun."],
+      calibrate: ["Низкая точность компаса. Отойдите от металла и проведите телефоном восьмёрку.", "Компас дәлдігі төмен. Металдан алыстап, телефонмен сегіздік сызыңыз.", "Pusula doğruluğu düşük. Metalden uzaklaşıp telefonla sekiz çizin."],
+      stale: ["Датчик перестал передавать направление. Поверните телефон или включите компас снова.", "Датчик бағытты жібермей тұр. Телефонды бұрыңыз не компасты қайта қосыңыз.", "Sensörden yön gelmiyor. Telefonu çevirin veya pusulayı yeniden açın."],
+      denied: ["Доступ к компасу не разрешён. Разрешите движение и ориентацию в настройках браузера и попробуйте снова.", "Компасқа рұқсат жоқ. Браузерде қозғалыс пен бағдарға рұқсат беріп, қайталаңыз.", "Pusula izni verilmedi. Tarayıcıda hareket ve yön iznini açıp tekrar deneyin."],
+      unsupported: ["Браузер не поддерживает компас. Показано направление от севера; используйте обычный компас.", "Браузер компасты қолдамайды. Солтүстіктен бағыт көрсетілді; кәдімгі компас қолданыңыз.", "Tarayıcı pusulayı desteklemiyor. Kuzeye göre yön gösteriliyor; normal bir pusula kullanın."],
+      unavailable: ["Телефон не передаёт абсолютное направление. Проверьте разрешение на датчики или откройте сайт в Safari/Chrome на телефоне.", "Телефон нақты бағытты жібермейді. Датчик рұқсатын тексеріңіз не телефондағы Safari/Chrome-да ашыңыз.", "Telefondan mutlak yön alınamıyor. Sensör iznini kontrol edin veya telefonda Safari/Chrome ile açın."]
+    };
+    st.textContent = L({ ru: messages[state][0], kk: messages[state][1], tr: messages[state][2] });
+    b.hidden = state === "active" || state === "calibrate" || state === "waiting";
+    b.disabled = state === "unsupported";
+    if (state !== "active") rot.classList.remove("ok");
+  };
+  const tracker = compassTracker({ onHeading: (heading, event) => {
+    if (!rot.isConnected) { tracker.dispose(); return; }
+    latestHeading = compassAngle(heading);
+    rot.style.transform = `rotate(${-heading}deg)`;
+    const flat = (event.beta == null || Math.abs(event.beta) < 40) && (event.gamma == null || Math.abs(event.gamma) < 40);
+    rot.classList.toggle("ok", flat && !(event.webkitCompassAccuracy > 20) && Math.abs(compassDelta(latestHeading, q)) < 5);
+  }, onState: state => { if (!disposed && state !== compassState) showState(state); } });
+  b.onclick = () => tracker.start();
+  const geo = h("button", { class: "btn ghost qb-location", type: "button", html: icon("pin") + esc(LX("Уточнить местоположение", "Орналасқан жерді нақтылау", "Konumu hassaslaştır")), onclick: () => {
+    if (!navigator.geolocation) return;
+    geo.disabled = true;
+    navigator.geolocation.getCurrentPosition(position => {
+      if (disposed || !rot.isConnected) return;
+      q = qiblaDeg(position.coords.latitude, position.coords.longitude); precise = true; updateBearing(); geo.disabled = false;
+      rot.classList.toggle("ok", compassState === "active" && latestHeading !== null && Math.abs(compassDelta(latestHeading, q)) < 5);
+    }, () => { if (!disposed) { geo.disabled = false; toast(LX("Местоположение не получено. Сохранено направление для выбранного города.", "Орын анықталмады. Таңдалған қала бағыты сақталды.", "Konum alınamadı. Seçilen şehrin yönü korunuyor.")); } }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  } });
+  const card = h("section", { class: "card qb" }, h("h2", {}, LX("Кибла", "Құбыла", "Kıble")), rot, bearing, st, b, navigator.geolocation ? geo : null,
+    h("p", { class: "muted small" }, LX("Геолокация задаёт точку, компас — поворот телефона. Точность зависит от датчиков и магнитных помех; держите телефон горизонтально вдали от металла.", "Геолокация орынды, компас телефон бұрылысын анықтайды. Дәлдік датчик пен магниттік кедергілерге тәуелді; телефонды металдан алыс, көлденең ұстаңыз.", "Konum yerinizi, pusula telefonun dönüşünü belirler. Doğruluk sensörlere ve manyetik parazite bağlıdır; telefonu yatay ve metalden uzakta tutun.")));
+  card.stopCompass = () => { disposed = true; tracker.dispose(); };
+  onRouteLeave(card.stopCompass);
+  updateBearing(); showState("idle");
+  if (!tracker.needsPermission) routeDelay(() => { if (!disposed && card.isConnected) tracker.start(); }, 0);
+  return card;
 }
 
 /* ═════════════ справочник ═════════════ */
@@ -3719,9 +3811,8 @@ function pageMe(v) {
   wrap.append(h("section", { class: "card stack" }, h("h2", {}, T("week")), wk, h("h3", {}, T("dailyGoal")), goalSeg), awardsSection);
   // напоминание и настройки — свёрнутыми пунктами
   const fold = (ic, title, sub, node) => { const d = h("details", { class: "acc-i me-f" }, h("summary", { html: `<i>${icon(ic)}</i><span><b>${esc(title)}</b><small>${esc(sub)}</small></span>${icon("chev")}` }), node); return d; };
-  const rc = remindCard("lesson"); rc.classList.add("bare");
+  const rc = remindCard(); rc.classList.add("bare");
   wrap.append(fold("bell", LX("Напоминание об уроке", "Сабақ туралы еске салу", "Ders hatırlatıcısı"), LX("Выбрать время напоминания", "Еске салу уақытын таңдау", "Hatırlatma saatini seç"), rc));
-  wrap.append(menuFold("download", LX("Сохранить или перенести прогресс", "Прогресті сақтау немесе көшіру", "İlerlemeyi kaydet veya taşı"), LX("Копия для другого устройства", "Басқа құрылғыға көшірме", "Başka cihaz için yedek"), progressBackupCard()));
   // настройки
   const themeSeg = h("div", { class: "seg" }, [["light", "light"], ["dark", "dark"], ["system", "system"]].map(([th, k]) => h("button", { "aria-pressed": String((S.theme || "light") === th), onclick: () => { S.theme = th; save(); applyTheme(); shell(); route(); } }, T(k))));
   const langSeg = h("div", { class: "seg" }, [["kk", "Қазақша"], ["ru", "Русский"], ["tr", "Türkçe"]].map(([l, t]) => h("button", { "aria-pressed": String(S.lang === l), onclick: () => setLang(l) }, t)));
@@ -3734,6 +3825,8 @@ function pageMe(v) {
     arzRow(),
     h("p", { class: "muted small" }, AUTH.user ? T("synced") : T("savedHere")),
     menuFold("alert", LX("Удаление прогресса", "Прогресті өшіру", "İlerlemeyi sil"), LX("Потребуется подтверждение", "Растау қажет", "Onay gerekir"), h("div", {}, h("button", { class: "btn ghost", onclick: () => confirmBox.hidden = false }, T("resetAll")), confirmBox)))));
+  const backup = progressBackupCard(); backup.classList.add("bare");
+  wrap.append(fold("download", LX("Сохранить или перенести прогресс", "Прогресті сақтау немесе көшіру", "İlerlemeyi kaydet veya taşı"), LX("Копия для другого устройства", "Басқа құрылғыға көшірме", "Başka cihaz için yedek"), backup));
   v.append(wrap);
 }
 
