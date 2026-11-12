@@ -6,14 +6,14 @@
 const KEY = "qoqu.v1";
 const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const blank = () => ({ lang: null, theme: null, xp: 0, days: {}, lessons: {}, ex: {}, tests: {},
-  badges: {}, mistakes: {}, hifz: {}, hifzAwarded: {}, hifzBonus: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true, tl: true },
+  badges: {}, mistakes: {}, hifz: {}, hifzAwarded: {}, hifzBonus: {}, reciter: "Husary_Muallim_128kbps", goal: 30, tr: { n: 0, ok: 0 }, view: { color: true, tr: true, tl: true, hifzTr: true },
   last: null, listen: { r: "mishary-alafasy/r1", s: 1 }, tsb: { k: 0, day: "", d: {}, t: {}, vib: true }, nzg: "m", at: 0 });
 let S = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch (e) {}
 S.hifzAwarded = S.hifzAwarded || {};
 S.hifzBonus = S.hifzBonus || {};
 for (const [n, marks] of Object.entries(S.hifz || {})) for (const [a, marked] of Object.entries(marks)) if (marked) S.hifzAwarded[`${n}:${a}`] = true;
-S.view = Object.assign({ color: true, tr: true, tl: true }, S.view);
+S.view = Object.assign({ color: true, tr: true, tl: true, hifzTr: true }, S.view);
 let onSave = null;
 const save = () => { S.at = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} if (onSave) onSave(); };
 
@@ -1927,6 +1927,7 @@ async function pageSura(v, n, hifz, goto) {
   wrap.append(modeTabs);
 
   const savedPlace = S.last ? { ...S.last } : null;
+  const transcriptKey = hifz ? "hifzTr" : "tr";
   const prefsKey = hifz ? "hifz" : "read", prefs = readingAudioPreferences(S.readingAudio?.[prefsKey], hifz);
   const firstUnmarked = d.ayat.find(a => !S.hifz[n]?.[a.n])?.n || 1;
   let idx = goto >= 1 && goto <= s.c ? goto - 1 : hifz ? firstUnmarked - 1 : savedPlace?.s === n ? savedPlace.a - 1 : 0;
@@ -1939,15 +1940,15 @@ async function pageSura(v, n, hifz, goto) {
   const toggle = title => h("button", { class: "reading-toggle", type: "button" }, h("span", {}, title), h("span", { class: "reading-toggle-state" }));
   const colorT = toggle(T("colors")), trT = toggle(T("translit")), tlT = toggle(T("tl"));
   const refreshTextControls = () => {
-    for (const [button, key] of [[colorT, "color"], [trT, "tr"], [tlT, "tl"]]) {
+    for (const [button, key] of [[colorT, "color"], [trT, transcriptKey], [tlT, "tl"]]) {
       button.setAttribute("aria-pressed", String(S.view[key]));
       button.lastChild.textContent = S.view[key] ? LX("Вкл", "Қосулы", "Açık") : LX("Выкл", "Өшірулі", "Kapalı");
     }
   };
-  const textBody = h("div", { class: "reading-fold-body" }, arzRow(false), h("div", { class: "reading-toggles" }, colorT, hifz ? null : trT, hifz ? null : tlT));
+  const textBody = h("div", { class: "reading-fold-body" }, arzRow(false), h("div", { class: "reading-toggles" }, colorT, trT, hifz ? null : tlT));
   const levelButtons = [];
   const setLevel = level => {
-    stopAll(); hzLevel = level; draw();
+    stopAll(); hzLevel = level; draw(); list.classList.toggle("hide-transcript", hifz && level > 0);
     levelButtons.forEach((button, i) => button.setAttribute("aria-pressed", String(i === level)));
   };
   if (hifz) {
@@ -2036,7 +2037,7 @@ async function pageSura(v, n, hifz, goto) {
   refreshTextControls();
 
   if (n !== 1 && n !== 9) wrap.append(h("div", { class: "bism", lang: "ar" }, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"));
-  const list = h("div", { class: "ayahs" + (S.view.color ? "" : " nocolor") + (S.view.tr && !hifz ? "" : " notr") + (S.view.tl && !hifz ? "" : " notl") });
+  const list = h("div", { class: "ayahs" + (S.view.color ? "" : " nocolor") + (S.view[transcriptKey] ? "" : " notr") + (S.view.tl && !hifz ? "" : " notl") });
   const cards = [], playButtons = [];
   let tlData = null;
   const fillTl = () => { if (!tlData) return; cards.forEach((c, i) => { const el = $(".tl", c); if (el) el.textContent = tlData[i] || ""; }); };
@@ -2090,7 +2091,7 @@ async function pageSura(v, n, hifz, goto) {
   const getTl = () => { if (hifz || tlData) return; loadTl(n).then(t => { tlData = t; fillTl(); }).catch(() => { tlNote.textContent = T("tlErr"); }); };
   if (S.view.tl) getTl();
   colorT.onclick = () => { S.view.color = !S.view.color; save(); colorT.setAttribute("aria-pressed", String(S.view.color)); list.classList.toggle("nocolor", !S.view.color); refreshTextControls(); };
-  trT.onclick = () => { S.view.tr = !S.view.tr; save(); trT.setAttribute("aria-pressed", String(S.view.tr)); list.classList.toggle("notr", !S.view.tr); refreshTextControls(); };
+  trT.onclick = () => { S.view[transcriptKey] = !S.view[transcriptKey]; save(); list.classList.toggle("notr", !S.view[transcriptKey]); refreshTextControls(); };
   tlT.onclick = () => { S.view.tl = !S.view.tl; save(); tlT.setAttribute("aria-pressed", String(S.view.tl)); list.classList.toggle("notl", !S.view.tl); if (S.view.tl) getTl(); refreshTextControls(); };
 
   // место чтения запоминается
@@ -2410,6 +2411,14 @@ function nzWitr(v, d) {
    Счёт у каждого зикра свой: сегодня и за всё время; у утренних и вечерних азкаров — отдельный счёт («m:», «e:»). */
 let ZD = null;
 const loadZD = () => ZD || (ZD = fetchJSON("data/zikr.json").then(d => { d.by = Object.fromEntries(d.items.map(x => [x.id, x])); return d; }).catch(e => { ZD = null; throw e; }));
+function zikrAudioTracks(item) {
+  if (item.au) {
+    const { s, a } = item.au, to = item.au.to ?? a, sura = suraBy(s);
+    if (!sura || !Number.isInteger(a) || !Number.isInteger(to) || a < 1 || to < a || to > sura.c) return [];
+    return Array.from({ length: to - a + 1 }, (_, i) => ayahURL(s, a + i));
+  }
+  return Number.isInteger(item.hm) && item.hm > 0 ? [hisnURL(item.hm)] : [];
+}
 const TS_AFTER = ["subhan", "hamd", "akbar"];
 const zkKey = (ctx, id) => ctx === "morning" ? "m:" + id : ctx === "evening" ? "e:" + id : id;
 const zkGoal = (d, ctx, x) => (ctx === "morning" || ctx === "evening") && d.azn[x.id] ? d.azn[x.id] : x.n;
@@ -2506,6 +2515,12 @@ async function zkCounter(v, id) {
   const card = h("button", { class: "ts-card", type: "button" }, h("span", { class: "ts-inner" }, front, back));
   const goalEl = h("div", { class: "ts-goal", role: "status", "aria-live": "polite" });
   const say = h("button", { class: "saybtn zk-say", type: "button", html: icon("sound") + `<span>${esc(LX("Слушать", "Тыңдау", "Dinle"))}</span>` });
+  let saying = false, tracks = [];
+  const sayLabel = () => { say.innerHTML = icon(saying ? "x" : "sound") + `<span>${esc(saying ? LX("Остановить", "Тоқтату", "Durdur") : LX("Слушать", "Тыңдау", "Dinle"))}</span>`; say.setAttribute("aria-pressed", String(saying)); };
+  const speech = readingPlaybackController({ play: index => playURL(tracks[index], say), onItem: () => {}, onFinish: () => { saying = false; sayLabel(); } });
+  const stopSaying = () => { speech.cancel(); saying = false; stopAudio(); sayLabel(); };
+  say.onclick = () => { if (saying) stopSaying(); else { saying = true; sayLabel(); speech.start(tracks.map((_, i) => ({ ayah: i }))); } };
+  onRouteLeave(stopSaying); sayLabel();
   const btn = h("button", { class: "ts-count", type: "button" });
   v.append(h("div", { class: "ts-wrap" }, h("div", { class: "ts-nav" }, prev, ttl, next), bar, h("div", { class: "slide-clip" }, h("div", { class: "ts-stage" }, card, goalEl)), say, btn));
 
@@ -2515,11 +2530,10 @@ async function zkCounter(v, id) {
     front.classList.toggle("long", long);
     front.innerHTML = `<span class="ts-ar${x.ar.length > 30 ? " long" : ""}" lang="ar">${esc(x.ar)}</span><span class="ts-tl">${esc(L(x.tl))}</span><span class="ts-m">${esc(L(x.m))}</span>` +
       (x.h ? `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите — хадис и источник", "Басыңыз — хадис пен дереккөз", "Dokunun — hadis ve kaynak"))}</span>` : "");
-    back.innerHTML = x.h ? `<span class="ts-hadith-label">${esc(LX("Хадис", "Хадис", "Hadis"))}</span><span class="ts-d">${esc(L(x.h.by))}</span><span class="ts-q">${esc(hadithQuote(L(x.h.q)))}</span><span class="ts-src">${esc(L(x.h.s))}</span>` +
+    back.innerHTML = x.h ? `<span class="ts-hadith-label">${esc(LX("Хадис", "Хадис", "Hadis"))}</span><span class="ts-d">${esc(L(x.h.by))}</span><span class="ts-q">«${esc(hadithQuote(L(x.h.q)))}»</span><span class="ts-src">${esc(L(x.h.s))}</span>` +
       `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите, чтобы вернуться", "Қайту үшін басыңыз", "Geri dönmek için dokunun"))}</span>` : "";
     fav.innerHTML = ""; fav.append(favBtn(x.id));
-    const src = x.au ? ayahURL(x.au.s, x.au.a) : x.hm ? hisnURL(x.hm) : null;
-    say.hidden = !src; say.onclick = () => { if (src) playURL(src, say); };
+    tracks = zikrAudioTracks(x); say.hidden = !tracks.length;
   };
   const draw = () => {
     const x = list[k], key = zkKey(ctx, x.id), n = st.d[key] || 0, g = zkGoal(d, ctx, x);
@@ -2531,7 +2545,7 @@ async function zkCounter(v, id) {
     card.setAttribute("aria-label", LX("Нажмите, чтобы перевернуть карточку. Листайте влево и вправо, чтобы сменить зикр.", "Карточканы аудару үшін басыңыз. Зікірді ауыстыру үшін солға-оңға сырғытыңыз.", "Kartı çevirmek için dokunun. Zikri değiştirmek için sağa sola kaydırın."));
   };
   const go = dir => {
-    stopAudio();
+    stopSaying();
     k = (k + dir + list.length) % list.length;
     replaceRouteHash(`#/zikr/c/${list[k].id}${ctx ? "?" + ctx : ""}`);
     card.classList.remove("flipped", "in-l", "in-r"); void card.offsetWidth; card.classList.add(dir > 0 ? "in-r" : "in-l");
@@ -3416,6 +3430,16 @@ function pagePlacement(v) {
   intro();
 }
 
+function bindHintToggle(button, box, onFirstOpen) {
+  let used = false;
+  button.setAttribute("aria-expanded", "false");
+  button.onclick = () => {
+    const open = box.hidden;
+    if (open && !used) { used = true; onFirstOpen(); }
+    box.hidden = !open; button.setAttribute("aria-expanded", String(open));
+    if (open) box.classList.add("in"); else box.classList.remove("in");
+  };
+}
 function pageTrainer(v, id) {
   const tr = TRAINERS.find(t => t.id === id);
   if (!tr) return notFound(v);
@@ -3440,8 +3464,13 @@ function pageTrainer(v, id) {
       const el = exEl(q, "tr", null, { noTag: true, single: true, mistakeRef: "t:" + tr.id, onDone: good => {
         buzz(good); S.tr.n++; if (good) { S.tr.ok++; ok++; addXP(2, el); } save(); i++; routeDelay(step, good ? 450 : 1400);
       } });
-      if (q.hint) { const hbox = h("div", { class: "hint-box", hidden: true, html: q.hint }), hb = h("button", { class: "hint-b", type: "button", html: icon("bulb") + `<span>${esc(LX("Подсказка", "Кеңес", "İpucu"))}</span>` });
-        hb.onclick = () => { el.mistakeHint(); hbox.hidden = false; hb.disabled = true; requestAnimationFrame(() => hbox.classList.add("in")); }; el.querySelector(".q").append(hb); el.querySelector(".q").after(hbox); }
+      el.classList.add("trainer-question");
+      if (q.hint) {
+        const hintId = `trainer-hint-${tr.id}-${i}`;
+        const hbox = h("div", { class: "hint-box", id: hintId, hidden: true, html: q.hint });
+        const hb = h("button", { class: "hint-b", type: "button", "aria-controls": hintId, html: icon("bulb") + `<span>${esc(LX("Подсказка", "Кеңес", "İpucu"))}</span>` });
+        bindHintToggle(hb, hbox, () => el.mistakeHint()); el.querySelector(".q").append(hb); el.querySelector(".q").after(hbox);
+      }
       if (q.promptHTML) el.querySelector(".q").after(h("div", { class: "prompt", style: "font-size:44px", html: q.promptHTML }));
       if (q.listen) { const lb = h("button", { class: "listen-btn", html: icon("sound"), title: T("play") }); lb.onclick = () => playURL(wordURL(q.listen), lb); el.querySelector(".q").after(lb); routeDelay(() => playURL(wordURL(q.listen), lb), 250); }
       box.append(el);

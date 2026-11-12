@@ -1949,3 +1949,12 @@ body:not([data-page="home"]) .footer-faq{display:none}
 body[data-page="home"] main{padding-bottom:24px}body[data-page="home"] .home-daily{margin-bottom:0}body[data-page="home"] footer.site{padding-top:32px}
 .ram-h{flex-wrap:wrap}.ram-h>.pill{margin-left:auto;min-height:44px;white-space:normal}.ram-empty .btn{align-self:flex-start}
 @media(max-width:360px){.ts-back .ts-q{font-size:20px;padding-left:12px}.ts-back .ts-d{font-size:11.5px}.ts-back{padding:20px 18px}}
+
+/* v37: stable audio button, question-aligned hints and memorization aids. */
+.zk-say{position:relative;z-index:1;isolation:isolate;overflow:hidden;-webkit-appearance:none;appearance:none;-webkit-tap-highlight-color:transparent;border-radius:999px;min-height:44px}
+.zk-say svg{display:block;flex:none;overflow:hidden}.zk-say:focus:not(:focus-visible){outline:none}.zk-say:focus-visible{border-radius:999px;outline:2px solid var(--primary);outline-offset:3px}
+.zk-say[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-soft)}
+.trainer-question>.q{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:12px}.trainer-question>.q>div,.trainer-question>.q>p{min-width:0;margin:0}.trainer-question>.q p{margin:0}
+.trainer-question>.q>.hint-b{margin:0;min-height:36px;padding:6px 10px;font-size:12px;white-space:nowrap;align-self:start}.hint-b[aria-expanded="true"]{background:var(--gold-soft);border-color:var(--warm-ink)}
+.ayahs.hide-transcript .tr{display:none}.reader-view .ay .tr{min-width:0;overflow-wrap:anywhere;line-height:1.7}
+@media(max-width:360px){.trainer-question>.q{gap:8px}.trainer-question>.q>.hint-b{padding:6px 8px;font-size:11px;gap:4px}}
