@@ -1558,8 +1558,6 @@ details>summary>svg{transition:transform .25s cubic-bezier(.2,.7,.2,1)}
 .zk-p{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);border-radius:0 3px 3px 0;transition:width .4s}
 .zk-bar{height:4px;border-radius:4px;background:color-mix(in srgb,var(--ink) 10%,transparent);overflow:hidden;margin:-4px 4px 2px}
 .zk-bar i{display:block;height:100%;background:var(--primary);border-radius:4px;transition:width .35s cubic-bezier(.2,.7,.2,1)}
-.zk-say{justify-self:center;margin:-2px auto 0}
-.zk-say[hidden]{display:none}
 .ts-count small{font-size:14px}
 .ts-count.done{background:linear-gradient(140deg,var(--hero),color-mix(in srgb,var(--hero) 70%,var(--accent)))}
 .ts-front.long .ts-ar{font-size:22px;line-height:2}
@@ -1951,10 +1949,13 @@ body[data-page="home"] main{padding-bottom:24px}body[data-page="home"] .home-dai
 @media(max-width:360px){.ts-back .ts-q{font-size:20px;padding-left:12px}.ts-back .ts-d{font-size:11.5px}.ts-back{padding:20px 18px}}
 
 /* v37: stable audio button, question-aligned hints and memorization aids. */
-.zk-say{position:relative;z-index:1;isolation:isolate;overflow:hidden;-webkit-appearance:none;appearance:none;-webkit-tap-highlight-color:transparent;border-radius:999px;min-height:44px}
-.zk-say svg{display:block;flex:none;overflow:hidden}.zk-say:focus:not(:focus-visible){outline:none}.zk-say:focus-visible{border-radius:999px;outline:2px solid var(--primary);outline-offset:3px}
-.zk-say[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-soft)}
 .trainer-question>.q{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:12px}.trainer-question>.q>div,.trainer-question>.q>p{min-width:0;margin:0}.trainer-question>.q p{margin:0}
 .trainer-question>.q>.hint-b{margin:0;min-height:36px;padding:6px 10px;font-size:12px;white-space:nowrap;align-self:start}.hint-b[aria-expanded="true"]{background:var(--gold-soft);border-color:var(--warm-ink)}
 .ayahs.hide-transcript .tr{display:none}.reader-view .ay .tr{min-width:0;overflow-wrap:anywhere;line-height:1.7}
 @media(max-width:360px){.trainer-question>.q{gap:8px}.trainer-question>.q>.hint-b{padding:6px 8px;font-size:11px;gap:4px}}
+
+/* v38: pointer taps never draw a native rectangular ring on rounded controls. */
+.tn-b,.saybtn,.iconbtn,.fav-b,.vib{-webkit-tap-highlight-color:transparent;-webkit-appearance:none;appearance:none}
+.tn-b:focus,.saybtn:focus,.iconbtn:focus,.fav-b:focus,.vib:focus{outline:none}
+.tn-b:focus-visible,.saybtn:focus-visible,.iconbtn:focus-visible,.fav-b:focus-visible,.vib:focus-visible{outline:none;box-shadow:0 0 0 3px var(--primary)}
+.tn-b,.tn-b:focus,.tn-b:focus-visible{border-radius:50%}.saybtn,.saybtn:focus,.saybtn:focus-visible{border-radius:999px}

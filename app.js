@@ -2411,14 +2411,6 @@ function nzWitr(v, d) {
    Счёт у каждого зикра свой: сегодня и за всё время; у утренних и вечерних азкаров — отдельный счёт («m:», «e:»). */
 let ZD = null;
 const loadZD = () => ZD || (ZD = fetchJSON("data/zikr.json").then(d => { d.by = Object.fromEntries(d.items.map(x => [x.id, x])); return d; }).catch(e => { ZD = null; throw e; }));
-function zikrAudioTracks(item) {
-  if (item.au) {
-    const { s, a } = item.au, to = item.au.to ?? a, sura = suraBy(s);
-    if (!sura || !Number.isInteger(a) || !Number.isInteger(to) || a < 1 || to < a || to > sura.c) return [];
-    return Array.from({ length: to - a + 1 }, (_, i) => ayahURL(s, a + i));
-  }
-  return Number.isInteger(item.hm) && item.hm > 0 ? [hisnURL(item.hm)] : [];
-}
 const TS_AFTER = ["subhan", "hamd", "akbar"];
 const zkKey = (ctx, id) => ctx === "morning" ? "m:" + id : ctx === "evening" ? "e:" + id : id;
 const zkGoal = (d, ctx, x) => (ctx === "morning" || ctx === "evening") && d.azn[x.id] ? d.azn[x.id] : x.n;
@@ -2514,15 +2506,8 @@ async function zkCounter(v, id) {
   const front = h("span", { class: "ts-face ts-front" }), back = h("span", { class: "ts-face ts-back" });
   const card = h("button", { class: "ts-card", type: "button" }, h("span", { class: "ts-inner" }, front, back));
   const goalEl = h("div", { class: "ts-goal", role: "status", "aria-live": "polite" });
-  const say = h("button", { class: "saybtn zk-say", type: "button", html: icon("sound") + `<span>${esc(LX("Слушать", "Тыңдау", "Dinle"))}</span>` });
-  let saying = false, tracks = [];
-  const sayLabel = () => { say.innerHTML = icon(saying ? "x" : "sound") + `<span>${esc(saying ? LX("Остановить", "Тоқтату", "Durdur") : LX("Слушать", "Тыңдау", "Dinle"))}</span>`; say.setAttribute("aria-pressed", String(saying)); };
-  const speech = readingPlaybackController({ play: index => playURL(tracks[index], say), onItem: () => {}, onFinish: () => { saying = false; sayLabel(); } });
-  const stopSaying = () => { speech.cancel(); saying = false; stopAudio(); sayLabel(); };
-  say.onclick = () => { if (saying) stopSaying(); else { saying = true; sayLabel(); speech.start(tracks.map((_, i) => ({ ayah: i }))); } };
-  onRouteLeave(stopSaying); sayLabel();
   const btn = h("button", { class: "ts-count", type: "button" });
-  v.append(h("div", { class: "ts-wrap" }, h("div", { class: "ts-nav" }, prev, ttl, next), bar, h("div", { class: "slide-clip" }, h("div", { class: "ts-stage" }, card, goalEl)), say, btn));
+  v.append(h("div", { class: "ts-wrap" }, h("div", { class: "ts-nav" }, prev, ttl, next), bar, h("div", { class: "slide-clip" }, h("div", { class: "ts-stage" }, card, goalEl)), btn));
 
   // стороны карточки рисуются только при смене зикра — переворот идёт плавно
   const faces = () => {
@@ -2533,7 +2518,6 @@ async function zkCounter(v, id) {
     back.innerHTML = x.h ? `<span class="ts-hadith-label">${esc(LX("Хадис", "Хадис", "Hadis"))}</span><span class="ts-d">${esc(L(x.h.by))}</span><span class="ts-q">«${esc(hadithQuote(L(x.h.q)))}»</span><span class="ts-src">${esc(L(x.h.s))}</span>` +
       `<span class="ts-hint">${icon("flip")}${esc(LX("Нажмите, чтобы вернуться", "Қайту үшін басыңыз", "Geri dönmek için dokunun"))}</span>` : "";
     fav.innerHTML = ""; fav.append(favBtn(x.id));
-    tracks = zikrAudioTracks(x); say.hidden = !tracks.length;
   };
   const draw = () => {
     const x = list[k], key = zkKey(ctx, x.id), n = st.d[key] || 0, g = zkGoal(d, ctx, x);
@@ -2545,7 +2529,7 @@ async function zkCounter(v, id) {
     card.setAttribute("aria-label", LX("Нажмите, чтобы перевернуть карточку. Листайте влево и вправо, чтобы сменить зикр.", "Карточканы аудару үшін басыңыз. Зікірді ауыстыру үшін солға-оңға сырғытыңыз.", "Kartı çevirmek için dokunun. Zikri değiştirmek için sağa sola kaydırın."));
   };
   const go = dir => {
-    stopSaying();
+    stopAudio();
     k = (k + dir + list.length) % list.length;
     replaceRouteHash(`#/zikr/c/${list[k].id}${ctx ? "?" + ctx : ""}`);
     card.classList.remove("flipped", "in-l", "in-r"); void card.offsetWidth; card.classList.add(dir > 0 ? "in-r" : "in-l");
