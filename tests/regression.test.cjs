@@ -689,18 +689,6 @@ test('zikr audio: all ten recorded Hisn formulas match the source and retain all
     for (const lang of ['ru', 'kk', 'tr']) { assert.ok(x.tl[lang], x.id + ':' + lang); assert.ok(x.m[lang]); }
   }
 });
-test('zikr audio: whole suras play every verse; Kursi remains one verse, invalid ranges cannot play', () => {
-  const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/zikr.json')));
-  const CORE = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/core.json')));
-  const c = load(section('function zikrAudioTracks(', 'const TS_AFTER ='), { suraBy: n => CORE.suras.find(s => s.n === n), ayahURL: (s, a) => s + ':' + a, hisnURL: n => 'hisn:' + n });
-  for (const [id, count] of [['fatiha', 7], ['ikhlas', 4], ['falaq', 5], ['nas', 6], ['kursi', 1]]) {
-    const x = data.items.find(x => x.id === id), tracks = c.zikrAudioTracks(x);
-    assert.equal(tracks.length, count, id); assert.equal(tracks[0], x.au.s + ':' + x.au.a);
-    assert.equal(tracks.at(-1), x.au.s + ':' + (x.au.to || x.au.a));
-  }
-  for (const au of [{ s: 1, a: 1, to: 8 }, { s: 1, a: 3, to: 2 }, { s: 1, a: 0 }, { s: 999, a: 1 }]) assert.equal(c.zikrAudioTracks({ au }).length, 0);
-  assert.equal(c.zikrAudioTracks({ hm: 98 })[0], 'hisn:98');
-});
 test('trainer hint: can open, close and reopen without disabling or counting help twice', () => {
   const c = load(section('function bindHintToggle(', 'function pageTrainer('), {});
   const button = h('button'), box = h('div'); box.hidden = true; let used = 0;
@@ -727,4 +715,34 @@ test('memorization transcription: a fresh memorization preference is enabled ind
   const c = load(section('const blank =', 'let S = blank();') + '\nthis.defaults = blank;', {});
   const state = c.defaults(); state.view.tr = false;
   assert.equal(state.view.hifzTr, true); assert.equal(state.view.tr, false);
+});
+
+test('zikr: every daily, morning and evening card has no playback, and count/carousel keep working', async () => {
+  const d = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/zikr.json')));
+  d.by = Object.fromEntries(d.items.map(x => [x.id, x]));
+  const make = (...args) => { const el = h(...args); el.addEventListener = () => {}; return el; };
+  let checked = 0;
+  for (const tab of ['', 'morning', 'evening']) {
+    const ids = tab ? d[tab] : d.items.map(x => x.id);
+    for (const id of ids) {
+      const st = { d: {}, t: {}, vib: false }, location = { hash: '#/zikr/c/' + id + (tab ? '?' + tab : '') }; let stops = 0;
+      const c = load(section('const TS_AFTER =', 'function tsState(') + section('const ZK_TABS =', 'function zikrExitHref(') + section('async function zkCounter(', '/* ───── утренние/вечерние'), {
+        ...ui, h: make, S: { lang: 'ru' }, location, loadZD: async () => d, tsState: () => st, save() {},
+        isFav: () => false, canHaptic: () => true, haptic() {}, today: () => '2026-11-12',
+        backHead: () => make('header'), favBtn: () => make('button'), hadithQuote: x => x, fmtN: String,
+        document: { addEventListener() {}, removeEventListener() {}, body: { dataset: { page: 'zikr' } } },
+        replaceRouteHash: hash => { location.hash = hash; }, stopAudio: () => stops++, onRouteLeave() {}, routeDelay() {}, clearTimeout
+      });
+      const v = make('main'); await c.zkCounter(v, id);
+      assert.equal(v.all().filter(x => x.className.includes('zk-say') || x.attrs['aria-label'] === 'Слушать' || x.textContent === 'Слушать').length, 0, tab + ':' + id);
+      v.all().find(x => x.className === 'ts-count').onclick();
+      const key = (tab === 'morning' ? 'm:' : tab === 'evening' ? 'e:' : '') + id;
+      assert.equal(st.d[key], 1); assert.equal(st.t[key], 1);
+      v.all().find(x => x.attrs['aria-label'] === 'Следующий зикр').onclick();
+      const expected = ids[(ids.indexOf(id) + 1) % ids.length];
+      assert.equal(location.hash, '#/zikr/c/' + expected + (tab ? '?' + tab : '')); assert.equal(stops, 1);
+      checked++;
+    }
+  }
+  assert.equal(checked, d.items.length + d.morning.length + d.evening.length);
 });
