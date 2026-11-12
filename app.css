@@ -1003,9 +1003,10 @@ a{color:var(--primary)}
 /* ───── тасбих ───── */
 .pill.vib{background:var(--surface);color:var(--primary);padding:7px 12px;font-size:12.5px;white-space:nowrap}
 .ts-wrap{position:relative;max-width:420px;margin:0 auto;display:grid;gap:16px}
-.ts-wrap::before,.ts-wrap::after{content:"";position:absolute;width:240px;height:240px;border-radius:999px;filter:blur(60px);pointer-events:none}
-.ts-wrap::before{background:var(--accent);opacity:.32;top:10px;right:-60px}
-.ts-wrap::after{background:var(--brass);opacity:.18;top:200px;left:-60px}
+/* Paint the same soft glow directly: no filtered backing layers behind controls. */
+.ts-wrap::before,.ts-wrap::after{content:"";position:absolute;width:360px;height:360px;border-radius:50%;filter:none;pointer-events:none}
+.ts-wrap::before{background:radial-gradient(closest-side,var(--accent),transparent);opacity:.32;top:-50px;right:-120px}
+.ts-wrap::after{background:radial-gradient(closest-side,var(--brass),transparent);opacity:.18;top:140px;left:-120px}
 .ts-nav{position:relative;z-index:1;display:flex;align-items:center;gap:10px}
 .tn-b{width:42px;height:42px;flex:none;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer}
 .tn-b:hover{border-color:var(--primary)}
@@ -1959,3 +1960,6 @@ body[data-page="home"] main{padding-bottom:24px}body[data-page="home"] .home-dai
 .tn-b:focus,.saybtn:focus,.iconbtn:focus,.fav-b:focus,.vib:focus{outline:none}
 .tn-b:focus-visible,.saybtn:focus-visible,.iconbtn:focus-visible,.fav-b:focus-visible,.vib:focus-visible{outline:none;box-shadow:0 0 0 3px var(--primary)}
 .tn-b,.tn-b:focus,.tn-b:focus-visible{border-radius:50%}.saybtn,.saybtn:focus,.saybtn:focus-visible{border-radius:999px}
+
+/* v39: keep zikr arrows out of WebKit's transformed/filtered backing layers. */
+.ts-nav .tn-b,.ts-nav .tn-b:active{transform:none;will-change:auto;transition:background-color .2s,border-color .2s,color .2s}
